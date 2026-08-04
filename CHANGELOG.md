@@ -4,6 +4,45 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.1.1 — 2026-08-04
+
+Documentation accuracy pass. No API or behavior changes — every Go change in
+this release is a comment.
+
+- **Two exported doc comments were invisible on pkg.go.dev.** A stray `//` and
+  a blank line detached the doc comments from `Client.Driver` and
+  `DefaultTokenCounter`, so `go doc` returned bare signatures and the
+  nil-receiver contract `Client.Driver` documents was not published anywhere.
+- Corrected the tool-denial documentation in `docs/callbacks.md`. It described
+  `OnToolCallStart` as a place a call can be denied. It is not: an error
+  returned from that callback — or from any tool hook, including
+  `Tool.PreRun` — aborts the whole run. Refusing one call while the run
+  continues is `ToolCallDecision{CallID: ..., Deny: true}` passed to
+  `ExecuteToolCalls`. The `CallID` is required; a decision that matches no
+  pending call is discarded with a warning and the tool runs, so the previous
+  example would have failed open.
+- Corrected the context-budget rule in `docs/requests.md` and
+  `docs/history.md`. Limiting is disabled in two cases, not one: when the model
+  carries no `ContextSize`, **and** when the output reserve is greater than or
+  equal to it — so a model at or under the default 4096-token reserve silently
+  gets no limiting. The reserve itself defaults to `MaxOutputTokens` when set,
+  otherwise 4096.
+- Fixed the custom limiting-handler example in `docs/history.md`, which sliced
+  the transcript at a raw index and could orphan a tool result — the exact
+  failure the surrounding text warns against.
+- Fixed `docs/drivers.md`, which showed `return elelem.ProviderError{...}`.
+  That does not compile: `Error()` is declared on the pointer receiver.
+- `docs/requests.md` now gives the full token-counter resolution order
+  (request → client → driver → package default); the client tier was missing.
+- `docs/structured-output.md`: response repair does not require strict
+  validation, and is skipped for refusals as well as truncated responses.
+- `README.md` reorganized — an example above the fold, a per-area table of what
+  the module contains, a driver section covering both transports' shared
+  options, and a logging section documenting the `LogReason*` constants.
+- Corrected `README.md`'s trust-boundary section, which listed tool-result size
+  among the engine's unconditional bounds. It is bounded only when
+  `WithMaxToolResultTokens` is set, which is not the default.
+
 ## v0.1.0 — 2026-08-04
 
 First standalone release. `elelem` previously lived inside another project as

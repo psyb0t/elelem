@@ -52,8 +52,6 @@ func WithClientTokenCounter(counter TokenCounter) Option {
 // Driver returns the underlying driver so callers can compose their own
 // decorators around it. Returns nil for a nil Client rather than panicking —
 // this is a read-only accessor and a nil check at every call site is noise.
-//
-
 func (c *Client) Driver() Driver {
 	if c == nil {
 		return nil

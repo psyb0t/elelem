@@ -47,8 +47,6 @@ func SetDefaultTokenCounter(counter TokenCounter) {
 }
 
 // DefaultTokenCounter returns the current process-wide fallback counter.
-//
-
 func DefaultTokenCounter() TokenCounter {
 	defaultCounterState.RLock()
 	defer defaultCounterState.RUnlock()

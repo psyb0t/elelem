@@ -125,7 +125,7 @@ wants to program it never holds the reference. The registry closes that gap:
 func TestSomething(t *testing.T) {
 	t.Cleanup(elelemtest.ResetGlobalScriptedDriver)
 
-	driver := elelemtest.NewScriptedDriver().WithTurns(elelemtest.Text("hi"))
+	driver := elelemtest.NewScriptedDriver(elelemtest.Text("hi"))
 	elelemtest.SetGlobalScriptedDriver(driver)
 
 	// the app's own wiring picks this up under `go test`

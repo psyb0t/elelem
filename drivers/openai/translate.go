@@ -64,9 +64,8 @@ func toOpenAIParams(req elelem.DriverRequest) (chatCompletionParams, error) {
 
 // rejectUnsupportedReasoning gates every reasoning knob this model does not
 // take. The engine validates these too, but a caller driving the Driver
-// directly (as RunConformance does) bypasses the engine entirely — so the
-// driver
-// cannot rely on someone upstream having checked.
+// directly (as conformance.Run does) bypasses the engine entirely — so the
+// driver cannot rely on someone upstream having checked.
 func rejectUnsupportedReasoning(
 	req elelem.DriverRequest,
 	caps elelem.Capabilities,

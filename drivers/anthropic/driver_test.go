@@ -553,8 +553,8 @@ func TestDriverNormalizesProviderErrors(t *testing.T) {
 }
 
 // The delta stream and Usage must report the SAME finish reason.
-// RunConformance's
-// assertFinishReasonsAgree binds this for every driver, but it cannot fail on
+// conformance.Run's assertFinishReasonsAgree binds this for every driver, but
+// it cannot fail on
 // the standard fixtures — they all end in end_turn, where the two channels
 // trivially match. A refusal is the case where they diverged on the OpenAI
 // side, so it is the case worth streaming here: an invariant no fixture can

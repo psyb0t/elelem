@@ -119,9 +119,9 @@ func TestClient_PropagatesCallbackAndScriptErrorsWithUsage(t *testing.T) {
 
 	// The mock is an elelem.Driver, so Usage must agree with the stream even
 	// on the error path — Text() puts Stop on the delta, and a Usage reporting
-	// Unset next to it is the same disagreement RunConformance now rejects
-	// for the
-	// real drivers. Everything else about the usage is passed through intact.
+	// Unset next to it is the same disagreement conformance.Run now rejects
+	// for the real drivers. Everything else about the usage is passed through
+	// intact.
 	expectedCallbackUsage := callbackUsage
 	expectedCallbackUsage.FinishReason = elelem.FinishReasonStop
 
@@ -223,7 +223,7 @@ func TestClient_ConcurrentStreamsAreRaceSafe(t *testing.T) {
 // contract teaches its users the wrong shape, and anything it hides is hidden
 // from every suite built on it.
 //
-// The full RunConformance is deliberately NOT used here. That suite
+// The full conformance.Run is deliberately NOT used here. That suite
 // codifies PROVIDER behaviour — transcript validation, rejecting parameters the
 // model cannot serve — and this type's entire purpose is to return exactly what
 // was scripted, including transcripts a provider would refuse. Asserted below
@@ -261,7 +261,7 @@ func TestClientHonoursTheDriverContract(t *testing.T) {
 
 		client := NewScriptedDriver(Text("answer"))
 
-		// RunConformance passes nil deliberately and every real driver guards.
+		// conformance.Run passes nil deliberately and every real driver guards.
 		usage, err := client.Stream(
 			t.Context(),
 			elelem.DriverRequest{Model: elelem.Model{ID: "mock-model"}},

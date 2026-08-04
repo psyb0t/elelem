@@ -18,8 +18,13 @@ all chains.
 
 ## Client and request lifecycle
 
-A `Client` is reusable and safe to hold for the process lifetime. A `Request`
-is single-use: build it, run it, throw it away.
+A `Client` is reusable and safe to hold for the process lifetime.
+
+A `Request` is **not consumed by running it.** Building is single-goroutine —
+the `With*` setters write without synchronization — but execution never writes
+back, so a fully-built `Request` can be run repeatedly, and concurrently from
+several goroutines. Each call snapshots the assembled transcript into private
+run state.
 
 ```go
 client := elelem.New(
@@ -191,18 +196,33 @@ tool call nobody will execute" and "hit max rounds and answered."
 
 ## Bounds
 
-Every one of these is off by default unless noted. Unset means unbounded.
+**Some of these ship with a default; the rest are genuinely unbounded until you
+set them.** The difference matters — assuming a bound exists when it does not
+is how a stream runs forever, and assuming none exists when one does is how a
+tool loop stops at twelve rounds for no visible reason.
 
-| Method | Bounds |
-|---|---|
-| `WithTimeout(d)` | The whole request. **The only thing stopping an endless stream.** |
-| `WithToolTimeout(d)` | Each tool's entire run — hooks included, not just the handler. |
-| `WithMaxRounds(n)` | Tool-loop rounds. Exceeding it returns `ErrMaxRoundsExceeded`. |
-| `WithMaxConcurrentTools(n)` | Goroutines as well as running handlers. |
-| `WithMaxToolResultTokens(n)` | Each tool result, measured on the finished string including the truncation marker. |
-| `WithMaxContextTokens(n)` | The transcript. See [history.md](history.md). |
-| `WithOutputReserveTokens(n)` | Reserve subtracted from `Model.ContextSize`. |
-| `WithTokenCounter(c)` | Overrides the counter for this request only. |
+| Method | Bounds | Default |
+|---|---|---|
+| `WithTimeout(d)` | The whole request. **The only thing stopping an endless stream.** | **none** — unbounded |
+| `WithToolTimeout(d)` | Each tool's entire run — hooks included, not just the handler. | **none** — unbounded |
+| `WithMaxToolResultTokens(n)` | Each tool result, measured on the finished string including the truncation marker. | **none** — unbounded |
+| `WithMaxContextTokens(n)` | The transcript. See [history.md](history.md). | **none** — see below |
+| `WithMaxRounds(n)` | Tool-loop rounds. Exceeding it returns `ErrMaxRoundsExceeded`. | **12** |
+| `WithMaxConcurrentTools(n)` | Goroutines as well as running handlers. | **8** |
+| `WithOutputReserveTokens(n)` | Reserve subtracted from `Model.ContextSize`. | `MaxOutputTokens` if set, else **4096** |
+| `WithForceFinalAnswer(v)` | Withholds tools on the last allowed round. | **true** |
+| `WithTokenCounter(c)` | Overrides the counter for this request only. | request → client → driver → package default |
+
+`WithMaxContextTokens` unset is not "unbounded" either: the budget then comes
+from `Model.ContextSize` minus the output reserve. Limiting stops happening in
+**two** cases — when the model carries no `ContextSize`, and when the reserve
+is greater than or equal to it. The second is the one that bites: with the
+default 4096 reserve, a `Model{ContextSize: 4096}` resolves to no budget at
+all, silently.
+
+Note `WithForceFinalAnswer` is already **on**. The examples above pass `true`
+explicitly for clarity; pass `false` if you would rather hit `MaxRounds` with an
+unexecuted tool call than have the model forced to answer.
 
 Check before you send:
 

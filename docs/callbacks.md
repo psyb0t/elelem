@@ -68,9 +68,32 @@ you'll just see the same content more than once.
 | `OnToolResult(fn)` | `ToolCallEvent` with `Result` populated |
 | `OnMessageInjection(fn)` | `MessageInjection` — a tool injected a message |
 
-Tool-call arguments stream in fragments, so `OnToolCallStart` fires with
-whatever arguments were assembled at that point. If you need the complete
-arguments, read them from `OnToolResult`, or from `Response.ToolCalls`.
+**`OnToolCallStart` arguments are COMPLETE.** It fires once per call after the
+stream has ended and the calls have been assembled and normalized — not while
+fragments are arriving. `OnToolCallFragment` is the one that sees partial
+arguments mid-stream.
+
+That distinction is what makes it useful for an approval gate's INSPECTION
+step: the arguments you read there are the ones the tool would run with.
+
+**It is not how you deny a call.** Returning an error here aborts the whole
+run, and `ToolCallEvent` is passed by value with `Arguments` copied, so a hook
+cannot rewrite what executes. `Tool.PreRun` is no better: its only refusal
+channel is an error, and an error from any hook aborts the run too.
+
+Refusing ONE call while the run continues has exactly one mechanism — drive the
+loop yourself and pass a decision to `ExecuteToolCalls`:
+
+```go
+response.ExecuteToolCalls(ctx, elelem.ToolCallDecision{
+	CallID: call.ID,   // REQUIRED — a decision whose CallID matches no
+	Deny:   true,      // pending call is discarded with a WARN and the
+})                     // tool runs anyway. It fails OPEN.
+```
+
+See [tools.md](tools.md#driving-the-loop-by-hand).
+
+`OnToolResult` fires after the tool already ran.
 
 ## Retries and errors
 
@@ -84,12 +107,14 @@ arguments, read them from `OnToolResult`, or from `Response.ToolCalls`.
 
 ## Token limits
 
-Two hooks, either side of the engine's own limiting:
+Two hooks. `PreMaxTokensReached` **replaces** the built-in `DropOldestUnits`
+rather than running beside it; `PostMaxTokensReached` runs after, and has no
+default. See [history.md](history.md#limiting-handlers).
 
 ```go
 request.
-	PreMaxTokensReached(elelem.DropOldestUnits).
-	PostMaxTokensReached(myCustomHandler)
+	PreMaxTokensReached(myCustomHandler).
+	PostMaxTokensReached(elelem.DropOldestUnits(nil))
 ```
 
 ```go
@@ -189,7 +214,7 @@ response, err := elelem.NewRequest(client).
 		return nil
 	}).
 
-	PreMaxTokensReached(elelem.DropOldestUnits).
+	PreMaxTokensReached(elelem.DropOldestUnits(nil)).
 	Run(ctx)
 ```
 

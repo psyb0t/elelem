@@ -6,25 +6,52 @@
 [![version](https://raw.githubusercontent.com/psyb0t/elelem/badges/version.svg)](https://github.com/psyb0t/elelem/tags)
 [![license](https://raw.githubusercontent.com/psyb0t/elelem/badges/license.svg)](LICENSE)
 
-Looks like an elf. Sounds like an elf. Would absolutely turn up in an
-appendix somewhere, third son of somebody, slain at some siege.
-
-It's an acronym. Say the letters: L, L, M.
-
-Sorry. This is not the first thing around here named by spelling something out
-phonetically until it stops resembling the thing it is, and it is not going to
-be the last. There's no known cure. Anyway —
+Say the letters out loud: L, L, M. The name is the whole joke. Moving on.
 
 A Go engine for talking to LLMs that doesn't care which one. Streaming, tool
-loops, history that fits in the context window, retries that don't hand your
-user the same paragraph twice, and typed structured responses. Swap OpenAI for
+loops, history that fits the context window, retries that don't hand your user
+the same paragraph twice, and typed structured responses. Swap OpenAI for
 Anthropic by changing one line; the rest of your code never finds out.
+
+It is a library, not a framework — the distinction being who owns the `for`
+loop. Here, you do. `Run` hands you the tool calls and stops; the engine only
+drives the loop if you explicitly ask it to with `WithAutoToolCalls()`. That
+ordering is deliberate, because the moment a human has to approve a tool call,
+"just describe your goal" abstractions stop being able to express the program
+you actually need.
+
+So there is no planner, no memory store, no chain-of-anything, no swarm, no
+crew, no graph of nodes that is secretly a `for` loop. It also stores nothing,
+picks no driver, resolves no credentials, discovers no external tools, decides
+who may call which tool exactly never, and renders nothing to a user — no
+config loader, no `init()` quietly reading your environment. You wire it; it
+runs requests. Agent
+frameworks are one `go get` and several regrets away, and this is the layer
+they'd sit on.
+
+Built on the official `openai-go` and `anthropic-sdk-go`, plus an embedded
+`o200k_base` tokenizer so budgeting needs no network. 194 tests at 91%+
+coverage, and both shipped drivers run the same conformance suite a third-party
+driver would — the `Driver` contract is executable rather than aspirational.
+
+```go
+driver := openai.NewDriver(openai.WithAPIKey(apiKey))
+client := elelem.New(driver)
+
+response, err := elelem.NewRequest(client).
+	WithModel(elelem.Model{ID: "some-model-id", ContextSize: 200_000}).
+	WithSystemMessage("You are a concise operations assistant.").
+	WithPrompt("Summarize the current incident state.").
+	Complete(ctx)
+```
 
 ## Contents
 
 - [Quick start](#quick-start)
-- [What it does and doesn't](#what-it-does-and-doesnt)
+- [What's in the box](#whats-in-the-box)
+- [Drivers](#drivers)
 - [Trust boundaries](#trust-boundaries)
+- [Logging](#logging)
 - [Package shape](#package-shape)
 - [Documentation](#documentation)
 - [Development](#development)
@@ -35,21 +62,16 @@ Anthropic by changing one line; the rest of your code never finds out.
 go get github.com/psyb0t/elelem
 ```
 
-```go
-driver := openai.NewDriver(openai.WithAPIKey(apiKey))
-client := elelem.New(elelem.WithRetry(driver, elelem.RetryConfig{MaxAttempts: 3}))
-
-response, err := elelem.NewRequest(client).
-	WithModel(elelem.Model{ID: "some-model-id", ContextSize: 200_000}).
-	WithSystemMessage("You are a concise operations assistant.").
-	WithPrompt("Summarize the current incident state.").
-	Complete(ctx)
-```
-
-Anthropic is the same, with a different constructor:
+Anthropic is the same as the example above, with a different constructor:
 
 ```go
 driver := anthropic.NewDriver(anthropic.WithAPIKey(apiKey))
+```
+
+Wrap the driver to get retries with backoff:
+
+```go
+client := elelem.New(elelem.WithRetry(driver, elelem.RetryConfig{MaxAttempts: 3}))
 ```
 
 Streaming, a tool loop, and a budget — still one chain:
@@ -77,24 +99,49 @@ calls back to approve or reject yourself.
 Every knob those three examples don't show is in
 [docs/requests.md](docs/requests.md).
 
-## What it does and doesn't
+## What's in the box
 
-**It does:** one streaming request shape across providers, an automatic tool
-loop with bounded concurrency and per-tool timeouts, history limiting that
-never orphans a tool result, retries that stop the moment output starts,
-structured responses validated against a schema derived from your own struct,
-and a token ledger that counts what the retries wasted.
+| Area | What you get |
+|---|---|
+| **[Requests](docs/requests.md)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
+| **[Tools](docs/tools.md)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of a crash, per-call denial, and tools that inject messages. |
+| **[Callbacks](docs/callbacks.md)** | Sixteen observation points — run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
+| **[History](docs/history.md)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
+| **[Retries](docs/retries.md)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and ledgers what the failed attempts cost. |
+| **[Structured output](docs/structured-output.md)** | `CompleteInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request on malformed JSON. |
+| **[Drivers](docs/drivers.md)** | OpenAI-compatible and Anthropic transports. `KnownModels()` / `LookupModel(id)` for pre-filled models; unknown ids stay usable, so this morning's release works today. |
+| **[Test doubles](docs/testing.md)** | A scripted `Driver` importing no test framework, a generated mock, and the conformance suite for writing a third driver. |
 
-**It doesn't:** store anything, pick your driver, resolve your credentials,
-decide who is allowed to call which tool, discover external tools, or render
-anything to a user. No database, no config loader, no `init()` quietly reading
-your environment and deciding things about your life. You wire it; it runs
-requests.
+## Drivers
 
-There is no agent framework in here either. No planner, no memory store, no
-chain-of-anything, no swarm, no crew, no graph of nodes that is secretly a
-`for` loop. Those are all one `go get` and several regrets away. This is the
-layer underneath them.
+Both drivers take the same four options and expose the same surface:
+
+```go
+openai.NewDriver(
+	openai.WithAPIKey(apiKey),
+	openai.WithBaseURL("https://your-openai-compatible-endpoint/v1"),
+	openai.WithHTTPClient(httpClient),
+	openai.WithSDKOptions(/* raw SDK options */),
+)
+```
+
+| | `drivers/openai` | `drivers/anthropic` |
+|---|---|---|
+| Talks to | OpenAI and anything OpenAI-compatible — vLLM, Ollama, OpenRouter, LM Studio, a proxy | The Anthropic Messages API |
+| Model discovery | `ListModels(ctx)` live, plus `KnownModels()` / `LookupModel(id)` | same |
+| Unknown model ids | accepted — the provider decides | accepted |
+
+**Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)`
+reports what one model supports — seed, tool choice, parallel tool calls,
+strict tool arguments, JSON schema, sampling parameters, reasoning effort and
+its ceiling. Anthropic rejects a non-default temperature on newer models while
+accepting it on older ones, so a single per-provider table would be a lie. The
+engine reads that struct and rejects an unsupported parameter **locally**,
+before any network call, instead of shipping it and eating a confusing 400.
+
+Writing a third driver is [docs/drivers.md](docs/drivers.md), and
+`elelemtest/conformance.Run` is the contract suite both shipped drivers run
+against — so it's live, not a document that drifted.
 
 ## Trust boundaries
 
@@ -102,17 +149,21 @@ Two inputs are untrusted, and neither needs anyone to be malicious — a model
 that hallucinates, an OpenAI-compatible endpoint, or a proxy is enough.
 
 **Provider output.** Tool-call ids, names, arguments, indices and the finish
-reason are all model-chosen. The engine bounds what that can cost: distinct
-tool calls per round, accumulated argument bytes, and tool-result size before
-tokenizing. A call with no id, a duplicate id, or an index reused for two
+reason are all model-chosen. The engine bounds distinct tool calls per round
+and accumulated argument bytes unconditionally. **Tool-result size is bounded
+only if you ask** — `WithMaxToolResultTokens` is unset by default, and until it
+is set a result is passed through at whatever length it arrived. A call with no
+id, a duplicate id, or an index reused for two
 different calls is dropped or split at ingest with a logged `reason` — because
 each of those is otherwise rejected by the provider on the NEXT request rather
 than the one that produced it.
 
 **Tool results.** A tool reads web pages, files and databases, so its output is
 attacker-influenced content going straight into the model's context. The engine
-bounds the size but **does not sanitize it**: a result saying "ignore your
-instructions" is delivered as written, and defending against that is your job.
+**does not sanitize it, and does not bound it unless you set
+`WithMaxToolResultTokens`**: a result saying "ignore your instructions" is
+delivered as written, at whatever length it arrived. Defending against that is
+your job.
 
 Three specifics worth knowing before you ship:
 
@@ -131,6 +182,33 @@ are stripped before the SDK sees them — the SDKs put the request URL into the
 text of every error they build, and those errors get logged.
 
 Full detail in [docs/tools.md](docs/tools.md).
+
+## Logging
+
+Structured `log/slog` through
+[`common-go/scope`](https://github.com/psyb0t/common-go), pulled from the
+context — the library never takes a logger parameter and never installs a
+global. Whatever you configure on `slog.Default()` at startup is what it
+writes to, and any scope attributes you set (`request_id`, `user_id`) ride
+along on every line the engine emits.
+
+It is quiet on purpose. DEBUG carries the per-round and per-tool detail. INFO
+is spent on exactly two events — a transcript being compacted to fit the
+budget, and a stream that succeeded only because a retry saved it — because
+both are things you want in a production log without having to turn DEBUG on,
+and neither is an error. WARN is for the recoverable anomalies: a malformed
+tool call dropped at ingest, a decision that matched no pending call, an
+unknown tool requested, the retry loop giving up. ERROR is failures.
+
+Compaction is INFO rather than WARN deliberately. It happens routinely on any
+long conversation, and a WARN that fires on the normal path is how a log
+becomes noise nobody reads.
+
+Every decision the engine makes quietly carries a `reason` field with a stable,
+greppable value — `token_budget_exceeded`, `tool_call_denied`,
+`max_attempts_exhausted`, `finish_reason_unmapped`, and so on. They are
+exported as `elelem.LogReason*` constants, so your alerting matches on the same
+symbol the engine emits rather than on a string you copied out of a log line.
 
 ## Package shape
 
@@ -155,7 +233,8 @@ drivers/anthropic/                 Anthropic transport
 ```
 
 Three placements the file name alone will not give you: the round/tool-loop
-lives in `engine.go`, every public sentinel lives in `errors.go`, and
+lives in `engine.go`, every sentinel this package exports lives in `errors.go`
+(each driver package has its own), and
 `structured.go` holds `CompleteInto` together with the request-validation
 helpers it shares with `request.go`.
 

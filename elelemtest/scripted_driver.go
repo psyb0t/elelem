@@ -81,7 +81,7 @@ func ToolCall(id, name, arguments string) Turn {
 // does not.
 //
 // Unlike a bare generated mock, this honours the Driver contract (see
-// RunConformance) rather than replaying whatever it is handed, so a test built
+// conformance.Run) rather than replaying whatever it is handed, so a test built
 // on it cannot pass against a driver shape no real provider can produce.
 type ScriptedDriver struct {
 	mutex        sync.Mutex
@@ -192,8 +192,8 @@ func (c *ScriptedDriver) Stream(
 
 	usage := turn.Usage
 
-	// The two channels must agree, exactly as RunConformance requires of a real
-	// driver. The Turn constructors put the finish reason on the DELTA and
+	// The two channels must agree, exactly as conformance.Run requires of a
+	// real driver. The Turn constructors put the finish reason on the DELTA and
 	// leave Usage empty, so a caller reading Usage saw Unset while the stream
 	// said Stop — this is an elelem.Driver, so it owes the same contract.
 	if usage.FinishReason == elelem.FinishReasonUnset {
@@ -201,7 +201,7 @@ func (c *ScriptedDriver) Stream(
 	}
 
 	for _, delta := range turn.Deltas {
-		// onDelta is optional on the Driver contract — RunConformance passes
+		// onDelta is optional on the Driver contract — conformance.Run passes
 		// nil deliberately, and every real driver guards. Dereferencing it here
 		// panicked instead of returning usage.
 		if onDelta == nil {

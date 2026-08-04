@@ -66,9 +66,17 @@ request.
 	WithResponseRepair()             // one bounded repair attempt on malformed JSON
 ```
 
-With validation on, one **bounded** repair request may correct malformed model
-JSON. Usage and cost from both calls are accumulated into the response, so the
-ledger reflects what you actually spent.
+The two are **independent knobs**, not a prerequisite pair: repair fires on any
+decode failure whenever `WithResponseRepair()` is set, whether or not strict
+validation is on. Its other gate is the finish reason: neither a **truncated**
+response nor a **refusal** is repaired, because neither is a schema mistake a
+second attempt would fix — one was cut off, the other was declined. Truncation
+surfaces as `ErrResponseTruncated`; a refusal carries no distinguishing
+sentinel, so it arrives as the plain validation error.
+
+When it does fire, it is **one** bounded repair request. Usage and cost from
+both calls are accumulated into the response, so the ledger reflects what you
+actually spent.
 
 `WithTranscriptRepair()` is the separate, adjacent knob for fixing a transcript
 the provider would reject.

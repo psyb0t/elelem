@@ -129,7 +129,7 @@ wrapping.
 | `ErrContextExceeded` | The provider rejected the transcript as too long. |
 | `ErrMaxOutputExceedsContext` | `MaxOutputTokens` leaves no room for the prompt. |
 | `ErrRetryMaxAttempts`, `ErrRetryDelays`, `ErrRetryDelayOrder` | `RetryConfig` is invalid. |
-| `ErrRetryLoopExhausted` | Every attempt failed. |
+| `ErrRetryLoopExhausted` | Defensive only — you should never see it. When every attempt fails you get the **provider's** error, not this. `RetryConfig` validation rejects `MaxAttempts < 1`, so the loop always runs and always returns from inside it. |
 
 Provider failures also join a `ProviderSentinel(status, code)`, so
 cross-provider checks work without knowing which provider served the request:

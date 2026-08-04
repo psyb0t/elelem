@@ -70,8 +70,12 @@ Build failures as `ProviderError` carrying the provider's own code, and join
 `ProviderSentinel(status, code)`:
 
 ```go
-return elelem.ProviderError{ /* ... */ }
+return &elelem.ProviderError{ /* ... */ }
 ```
+
+The `&` is load-bearing: `Error()` is declared on the pointer receiver, so a
+bare `elelem.ProviderError{}` value does not satisfy `error` and will not
+compile.
 
 That's what makes this work for a caller who doesn't know or care which
 provider served the request:

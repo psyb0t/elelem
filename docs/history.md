@@ -25,9 +25,16 @@ silently getting less would be worse than either behavior on its own. The
 reserve applies **only** when `WithMaxContextTokens` is unset and the model
 carries a `ContextSize`.
 
-If neither is set and the model has no `ContextSize`, there is no budget and no
-limiting happens. That is why `WithDefaultModel` matters: a bare `Model{}`
-disables the checks without saying so.
+Two shapes resolve to no budget at all, and neither says so:
+
+- the model has no `ContextSize` — a bare `Model{}`, which is why
+  `WithDefaultModel` matters
+- the reserve is `>=` the model's `ContextSize`. With the default 4096 reserve
+  that means any model at or under 4096 tokens gets no limiting whatsoever.
+
+The reserve itself defaults to `MaxOutputTokens` when that is set, and to 4096
+otherwise. It applies **only** when `WithMaxContextTokens` is unset and the
+model carries a `ContextSize`.
 
 Pre-flight:
 
@@ -65,22 +72,68 @@ malformed.
 
 ## Limiting handlers
 
+**Compaction is elelem's default, not its policy.** With no handler set, the
+engine uses `DropOldestUnits` — a standard sliding window that honours the unit
+rule. Setting `PreMaxTokensReached` **replaces** it outright; the built-in never
+runs alongside your handler.
+
 ```go
+// Your policy, instead of the built-in one.
+request.PreMaxTokensReached(summarizeOldest)
+
+// The built-in, stated explicitly. DropOldestUnits is a CONSTRUCTOR — it takes
+// a counter and returns the handler. nil keeps the counter already on the
+// event, which is what you want unless you are pricing with a different one.
+request.PreMaxTokensReached(elelem.DropOldestUnits(nil))
+
+// Both: yours runs first, then the engine recounts and runs the second.
 request.
-	PreMaxTokensReached(elelem.DropOldestUnits).
-	PostMaxTokensReached(myHandler)
+	PreMaxTokensReached(summarizeOldest).
+	PostMaxTokensReached(elelem.DropOldestUnits(nil))
 ```
 
-`DropOldestUnits` is the standard sliding window and honors the unit rule.
+That last shape is the useful one for a custom strategy that might not free
+enough on its own — summarize first, then let the window take whatever is still
+over budget.
 
-A custom handler is a `TokenLimitHandler`:
+`PostMaxTokensReached` has **no** default: unset, it does nothing.
+
+A handler is a `TokenLimitHandler`:
 
 ```go
 func myHandler(ctx context.Context, event *elelem.TokenLimitEvent) error {
 	// event.Messages is a COPY -- rewrite it in place.
 	// event.Tools is NOT a copy -- read-only.
 	// Whatever is left in event.Messages is what gets sent.
-	event.Messages = summarizeOldest(event.Messages)
+	// Keep the leading system message and roughly the newest `keep` messages,
+	// then let the built-in take anything still over budget (see the
+	// PostMaxTokensReached example above). Dropping from the FRONT keeps the
+	// live tool exchange and the current prompt — both at the end — intact.
+	const keep = 20
+
+	if len(event.Messages) <= keep+1 {
+		return nil
+	}
+
+	// A raw index would be a BUG. len-keep can land between an assistant
+	// message carrying ToolCalls and its RoleTool results, orphaning them —
+	// the exact failure described below. Walk backwards to a message that is
+	// safe to start on instead.
+	start := len(event.Messages) - keep
+	for start > 1 && event.Messages[start].Role == elelem.RoleTool {
+		start--
+	}
+
+	if event.Messages[start-1].Role == elelem.RoleAssistant &&
+		len(event.Messages[start-1].ToolCalls) > 0 {
+		start--
+	}
+
+	trimmed := make([]elelem.Message, 0, len(event.Messages)-start+1)
+	trimmed = append(trimmed, event.Messages[0])
+	trimmed = append(trimmed, event.Messages[start:]...)
+
+	event.Messages = trimmed
 
 	return nil
 }
