@@ -372,22 +372,14 @@ func insertProviderReasoning(
 		return blocks, nil
 	}
 
-	// Thinking blocks are replayed AT THE FRONT, in their recorded order —
-	// deliberately NOT at their original absolute indices.
-	//
-	// The recorded Index is a position in the PROVIDER's content array, but the
-	// array we rebuild here comes from Message.Content, which has already
-	// collapsed N provider text blocks into one string. The two arrays have
-	// different lengths and different positions, so replaying at the absolute
-	// index either reorders the blocks (which the provider rejects: the
-	// consecutive thinking sequence "can't be rearranged, edited or partially
-	// dropped") or runs off the end of a perfectly legal transcript — e.g.
-	// [text, text, tool_use, thinking] records index 3 but rebuilds to
-	// length 2.
-	//
-	// Front-loading preserves the one invariant that is actually enforceable
-	// after the round-trip: the thinking blocks stay in their original relative
-	// order, ahead of the answer they produced.
+	// Replayed at the FRONT in recorded order, not at their recorded indices.
+	// Those indices address the provider's content array, but we rebuild from
+	// Message.Content, which already collapsed N text blocks into one string —
+	// so an absolute index either reorders the thinking sequence (which the
+	// provider rejects) or runs off the end: [text, text, tool_use, thinking]
+	// records index 3 and rebuilds to length 2. Front-loading keeps the one
+	// invariant that survives the round-trip — relative order, ahead of the
+	// answer they produced.
 	ordered := slices.Clone(envelope.Blocks)
 	slices.SortStableFunc(
 		ordered,
@@ -895,14 +887,12 @@ func emitEventDelta(
 // decodeReasoningBlocks turns the stored opaque blocks back into provider
 // params, refusing anything that is not reasoning state.
 //
-// The type check applies the SAME allowlist the writer does. The reader used to
-// accept any block type and front-load it into the assistant turn, and this
-// field round-trips through the caller's database — so a stored
-// {"type":"text","text":"..."} came back as the assistant's own first text
-// block, letting anything able to write that column put words in the model's
-// mouth on every later turn. The envelope guard upstream verifies provider,
-// version and model: that is format, not content, and a tampered payload with
-// the right shape satisfies it.
+// The type check applies the SAME allowlist as the writer. This field
+// round-trips through the caller's database, so accepting any block type let a
+// stored text block come back as the assistant's own words on every later turn
+// — anything able to write that column could put words in the model's mouth.
+// The upstream envelope guard checks provider, version and model: format, not
+// content, which a well-shaped tampered payload satisfies.
 func decodeReasoningBlocks(
 	ordered []providerReasoningBlock,
 ) ([]anthropicsdk.ContentBlockParamUnion, error) {

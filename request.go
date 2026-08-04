@@ -21,13 +21,12 @@ const (
 // Request is one configured call, built with chained With* setters and then
 // executed by Run, Complete, Stream, or CompleteInto.
 //
-// Concurrency, which differs between the two halves of its life:
-//   - BUILDING is not safe to do concurrently. The With* setters write fields
-//     with no synchronization, so configure a Request from one goroutine.
-//   - EXECUTING is safe. Run and friends never write back to the Request; each
-//     call snapshots the assembled transcript into private run state. The same
-//     fully-built Request can therefore be executed from many goroutines at
-//     once, and re-executed as many times as you like — it is not consumed.
+// Concurrency differs between the two halves of its life:
+//   - BUILDING is not safe. The With* setters write unsynchronized, so
+//     configure from one goroutine.
+//   - EXECUTING is safe. Run and friends never write back; each call snapshots
+//     the transcript into private run state, so a fully-built Request can run
+//     from many goroutines and be re-executed — it is not consumed.
 type Request struct {
 	client                   *Client
 	model                    Model
@@ -154,22 +153,16 @@ func (r *Request) WithPrompt(prompt string) *Request {
 	return r
 }
 
-// WithMessages seeds the conversation history.
+// WithMessages seeds the conversation history, dropping messages a tool
+// injected during an earlier run.
 //
-// Messages a tool INJECTED during an earlier run are dropped here. An injection
-// is a tool instructing the model about the result it just returned — it is
-// scoped to the run that produced it, and the injector re-creates it whenever
-// the same situation recurs. Replaying a stored one feeds the model an
-// instruction about a tool result that is no longer the subject, and every
-// later turn inherits it, so the transcript accumulates stale directives that
-// nothing ever removes.
-//
-// This is the default because the documented way to continue a conversation is
-// to feed Response.Messages straight back, and Response.Messages contains the
-// injections — every caller doing the obvious thing would otherwise replay
-// them. Injections added DURING the current run are unaffected: they enter the
-// transcript after this point and are pinned against compaction, because there
-// they are live instruction rather than history.
+// An injection is scoped to the run that produced it, and its injector
+// re-creates it when the situation recurs. Replaying a stored one instructs the
+// model about a tool result that is no longer the subject, and every later turn
+// inherits it. Dropping is the default because Response.Messages contains the
+// injections and feeding it straight back is the documented way to continue.
+// Injections added during the CURRENT run are unaffected — they arrive after
+// this point and are live instruction, not history.
 func (r *Request) WithMessages(messages ...Message) *Request {
 	for _, message := range messages {
 		if message.Origin == MessageOriginInjection {
@@ -385,19 +378,15 @@ func (r *Request) WithAutoToolCalls() *Request {
 	return r
 }
 
-// WithTranscriptRepair DELETES messages to make an illegal transcript legal,
-// before each round. It is the only option here that discards conversation, so
-// it is opt-in rather than the default.
+// WithTranscriptRepair DELETES messages before each round to make an illegal
+// transcript legal: an assistant tool-call message missing any of its results
+// (the whole unit goes), and any result answering no call. Providers reject
+// both outright, so the choice is losing that exchange or failing the request.
 //
-// What it removes: any assistant tool-call message whose results are not all
-// present (the whole unit goes), and any tool result that answers no call.
-// Both shapes are rejected outright by the providers, so the choice is between
-// losing that exchange and the request failing.
-//
-// Reach for it when transcripts come from storage — a run that died mid-tool
-// leaves exactly this damage. Leave it off when you build the transcript in
-// process and would rather see ErrInvalidTranscript than lose history. Every
-// repair that drops anything is logged at Warn with a count.
+// Opt-in because it is the only option here that discards conversation. Reach
+// for it when transcripts come from storage, where a run that died mid-tool
+// leaves exactly this damage; leave it off in-process if you would rather see
+// ErrInvalidTranscript. Every repair is logged at Warn with a count.
 func (r *Request) WithTranscriptRepair() *Request {
 	r.transcriptRepair = true
 

@@ -559,16 +559,13 @@ func (s *runState) consumeToolCallDelta(
 ) error {
 	call := calls[delta.Index]
 
-	// A delta carrying a DIFFERENT id than the call already accumulating at
-	// this index is a new call, not a continuation of that one. Treating it as
-	// a continuation merged two calls into one: last id won, last name won,
-	// and the argument documents concatenated into `{"x":1}{"y":2}`, which
-	// parses as neither. Driver is a published extension point and nothing
-	// promises unique indices — a driver that never sets Index leaves every
-	// call in the round at 0, which merged all of them.
+	// A delta with a DIFFERENT id at this index is a new call, not a
+	// continuation: merging them concatenates the argument documents into
+	// `{"x":1}{"y":2}`, which parses as neither. Nothing promises unique
+	// indices — a driver that never sets Index leaves every call at 0.
 	//
-	// The existing call is relocated so this index can keep hosting the new
-	// one, because subsequent fragments will arrive under the same index.
+	// The existing call is relocated so this index keeps hosting the new one,
+	// since later fragments arrive under the same index.
 	if isDifferentCallAtSameIndex(call, delta) {
 		calls[unusedToolCallIndex(calls)] = call
 		call = nil
@@ -606,15 +603,11 @@ func (s *runState) consumeToolCallDelta(
 		call.Name = delta.Name
 	}
 
-	// Arguments accumulate from PROVIDER output with nothing bounding them:
+	// Arguments accumulate from provider output unbounded —
 	// WithMaxToolResultTokens caps what a tool RETURNS, not what the model asks
-	// with, and a stream declaring megabytes of arguments was retained whole,
-	// deep-copied at each publish site, and re-sent on every later round.
-	//
-	// Stopping the append leaves the JSON truncated, which is the right
-	// outcome: the existing invalid-arguments path turns it into a tool error
-	// the model can see and recover from, instead of the engine quietly
-	// holding the memory. The cap is far above any real call.
+	// with. Truncating leaves invalid JSON, which is the right outcome: the
+	// invalid-arguments path turns it into a tool error the model can recover
+	// from. The cap is far above any real call.
 	if len(call.Arguments)+len(delta.Arguments) > maxToolCallArgumentsBytes {
 		s.warnToolArgumentsCapped(ctx, call, len(delta.Arguments))
 	} else {
@@ -790,14 +783,10 @@ func (s *runState) executeTools(
 	outcomes, err := s.runToolCalls(ctx, tools, calls, decisionByID)
 	if err != nil {
 		// recordToolOutcomes is the ONLY writer of RoleTool messages, so
-		// returning here leaves the assistant message declaring calls that
-		// nothing will ever answer. Response.Messages is the documented way to
-		// continue a conversation, and an unanswered tool_call makes the NEXT
-		// request illegal — this package's own validators reject it, a round
-		// later, at a call site that did nothing wrong.
-		//
-		// Transcript repair would fix it, but it is OPT-IN, so by default the
-		// caller was handed a transcript that could never be used again.
+		// returning here would leave the assistant message declaring calls
+		// nothing answers. Since Response.Messages is how a conversation
+		// continues, that transcript is illegal on the NEXT request — and
+		// transcript repair is opt-in, so by default it is unusable forever.
 		s.dropUnansweredToolCalls(ctx)
 
 		return err
@@ -1026,16 +1015,11 @@ func (s *runState) recordToolOutcomes(
 	return s.recordInjections(ctx, injections, firstErr)
 }
 
-// recordToolResultMessage is the CHOKE POINT every tool result passes through
-// on its way into the transcript, so the truncation cap is applied here.
-//
-// It used to be applied at the two sites that produce a HANDLER result, and
-// results are produced at six: invalid arguments, a PreRun error, a missing
-// handler, a hook that cleared the result, the unknown-tool message — which
-// interpolates the entire tool catalog and measured 1211 tokens through a
-// 10-token cap — and the handler itself. WithMaxToolResultTokens is a bound
-// the caller sets to protect the context window; a bound enforced on some
-// paths is not a bound.
+// recordToolResultMessage is the choke point every tool result passes through
+// into the transcript, so the truncation cap is applied here rather than at the
+// producing sites. There are six of those — invalid arguments, a PreRun error,
+// a missing handler, a cleared result, the unknown-tool message, and the
+// handler — and a bound enforced on only some of them is not a bound.
 func (s *runState) recordToolResultMessage(call ToolCall, result ToolResult) {
 	s.messages = append(s.messages, Message{
 		Role:              RoleTool,
@@ -1619,16 +1603,13 @@ func (s *runState) logCompactionOutcome(
 	)
 }
 
-// compactToBudget runs the limit hooks and records the outcome on every path.
-// Compaction deletes conversation, so a turn that quietly lost history would
-// otherwise be undiagnosable after the fact.
+// compactToBudget runs the limit hooks and records the outcome on every path,
+// because compaction deletes conversation and a turn that quietly lost history
+// is undiagnosable afterwards.
 //
-// The entry line is Info, not Warn, deliberately: the severity heuristic's Warn
-// case is "data exists but we chose not to use it", and compaction IS the
-// caller's own request via WithMaxContextTokens — expected behaviour, not a
-// degradation. Warning on every round of a long chat would be alarm fatigue.
-// The genuinely unexpected outcome — still over budget after compacting — is
-// the one that warns.
+// The entry line is Info, not Warn: compaction is the caller's own request via
+// WithMaxContextTokens, so warning every round of a long chat is alarm fatigue.
+// Still being over budget afterwards is the unexpected outcome, and that warns.
 func (s *runState) compactToBudget(
 	ctx context.Context,
 	event *TokenLimitEvent,
@@ -1728,13 +1709,11 @@ func (s *runState) responseFromAssistant(assistant Message) *Response {
 // partialResponse describes a run that did NOT complete — every caller returns
 // it alongside an error.
 //
-// FinishReason is deliberately Unset rather than s.usage.FinishReason. The
-// accumulated value still holds the PREVIOUS round's reason, so a failed tool
-// round reported "tool_calls" next to zero tool calls and a nil
-// ExecuteToolCalls: IsTerminal() said the turn continues while nothing existed
-// to continue it. Same rule as addUsage — a round that did not finish has no
-// answer to "how did it end". Model is kept, because who served the earlier
-// rounds is still true and still what an operator reads on the error path.
+// FinishReason is left Unset rather than carrying s.usage.FinishReason, which
+// still holds the PREVIOUS round's value: a failed tool round would report
+// "tool_calls" beside zero calls and a nil ExecuteToolCalls, so IsTerminal()
+// claims the turn continues with nothing to continue it. Model is kept — who
+// served the earlier rounds is still true, and it is what an operator reads.
 func (s *runState) partialResponse() *Response {
 	return &Response{
 		Usage:      s.usage,

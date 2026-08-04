@@ -2,7 +2,25 @@ package elelem
 
 import (
 	"context"
+	"net/url"
 )
+
+// SanitizeBaseURL strips userinfo credentials from an endpoint and reports
+// whether it removed any. The SDKs embed the request URL in every error they
+// build, and drivers log those errors, so a https://user:secret@host base URL
+// leaks the password to the log aggregator on first failure. Stripped rather
+// than rejected: these SDKs authenticate by header and ignore userinfo, so it
+// never worked as credentials anyway.
+func SanitizeBaseURL(baseURL string) (string, bool) {
+	parsed, err := url.Parse(baseURL)
+	if err != nil || parsed.User == nil {
+		return baseURL, false
+	}
+
+	parsed.User = nil
+
+	return parsed.String(), true
+}
 
 // Driver is the ONLY provider-aware surface in the library — everything above
 // it speaks elelem's own vocabulary types. Implementations translate a

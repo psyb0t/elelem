@@ -90,3 +90,20 @@ func TestCostChargesAccumulatedLongTTLAtItsOwnRate(t *testing.T) {
 	// were dropped in the sum, all 20 writes price at 2 → 220.
 	assert.InDelta(t, 380.0, model.Cost(total), 0.001)
 }
+
+func TestUsage_BilledTotalTokensIncludesWastedRetries(t *testing.T) {
+	t.Parallel()
+
+	const (
+		succeeded = int64(100)
+		wasted    = int64(30)
+	)
+
+	usage := Usage{
+		TokenCounts: TokenCounts{Total: succeeded},
+		Retry:       RetryInfo{WastedTotalTokens: wasted},
+	}
+
+	assert.Equal(t, succeeded, usage.Total)
+	assert.Equal(t, succeeded+wasted, usage.BilledTotalTokens())
+}

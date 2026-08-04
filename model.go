@@ -52,14 +52,12 @@ func reasoningLevel(got, fallback ReasoningEffort) ReasoningEffort {
 
 // Cost prices ONE call's usage against this model's Pricing.
 //
-// Hand it a single Usage, never a multi-round running total: the long-context
-// threshold is evaluated against u.Prompt, so a summed total crosses that
-// threshold on volume alone and silently prices every round at the
-// long-context rate. For a whole run, sum the per-round costs instead.
+// Hand it a single Usage, never a running total: the long-context threshold is
+// evaluated against u.Prompt, so a summed total crosses it on volume alone and
+// prices every round at the long-context rate. Sum per-round costs instead.
 //
-// Returns 0 for a model with no Pricing — 0 means "unknown", not "free", and
-// drivers deliberately leave Pricing unset rather than ship rates that go
-// stale. Retry waste is NOT included; see Usage.BilledTotalTokens.
+// Returns 0 when the model has no Pricing — 0 means unknown, not free. Retry
+// waste is not included; see Usage.BilledTotalTokens.
 func (m Model) Cost(u Usage) float64 {
 	inputRate, outputRate := m.Pricing.InputPerToken, m.Pricing.OutputPerToken
 	if m.Pricing.LongContextThreshold > 0 &&

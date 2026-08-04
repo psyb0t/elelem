@@ -24,8 +24,7 @@ func normalizeProviderError(err error) error {
 	// not-retryable and the decorator gave up after one attempt. The status is
 	// unavailable here (the transport returned 200), so the provider's own
 	// code is the whole signal and it is preserved in the raw event data.
-	var streamError *ssestream.StreamError
-	if errors.As(err, &streamError) {
+	if streamError, ok := errors.AsType[*ssestream.StreamError](err); ok {
 		return ctxerrors.Wrap(
 			&elelem.ProviderError{
 				Cause: err,

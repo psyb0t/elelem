@@ -155,14 +155,11 @@ func samplingRestrictedModelIDs() []string {
 // supportsSamplingParams reports whether the model accepts a non-default
 // temperature / top_p / top_k.
 //
-// An unlisted id is ALLOWED, not denied. The restriction is documented as
-// starting with Opus 4.7 and applying forward, so the models it does not cover
-// are the older ones — and denying by default refused temperature on
-// SDK-listed models like claude-opus-4-1 that genuinely accept it. Denying
-// also disagreed with the OpenAI driver, leaving two drivers in one package
-// holding opposite doctrines on the same question; permissive is the right one
-// because an invented restriction fails locally and cannot be corrected, while
-// an over-claim costs at most one provider 400.
+// An unlisted id is ALLOWED. The restriction starts at Opus 4.7 and applies
+// forward, so what it does not cover is the older models — denying by default
+// refused temperature on SDK-listed ids like claude-opus-4-1 that accept it.
+// An invented restriction fails locally and cannot be corrected; an over-claim
+// costs at most one provider 400.
 func supportsSamplingParams(id string) bool {
 	return !slices.Contains(samplingRestrictedModelIDs(), canonicalModelID(id))
 }
@@ -170,14 +167,11 @@ func supportsSamplingParams(id string) bool {
 // supportsStructuredOutput reports whether the model accepts native structured
 // output (output_config.format) and strict tool arguments.
 //
-// This one DENIES unlisted ids, unlike supportsSamplingParams and
-// supportsDisablingReasoning above — deliberately, and the difference is the
-// point. Those two gate a restriction that applies to a KNOWN SUBSET (the
-// Opus 4.7-and-later sampling rule; the always-reasoning models), so denying an
-// unlisted id would invent a limit. This gates a FEATURE that only the listed
-// generation has: claiming it for an unknown id promises a response shape the
-// caller then parses, and a silent shape mismatch is worse than a refusal.
-// Stated explicitly so the asymmetry reads as a decision, not an oversight.
+// DENIES unlisted ids, unlike supportsSamplingParams above — deliberately.
+// Those gate a RESTRICTION on a known subset, so denying an unknown id would
+// invent a limit. This gates a FEATURE only the listed generation has, and
+// claiming it promises a response shape the caller then parses: a silent shape
+// mismatch is worse than a refusal.
 func supportsStructuredOutput(id string) bool {
 	return slices.Contains(knownModelIDs(), canonicalModelID(id))
 }

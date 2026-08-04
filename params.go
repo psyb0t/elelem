@@ -107,9 +107,8 @@ func (f FinishReason) IsTruncated() bool {
 // the same refusal, surfaced to the operator as a schema mismatch that never
 // existed.
 //
-// A predicate rather than a bare constant comparison, matching IsTruncated
-// above — the constant set is allowed to grow, and a provider that gains its
-// own distinct refusal value should land here once instead of at every caller.
+// A predicate rather than a constant comparison, like IsTruncated: a provider
+// gaining its own refusal value should land here once, not at every caller.
 func (f FinishReason) IsRefusal() bool {
 	return f == FinishReasonContentFilter
 }

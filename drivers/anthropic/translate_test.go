@@ -833,3 +833,19 @@ func TestReasoningCapabilitiesMatchAnthropicModelMatrix(t *testing.T) {
 		})
 	}
 }
+
+// Mid-conversation system messages are the wire form of tool-driven system
+// injection. They are deliberately NOT model-gated, so the only thing standing
+// between "a tool injected a system message" and "the model never saw it" is
+// this translation emitting the system role.
+func TestToMidConvSystemMessage(t *testing.T) {
+	t.Parallel()
+
+	message := toMidConvSystemMessage(elelem.Message{
+		Role:    elelem.RoleSystem,
+		Content: "you are now in maintenance mode",
+	})
+
+	assert.Equal(t, anthropicsdk.MessageParamRoleSystem, message.Role)
+	require.Len(t, message.Content, 1)
+}

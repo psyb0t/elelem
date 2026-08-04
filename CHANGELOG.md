@@ -16,9 +16,11 @@ an internal package; it is now its own module at
   (`drivers/anthropic`), each translating portable requests and streams,
   validating provider transcript constraints, and normalizing finish reasons
   and usage.
-- Automatic tool loop with bounded concurrency, per-tool timeouts, panic
-  recovery, result-size limits, hooks, denial decisions, and tool-driven
-  message injection.
+- Tool loop with bounded concurrency, per-tool timeouts, panic recovery,
+  result-size limits, hooks, denial decisions, and tool-driven message
+  injection. Manual driving is the default — `Run` sends the tools and hands
+  back `Response.ExecuteToolCalls`; `WithAutoToolCalls` opts into the engine
+  running the loop itself.
 - History limiting on whole transcript units, so an assistant tool call and
   its results are never split apart. Token budgeting via `WithMaxContextTokens`
   or `WithOutputReserveTokens`, with an embedded `o200k_base` estimator as the
@@ -27,8 +29,16 @@ an internal package; it is now its own module at
   limits and server errors, but only before the first streamed delta. Provider
   error codes are consulted ahead of HTTP status, since both providers report
   mid-stream failures in band inside an HTTP 200.
+- Usage accounting that separates context from cost. `Usage.Total` counts only
+  the attempt that succeeded; `Usage.BilledTotalTokens()` adds the tokens
+  failed retries burned, and `Usage.Retry` itemizes every attempt. Both
+  accumulate across the rounds of a tool loop.
 - Structured output via `CompleteInto`, deriving a strict JSON Schema from the
   destination and assigning only after a successful decode.
 - Test doubles in `elelemtest` (a scripted Driver that imports no test
   framework) and `elelemtest/mocks` (a generated `MockDriver`), plus the
   `elelemtest/conformance` contract suite that both shipped drivers run.
+- Reference documentation under [`docs/`](docs/) covering requests, callbacks,
+  tools, history and budgets, retries, structured output, driver authoring and
+  testing. The README is the tour; `docs/` is where each surface is documented
+  in full.

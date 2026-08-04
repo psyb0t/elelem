@@ -2,6 +2,7 @@ package elelem
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -11,6 +12,49 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// relayDriver records what the decorator forwarded to the driver beneath it, so
+// the passthrough tests assert the call ARRIVED rather than that some value
+// came back.
+type relayDriver struct {
+	scriptedDriver
+
+	models      []string
+	modelsErr   error
+	caps        Capabilities
+	counter     TokenCounter
+	modelsCalls int
+	capsCalls   int
+	counterHits int
+	capsModel   Model
+}
+
+func (d *relayDriver) ListModels(context.Context) ([]string, error) {
+	d.modelsCalls++
+
+	return d.models, d.modelsErr
+}
+
+func (d *relayDriver) Capabilities(model Model) Capabilities {
+	d.capsCalls++
+	d.capsModel = model
+
+	return d.caps
+}
+
+func (d *relayDriver) TokenCounter() TokenCounter {
+	d.counterHits++
+
+	return d.counter
+}
+
+// timeoutError is a net.Error reporting a timeout. The stdlib exposes no
+// constructible one, and the decorator branches on the interface.
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
 
 // retryAfterError carries a provider-supplied Retry-After, as a rate-limited
 // upstream does.
@@ -620,4 +664,352 @@ func TestRetryAfterIsBoundedByMaxDelay(t *testing.T) {
 				"delay exceeded the caller's ceiling")
 		})
 	}
+}
+
+// The decorator wraps a Driver, so every method it does NOT retry still has to
+// reach the wrapped driver unchanged. A passthrough that quietly answered for
+// itself would strip the provider's real model list or token counter with
+// nothing failing.
+func TestWithRetry_PassesNonStreamCallsThrough(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ListModels", func(t *testing.T) {
+		t.Parallel()
+
+		want := []string{"model-a", "model-b"}
+		driver := &relayDriver{models: want}
+
+		got, err := WithRetry(driver, RetryConfig{}).
+			ListModels(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+		assert.Equal(t, 1, driver.modelsCalls)
+	})
+
+	t.Run("ListModels error is wrapped, not swallowed", func(t *testing.T) {
+		t.Parallel()
+
+		driver := &relayDriver{modelsErr: commonerrors.ErrNotFound}
+
+		got, err := WithRetry(driver, RetryConfig{}).
+			ListModels(context.Background())
+		require.ErrorIs(t, err, commonerrors.ErrNotFound)
+		assert.Nil(t, got)
+	})
+
+	t.Run("Capabilities", func(t *testing.T) {
+		t.Parallel()
+
+		model := Model{ID: "model-a"}
+		driver := &relayDriver{caps: Capabilities{SupportsToolChoice: true}}
+
+		got := WithRetry(driver, RetryConfig{}).Capabilities(model)
+		assert.True(t, got.SupportsToolChoice)
+		assert.Equal(t, 1, driver.capsCalls)
+		assert.Equal(t, model, driver.capsModel,
+			"the model must reach the driver unchanged")
+	})
+
+	t.Run("TokenCounter", func(t *testing.T) {
+		t.Parallel()
+
+		want := fixedCounter(7)
+		driver := &relayDriver{counter: want}
+
+		got := WithRetry(driver, RetryConfig{}).TokenCounter()
+		assert.Equal(t, want, got)
+		assert.Equal(t, 1, driver.counterHits)
+	})
+}
+
+// A connection that broke before the provider rendered a verdict is retryable
+// whatever shape the failure takes. None of these carry an HTTP status, so a
+// decorator that only understood statuses would give up on all of them.
+func TestWithRetry_RetriesTransportFailures(t *testing.T) {
+	t.Parallel()
+
+	const attempts = 3
+
+	testCases := []struct {
+		name string
+		err  error
+	}{
+		{name: "net timeout", err: timeoutError{}},
+		{name: "EOF", err: io.EOF},
+		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			turns := make([]scriptedTurn, 0, attempts)
+			for range attempts {
+				turns = append(turns, scriptedTurn{err: tc.err})
+			}
+
+			base := &scriptedDriver{turns: turns}
+			jitter := false
+			retry := withRetryClock(
+				WithRetry(base, RetryConfig{
+					MaxAttempts:  attempts,
+					InitialDelay: time.Nanosecond,
+					MaxDelay:     time.Nanosecond,
+					Jitter:       &jitter,
+				}),
+				&instantRetryClock{},
+				func() float64 { return 0 },
+			)
+
+			_, err := retry.Stream(
+				context.Background(),
+				DriverRequest{Model: Model{ID: "test-model"}},
+				nil,
+			)
+			require.Error(t, err)
+			assert.Len(t, base.Requests(), attempts,
+				"a transport failure should exhaust every attempt")
+		})
+	}
+}
+
+// The mirror of the case above: a verdict no number of retries can change must
+// stop the loop rather than spend quota arriving at the same error.
+func TestWithRetry_DoesNotRetryPermanentFailures(t *testing.T) {
+	t.Parallel()
+
+	base := &scriptedDriver{turns: []scriptedTurn{
+		{err: commonerrors.ErrInvalidArgument},
+		{err: commonerrors.ErrInvalidArgument},
+	}}
+
+	jitter := false
+	retry := withRetryClock(
+		WithRetry(base, RetryConfig{
+			MaxAttempts:  2,
+			InitialDelay: time.Nanosecond,
+			MaxDelay:     time.Nanosecond,
+			Jitter:       &jitter,
+		}),
+		&instantRetryClock{},
+		func() float64 { return 0 },
+	)
+
+	_, err := retry.Stream(
+		context.Background(),
+		DriverRequest{Model: Model{ID: "test-model"}},
+		nil,
+	)
+	require.ErrorIs(t, err, commonerrors.ErrInvalidArgument)
+	assert.Len(t, base.Requests(), 1,
+		"a permanent failure must not be retried")
+}
+
+// Retry accounting is only useful if it survives the whole run. The decorator
+// aggregates within ONE Stream call; a tool loop makes several, and the engine
+// has to merge each round's RetryInfo into the total. Nothing pinned that
+// merge: a round's retries could be dropped and the only symptom would be a
+// cost report that quietly under-charges.
+func TestRetryAccounting_AccumulatesAcrossToolLoopRounds(t *testing.T) {
+	t.Parallel()
+
+	const (
+		firstWasted     = int64(3)
+		firstSucceeded  = int64(10)
+		secondWasted    = int64(5)
+		secondSucceeded = int64(20)
+
+		attemptsPerRound = 2
+		rounds           = 2
+	)
+
+	driver := &scriptedDriver{turns: []scriptedTurn{
+		{
+			err:   commonerrors.ErrRateLimited,
+			usage: Usage{TokenCounts: TokenCounts{Total: firstWasted}},
+		},
+		{
+			deltas: []Delta{{ToolCall: &ToolCallDelta{
+				Index:     0,
+				ID:        "call-1",
+				Name:      "lookup",
+				Arguments: `{}`,
+			}}},
+			usage: Usage{
+				TokenCounts:  TokenCounts{Total: firstSucceeded},
+				Model:        "test-model",
+				FinishReason: FinishReasonToolCalls,
+			},
+		},
+		{
+			err:   commonerrors.ErrRateLimited,
+			usage: Usage{TokenCounts: TokenCounts{Total: secondWasted}},
+		},
+		{
+			deltas: []Delta{{
+				Text:         "done",
+				FinishReason: FinishReasonStop,
+			}},
+			usage: Usage{
+				TokenCounts:  TokenCounts{Total: secondSucceeded},
+				Model:        "test-model",
+				FinishReason: FinishReasonStop,
+			},
+		},
+	}}
+
+	jitter := false
+	retrying := withRetryClock(
+		WithRetry(driver, RetryConfig{
+			MaxAttempts:  attemptsPerRound,
+			InitialDelay: time.Nanosecond,
+			MaxDelay:     time.Nanosecond,
+			Jitter:       &jitter,
+		}),
+		&instantRetryClock{},
+		func() float64 { return 0 },
+	)
+
+	// WithAutoToolCalls, not just Run: manual driving is the default, and
+	// without it the run stops after the round that asked for the tool.
+	response, err := NewRequest(New(retrying)).
+		WithModel(Model{ID: "test-model"}).
+		WithPrompt("go").
+		WithAutoToolCalls().
+		WithTool(Tool{
+			Name: "lookup",
+			Handler: func(context.Context, ToolInput) (ToolResult, error) {
+				return ToolResult{Content: "ok"}, nil
+			},
+		}).
+		Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "done", response.Text)
+
+	retryInfo := response.Usage.Retry
+
+	assert.Equal(
+		t,
+		rounds*attemptsPerRound,
+		retryInfo.TotalAttempts,
+		"attempts from BOTH rounds must be summed",
+	)
+	require.Len(
+		t,
+		retryInfo.FailedAttempts,
+		rounds,
+		"failed attempts append across rounds rather than replacing",
+	)
+	assert.Equal(
+		t,
+		firstWasted+secondWasted,
+		retryInfo.WastedTotalTokens,
+		"wasted tokens from every round are summed",
+	)
+	assert.Equal(
+		t,
+		firstSucceeded+secondSucceeded,
+		response.Usage.Total,
+		"Total excludes tokens burned by attempts that were thrown away",
+	)
+	assert.Equal(
+		t,
+		firstSucceeded+secondSucceeded+firstWasted+secondWasted,
+		response.Usage.BilledTotalTokens(),
+		"BilledTotalTokens is the whole run, successes plus waste",
+	)
+}
+
+// The case that matters most for cost and least for output: every attempt
+// failed, so the caller is billed for tokens it has nothing to show for. The
+// ledger has to survive the ERROR path.
+func TestRetryAccounting_ExhaustedRetriesStillReportTheirCost(t *testing.T) {
+	t.Parallel()
+
+	const (
+		firstWasted  = int64(4)
+		secondWasted = int64(6)
+		attempts     = 2
+	)
+
+	driver := &scriptedDriver{turns: []scriptedTurn{
+		{
+			err:   commonerrors.ErrRateLimited,
+			usage: Usage{TokenCounts: TokenCounts{Total: firstWasted}},
+		},
+		{
+			err:   commonerrors.ErrRateLimited,
+			usage: Usage{TokenCounts: TokenCounts{Total: secondWasted}},
+		},
+	}}
+
+	jitter := false
+	retrying := withRetryClock(
+		WithRetry(driver, RetryConfig{
+			MaxAttempts:  attempts,
+			InitialDelay: time.Nanosecond,
+			MaxDelay:     time.Nanosecond,
+			Jitter:       &jitter,
+		}),
+		&instantRetryClock{},
+		func() float64 { return 0 },
+	)
+
+	response, err := NewRequest(New(retrying)).
+		WithModel(Model{ID: "test-model"}).
+		WithPrompt("go").
+		Complete(context.Background())
+
+	require.ErrorIs(t, err, commonerrors.ErrRateLimited)
+	require.NotNil(t, response, "a failed run still reports what it spent")
+
+	assert.Equal(t, attempts, response.Usage.Retry.TotalAttempts)
+	assert.Len(t, response.Usage.Retry.FailedAttempts, attempts)
+	assert.Equal(
+		t,
+		firstWasted+secondWasted,
+		response.Usage.Retry.WastedTotalTokens,
+	)
+
+	// Nothing succeeded, so there is no context to account for -- but the
+	// provider still charged for both attempts.
+	assert.Zero(t, response.Usage.Total, "no attempt produced usable output")
+	assert.Equal(
+		t,
+		firstWasted+secondWasted,
+		response.Usage.BilledTotalTokens(),
+		"billed is entirely waste when every attempt failed",
+	)
+}
+
+// A run with no retries must report a zero ledger rather than an absent one --
+// callers sum WastedTotalTokens unconditionally.
+func TestRetryAccounting_CleanRunReportsZeroWaste(t *testing.T) {
+	t.Parallel()
+
+	const succeeded = int64(12)
+
+	driver := &scriptedDriver{turns: []scriptedTurn{{
+		deltas: []Delta{{Text: "done", FinishReason: FinishReasonStop}},
+		usage: Usage{
+			TokenCounts:  TokenCounts{Total: succeeded},
+			FinishReason: FinishReasonStop,
+		},
+	}}}
+
+	response, err := NewRequest(New(WithRetry(driver, RetryConfig{}))).
+		WithModel(Model{ID: "test-model"}).
+		WithPrompt("go").
+		Complete(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, response.Usage.Retry.TotalAttempts)
+	assert.Empty(t, response.Usage.Retry.FailedAttempts)
+	assert.Zero(t, response.Usage.Retry.WastedTotalTokens)
+	assert.Equal(
+		t,
+		response.Usage.Total,
+		response.Usage.BilledTotalTokens(),
+		"with no waste, billed and total agree",
+	)
 }

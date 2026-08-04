@@ -86,18 +86,15 @@ type Tool struct {
 
 	Handler ToolHandler
 
-	// The lifecycle, in firing order: PreRun → Handler → OnSuccess|OnError →
-	// the matching injector → PostRun → PostRunMessageInjector.
+	// Firing order: PreRun → Handler → OnSuccess|OnError → the matching
+	// injector → PostRun → PostRunMessageInjector.
 	//
-	// An error returned by ANY of these hooks aborts the run — hooks are the
-	// caller's own code, so their failure is a caller-code failure rather than
-	// a model condition. PreRun additionally skips the Handler. The HANDLER is
-	// the opposite: its error becomes a tool error the model can see and react
-	// to, and the loop continues.
-	//
-	// A panic — in the handler or in any hook — never aborts. It is recovered
-	// and converted into a tool error, with the panic value kept out of the
-	// transcript and sent to the log instead.
+	// An error from any HOOK aborts the run (hooks are caller code, so their
+	// failure is a caller failure); PreRun additionally skips the Handler. An
+	// error from the HANDLER does the opposite — it becomes a tool error the
+	// model can react to, and the loop continues. A panic in either never
+	// aborts: it is recovered into a tool error, with the panic value logged
+	// rather than written to the transcript.
 	PreRun    ToolHook
 	OnSuccess ToolHook
 	OnError   ToolHook
@@ -120,18 +117,14 @@ type ToolEvent struct {
 	RawArguments json.RawMessage
 	Messages     []Message
 
-	// Result is MUTABLE ON PURPOSE and is authoritative after PostRun —
-	// whatever it holds then is what enters the transcript, so a hook can
-	// rewrite, redact, or replace the handler's output.
+	// Result is mutable on purpose and authoritative after PostRun, so a hook
+	// can rewrite or redact the handler's output. Setting it to nil does NOT
+	// remove the tool message — an unanswered tool_call_id is protocol-illegal,
+	// so the engine substitutes an error result; write empty Content instead.
 	//
-	// Setting it to nil does NOT remove the tool message: an absent
-	// tool_call_id makes the transcript protocol-illegal, so the engine
-	// substitutes an error result and logs it. To suppress content, write an
-	// empty Content instead of clearing the pointer.
-	//
-	// Each in-flight call owns its own event, so hooks for DIFFERENT calls run
-	// concurrently and must not share state without synchronizing. Hooks for
-	// the SAME call are sequential and need no locking.
+	// Each in-flight call owns its event: hooks for DIFFERENT calls run
+	// concurrently and must synchronize shared state. Hooks for the SAME call
+	// are sequential.
 	Result *ToolResult
 
 	// Err is the handler's error on the OnError path, nil otherwise.
@@ -195,14 +188,10 @@ func (s *ToolSet) Definitions() []Tool {
 
 // cloneTools deep-copies the tool set, ArgumentsSchema included.
 //
-// slices.Clone alone shared the schema's backing array with BOTH the wire and
-// the caller's own ToolSet: an OnRoundStart hook redacting
-// ev.Tools[i].ArgumentsSchema rewrote the schema every DriverRequest carried
-// AND corrupted the caller's ToolSet for the rest of the process — the tools
-// are long-lived, so unlike a transcript alias this one never heals.
-//
-// Same defect the cloneToolCalls godoc describes; the two are the only
-// reference-typed members elelem hands outward, and both must copy.
+// slices.Clone alone shares the schema's backing array with both the wire and
+// the caller's ToolSet, so a hook redacting ev.Tools[i].ArgumentsSchema
+// corrupts the caller's set for the process lifetime — tools are long-lived, so
+// unlike a transcript alias this never heals. See also cloneToolCalls.
 func cloneTools(tools []Tool) []Tool {
 	cloned := slices.Clone(tools)
 	for index := range cloned {

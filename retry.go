@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	commonerrors "github.com/psyb0t/common-go/errors"
@@ -20,6 +21,47 @@ const (
 	defaultRetryMaxDelay     = 5 * time.Second
 	retryHalfDivisor         = 2
 )
+
+// maxParsedRetryAfter caps what an upstream can ask us to wait. The header is
+// attacker-influenced and the value is multiplied by time.Second, so a large
+// integer overflows int64 and lands NEGATIVE — which reads as "no delay" and
+// silently defeats the pause the provider asked for. A day is far beyond any
+// legitimate hint and far below the overflow point.
+const maxParsedRetryAfter = 24 * time.Hour
+
+// ParseRetryAfter reads a Retry-After header value in either RFC 7231 form:
+// delay-seconds, or an HTTP-date. Returns 0 when absent, unparseable, or in the
+// past — never a negative duration, which callers would treat as "wait
+// forever" or "do not wait" depending on how they compare it.
+//
+// Shared rather than per-driver: both drivers had a byte-identical copy, and
+// duplicated parsing of an untrusted header is how one of them ends up
+// hardened and the other not.
+func ParseRetryAfter(value string) time.Duration {
+	if seconds, err := strconv.ParseInt(value, 10, 64); err == nil {
+		if seconds <= 0 {
+			return 0
+		}
+
+		if seconds > int64(maxParsedRetryAfter/time.Second) {
+			return maxParsedRetryAfter
+		}
+
+		return time.Duration(seconds) * time.Second
+	}
+
+	when, err := http.ParseTime(value)
+	if err != nil {
+		return 0
+	}
+
+	delay := time.Until(when)
+	if delay <= 0 {
+		return 0
+	}
+
+	return min(delay, maxParsedRetryAfter)
+}
 
 // Provider error codes elelem understands. A provider's own code is the only
 // trustworthy signal when a failure arrives IN BAND: both supported providers
@@ -246,8 +288,6 @@ func (d *retryDriver) streamWithRetry(
 		recordFailedAttempt(&aggregate, failedAttempt)
 
 		if decision.stop {
-			usage.Retry = aggregate.Retry
-
 			d.logRetryGaveUp(
 				ctx,
 				failedAttempt,
@@ -255,23 +295,20 @@ func (d *retryDriver) streamWithRetry(
 				streamed,
 			)
 
-			return usage, mapProviderError(err, failedAttempt.Status)
+			return failedRetryUsage(usage, aggregate),
+				mapProviderError(err, failedAttempt.Status)
 		}
 
 		d.logRetryScheduled(ctx, failedAttempt)
 
 		if err := notifyRetry(ctx, failedAttempt); err != nil {
-			usage.Retry = aggregate.Retry
-
-			return usage, err
+			return failedRetryUsage(usage, aggregate), err
 		}
 
 		if err := d.wait(ctx, failedAttempt.Delay); err != nil {
 			// Every other exit sets this; a run cancelled mid-backoff is
 			// precisely when you most want to know it already burned attempts.
-			usage.Retry = aggregate.Retry
-
-			return usage, err
+			return failedRetryUsage(usage, aggregate), err
 		}
 	}
 
@@ -324,6 +361,17 @@ func (d *retryDriver) classifyAttempt(
 }
 
 func successfulRetryUsage(usage Usage, aggregate Usage) Usage {
+	usage.Retry = aggregate.Retry
+
+	return usage
+}
+
+// failedRetryUsage reports a run where no attempt succeeded. Token counts are
+// cleared because Total means "the attempt that succeeded" — keeping the final
+// failure's counts there would double-bill it, since recordFailedAttempt
+// already put them in Retry.
+func failedRetryUsage(usage Usage, aggregate Usage) Usage {
+	usage.TokenCounts = TokenCounts{}
 	usage.Retry = aggregate.Retry
 
 	return usage
@@ -475,13 +523,11 @@ func (d *retryDriver) TokenCounter() TokenCounter {
 }
 
 func (d *retryDriver) delay(attempt int, err error) time.Duration {
-	// BOUNDED by MaxDelay, like every other path here. Returning the header
-	// verbatim let an upstream decide how long the caller blocks — a 24h
-	// Retry-After against a 50ms MaxDelay parked the run for a day, with the
-	// engine logging its own schedule as delay_ms=86400000. RetryConfig
-	// documents itself as bounding the decorator and the README promises
-	// "bounded provider Retry-After guidance"; neither held. Honouring the
-	// hint up to the caller's ceiling keeps both true.
+	// Bounded by MaxDelay. Honouring the header verbatim lets an upstream
+	// decide how long the caller blocks — a 24h Retry-After once parked a run
+	// for a day against a 50ms ceiling.
+	// errors.As, not AsType: inside a && chain AsType must be hoisted above the
+	// if, which loses the short-circuit when RespectRetryAfter is off.
 	var statusErr HTTPStatusError
 	if boolValue(d.config.RespectRetryAfter, true) &&
 		errors.As(err, &statusErr) &&
@@ -570,8 +616,7 @@ func classifyRetry(err error) (RetryReason, int, bool) {
 	// outcome. Anthropic's overloaded_error arrives exactly that way during a
 	// capacity event — the moment retrying matters most — and was classified
 	// not-retryable, so the decorator gave up after one attempt.
-	var providerErr *ProviderError
-	if errors.As(err, &providerErr) {
+	if providerErr, ok := errors.AsType[*ProviderError](err); ok {
 		reason, retryable, known := classifyProviderErrorCode(
 			providerErr.ErrorCode(),
 		)
@@ -580,8 +625,7 @@ func classifyRetry(err error) (RetryReason, int, bool) {
 		}
 	}
 
-	var statusErr HTTPStatusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[HTTPStatusError](err); ok {
 		return classifyHTTPStatus(statusErr.HTTPStatus())
 	}
 
@@ -596,8 +640,7 @@ func classifyRetry(err error) (RetryReason, int, bool) {
 // — the connection itself broke. All of them are retryable; only the reason
 // differs, so the caller reports what happened.
 func classifyTransportError(err error) (RetryReason, bool) {
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if netErr, ok := errors.AsType[net.Error](err); ok {
 		if netErr.Timeout() {
 			return RetryReasonTimeout, true
 		}

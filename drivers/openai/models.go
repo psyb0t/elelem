@@ -152,16 +152,12 @@ func KnownModels() []elelem.Model {
 // empty ReasoningLevels — and the zero value resolves Min to "minimal", a
 // gpt-5-only level the o-series rejects. The two must agree on family.
 func LookupModel(id string) elelem.Model {
-	// LONGEST prefix wins. "gpt-5.6-sol-2026-03-01" must resolve to
-	// gpt-5.6-sol, not to gpt-5 — and gpt-5 and gpt-5.6 carry DIFFERENT
-	// floors, so picking the shorter match silently hands back a level the
-	// model rejects. Exact-matching here (while isKnownModelID prefix-matched)
-	// is what let dated snapshots inherit the wrong reasoning range.
+	// LONGEST prefix wins: gpt-5.6-sol-<date> must resolve to gpt-5.6-sol, not
+	// gpt-5, since the two carry different reasoning floors.
 	//
-	// A `-chat-latest` alias must not inherit its base's reasoning metadata:
-	// "gpt-5-chat-latest" prefix-matches the gpt-5 entry and would pick up
-	// SupportsReasoning, which capabilities() then reads directly — bypassing
-	// the isReasoningModelID exclusion entirely.
+	// A -chat-latest alias must NOT inherit its base's metadata — it
+	// prefix-matches the gpt-5 entry and would pick up SupportsReasoning, which
+	// capabilities() reads directly, bypassing the isReasoningModelID check.
 	if strings.HasSuffix(id, suffixChatLatest) {
 		return elelem.Model{ID: id}
 	}
@@ -202,18 +198,15 @@ func LookupModel(id string) elelem.Model {
 func capabilities(model elelem.Model) elelem.Capabilities {
 	reasoning := model.SupportsReasoning || isReasoningModelID(model.ID)
 
-	// Two tiers of knowledge, and conflating them inverts the doctrine:
+	// Two tiers, and conflating them inverts the doctrine:
 	//
-	//   isKnownModelID — this id belongs to a family whose FAMILY-WIDE facts
-	//     we know (the reasoning families reject the sampling knobs outright).
-	//   hasModelEntry  — we hold data for THIS model: its effort range, its
-	//     caching support. Used by the per-model helpers below.
+	//   isKnownModelID — the id's FAMILY has known facts (reasoning families
+	//     reject the sampling knobs outright).
+	//   hasModelEntry  — we hold data for THIS model: effort range, caching.
 	//
-	// An id matching neither is served by some arbitrary OpenAI-compatible
-	// endpoint (WithBaseURL) whose support we cannot know, so nothing is
-	// claimed against it — inventing a limit rejects requests the endpoint
-	// accepts. This is the single place the policy lives; engine and driver
-	// both read Capabilities, so they cannot disagree.
+	// An id matching neither comes from some arbitrary OpenAI-compatible
+	// endpoint whose support we cannot know, so nothing is claimed against it —
+	// inventing a limit rejects requests the endpoint would accept.
 	known := isKnownModelID(model.ID)
 
 	// The o-series and gpt-5 reasoning models do NOT accept the sampling knobs
@@ -256,14 +249,11 @@ func capabilities(model elelem.Model) elelem.Capabilities {
 // hasModelEntry reports whether this driver holds actual DATA for the model —
 // a listed entry, or a dated snapshot of one.
 //
-// Distinct from isKnownModelID, and the distinction is load-bearing. Matching a
-// family prefix tells us the model REASONS (a family-wide fact); it tells us
-// nothing about that model's effort ceiling, floor, or caching support, which
-// are per-model. The SDK ships gpt-5.1/5.2/5.4 and friends that this driver has
-// no entry for; treating a prefix match as full knowledge refused `max` on a
-// model literally named `-codex-max`, while a completely unknown id sailed
-// through — the doctrine exactly inverted. Per-model claims must key off THIS,
-// family-wide ones off isKnownModelID.
+// Load-bearing distinction from isKnownModelID: a family prefix says the model
+// REASONS, but nothing about its effort ceiling or caching, which are
+// per-model. Treating a prefix match as full knowledge refused `max` on a model
+// named `-codex-max` while a wholly unknown id sailed through. Per-model claims
+// key off THIS; family-wide ones off isKnownModelID.
 func hasModelEntry(id string) bool {
 	return slices.ContainsFunc(knownModels(), func(m elelem.Model) bool {
 		return m.ID == id || strings.HasPrefix(id, m.ID+"-")
@@ -334,13 +324,11 @@ func supportsDisablingReasoning(id string) bool {
 // supportsExplicitPromptCaching reports whether a CacheHint on this model
 // results in an explicit breakpoint.
 //
-// Always false, and the reason is about THIS DRIVER, not the API: the API does
-// expose breakpoints (prompt_cache_options / prompt_cache_breakpoint,
-// "Supported for gpt-5.6 and later"), but toOpenAIParams never populates them,
-// so a hint is silently dropped and OpenAI's implicit caching applies. The
-// flag's whole job is to tell the caller which of the two they get — reporting
-// true because the API could do it, while the driver does not, is the same
-// lie in the opposite direction. Flip this the moment the wiring lands.
+// Always false because of THIS DRIVER, not the API. The API does expose
+// breakpoints, but toOpenAIParams never populates them, so a hint is dropped
+// and implicit caching applies. The flag reports which of the two the caller
+// gets, so claiming true on API capability alone would be a lie. Flip it when
+// the wiring lands.
 func supportsExplicitPromptCaching(_ string) bool {
 	return false
 }

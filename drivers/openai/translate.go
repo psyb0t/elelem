@@ -491,12 +491,9 @@ const toolErrorPrefix = "Error: "
 // toolResultContent carries ToolResultIsError into content for a provider whose
 // wire format cannot express it.
 //
-// Anthropic sends is_error natively, so without this a failed tool result is
-// visible to the model on one provider and INDISTINGUISHABLE FROM SUCCESS on
-// the other — the model's ability to notice its own tool failed became a
-// function of which driver the caller happened to configure. Provider-neutral
-// behaviour is the point of this package, so the flag rides in the text rather
-// than vanishing.
+// Anthropic sends is_error natively, so without this the model's ability to
+// notice its own tool failed would depend on which driver was configured. The
+// flag rides in the text rather than vanishing.
 func toolResultContent(message elelem.Message) string {
 	if !message.ToolResultIsError {
 		return message.Content
