@@ -1,0 +1,15 @@
+# Colocated with the gen.go that runs it and the driver.gen.go it writes, so
+# the package is self-describing: directive + config + output in one dir.
+# `go generate` sets CWD to this dir, so dir/output are relative to here.
+all: false
+dir: .
+filename: driver.gen.go
+force-file-write: true
+formatter: goimports
+pkgname: mocks
+structname: MockDriver
+template: testify
+packages:
+  github.com/psyb0t/elelem:
+    interfaces:
+      Driver:

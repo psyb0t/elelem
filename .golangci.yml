@@ -1,0 +1,156 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - err113
+    - mnd
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - cyclop
+    - decorder
+    - depguard
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - goheader
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - grouper
+    - importas
+    - interfacebloat
+    - ireturn
+    - lll
+    - loggercheck
+    - maintidx
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - tagalign
+    - tagliatelle
+    - testableexamples
+    # - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl_v5
+    - zerologlint
+
+  settings:
+    lll:
+      line-length: 80
+      tab-width: 4
+    ireturn:
+      # Driver and TokenCounter ARE elelem's public abstractions -- the whole
+      # point of the package is that callers hold the interface while
+      # constructors, decorators (WithRetry, the usage recorder) and test
+      # doubles hand one back. Returning them is the design, not a leak, so
+      # allow it here instead of scattering nine //nolint:ireturn directives
+      # that nolintlint then reports as unused.
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
+        - github.com/psyb0t/elelem\.(Driver|TokenCounter)
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
+    depguard:
+      rules:
+        # An LLM engine attracts SDKs. Every provider ships one, and each new
+        # one lands in the engine before anyone asks whether it belongs there.
+        # The allow-list is the ask: a provider SDK is admissible inside its
+        # own drivers/ package, and the engine stays on the portable types.
+        main:
+          allow:
+            - $gostd
+            - github.com/stretchr/testify/
+            - github.com/psyb0t
+            - github.com/google/jsonschema-go/
+            - github.com/anthropics/anthropic-sdk-go
+            - github.com/openai/openai-go
+            - github.com/tiktoken-go/tokenizer
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - funlen
+          - gocognit
+          - maintidx
+          - wrapcheck
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

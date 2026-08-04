@@ -1,0 +1,9 @@
+data: {"choices":[{"delta":{"refusal":"I cannot help with that."}}]}
+
+data: {"choices":[{"delta":{"refusal":" Please ask something else."}}]}
+
+data: {"choices":[{"delta":{},"finish_reason":"stop"}]}
+
+data: {"choices":[],"model":"gpt-test","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}}
+
+data: [DONE]

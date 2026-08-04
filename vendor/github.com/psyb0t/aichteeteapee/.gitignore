@@ -1,0 +1,14 @@
+.vscode
+test
+.env
+*coverage.*
+__pycache__
+http/server/.test/uploads
+*.out
+CLAUDE.md
+.test*
+.research_files
+ANUSTIMES.md
+.telemetry/
+coverage-percent.txt
+git-update.sh

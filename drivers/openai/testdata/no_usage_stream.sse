@@ -1,0 +1,5 @@
+data: {"model":"gpt-test","choices":[{"delta":{"content":"hi"}}]}
+
+data: {"model":"gpt-test","choices":[{"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
