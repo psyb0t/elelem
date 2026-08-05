@@ -36,6 +36,14 @@ type structuredTestDriver struct {
 	capabilities Capabilities
 }
 
+func (d *structuredTestDriver) Complete(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	return d.Stream(ctx, request, onDelta)
+}
+
 func (d *structuredTestDriver) Stream(
 	_ context.Context,
 	request DriverRequest,
@@ -114,7 +122,7 @@ func successfulStructuredUsage(prompt, completion int64) Usage {
 	}
 }
 
-func TestCompleteInto_DerivesStrictSchemaWithoutMutatingRequest(t *testing.T) {
+func TestRunInto_DerivesStrictSchemaWithoutMutatingRequest(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -127,7 +135,7 @@ func TestCompleteInto_DerivesStrictSchemaWithoutMutatingRequest(t *testing.T) {
 	request := newStructuredRequest(driver, Model{})
 	target := structuredResult{Label: "unchanged", Count: -1}
 
-	response, err := request.CompleteInto(t.Context(), &target)
+	response, err := request.RunInto(t.Context(), &target)
 	require.NoError(t, err)
 	assert.Equal(t, structuredResult{Label: "ready", Count: 2}, target)
 	assert.Equal(t, int64(7), response.Usage.Total)
@@ -148,7 +156,75 @@ func TestCompleteInto_DerivesStrictSchemaWithoutMutatingRequest(t *testing.T) {
 	assert.Equal(t, false, schema["additionalProperties"])
 }
 
-func TestCompleteInto_RejectsInvalidTargetBeforeCallingDriver(t *testing.T) {
+// A typed object and a tool list are competing answers to the same turn: hand
+// the model both and it can satisfy the request by calling the tool, leaving
+// nothing to decode.
+//
+// The suppression used to be implicit — the structured turn was dispatched with
+// Complete, whose withTools: false dropped them at the engine. Run infers the
+// tool loop from configuration instead, so a request that carries tools would
+// now send them here unless cloneForStructuredResponse clears them. Deleting
+// those two lines leaves every other test in the suite green.
+func TestRunInto_DoesNotSendToolsConfiguredOnTheRequest(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		arrange func(*Request) *Request
+	}{
+		{
+			name: "static tool",
+			arrange: func(request *Request) *Request {
+				return request.WithTool(Tool{Name: "lookup"})
+			},
+		},
+		{
+			name: "tool provider",
+			arrange: func(request *Request) *Request {
+				return request.WithToolProvider(
+					func(context.Context) (*ToolSet, error) {
+						return NewToolSet(Tool{Name: "lookup"}), nil
+					},
+				)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			driver := &structuredTestDriver{
+				turns: []structuredTestTurn{{
+					text:  `{"label":"ready","count":2}`,
+					usage: successfulStructuredUsage(3, 4),
+				}},
+				capabilities: Capabilities{
+					SupportsResponseFormatJSONSchema: true,
+				},
+			}
+
+			request := tc.arrange(newStructuredRequest(driver, Model{}))
+
+			var target structuredResult
+
+			_, err := request.RunInto(t.Context(), &target)
+			require.NoError(t, err)
+			assert.Equal(
+				t,
+				structuredResult{Label: "ready", Count: 2},
+				target,
+			)
+
+			requests := driver.Requests()
+			require.Len(t, requests, 1)
+			assert.Empty(t, requests[0].Tools,
+				"a structured turn must not offer the model a tool to call")
+		})
+	}
+}
+
+func TestRunInto_RejectsInvalidTargetBeforeCallingDriver(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -171,7 +247,7 @@ func TestCompleteInto_RejectsInvalidTargetBeforeCallingDriver(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := request.CompleteInto(t.Context(), tc.target)
+			_, err := request.RunInto(t.Context(), tc.target)
 			require.ErrorIs(t, err, ErrInvalidRequest)
 		})
 	}
@@ -179,7 +255,7 @@ func TestCompleteInto_RejectsInvalidTargetBeforeCallingDriver(t *testing.T) {
 	assert.Empty(t, driver.Requests())
 }
 
-func TestCompleteInto_TruncationIsDistinctAndNeverRepairs(t *testing.T) {
+func TestRunInto_TruncationIsDistinctAndNeverRepairs(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -192,7 +268,7 @@ func TestCompleteInto_TruncationIsDistinctAndNeverRepairs(t *testing.T) {
 	request := newStructuredRequest(driver, Model{}).WithResponseRepair()
 	target := structuredResult{Label: "preserved", Count: 9}
 
-	response, err := request.CompleteInto(t.Context(), &target)
+	response, err := request.RunInto(t.Context(), &target)
 	require.ErrorIs(t, err, ErrResponseTruncated)
 	require.NotNil(t, response)
 	assert.Equal(t, structuredResult{Label: "preserved", Count: 9}, target)
@@ -207,7 +283,7 @@ func TestCompleteInto_TruncationIsDistinctAndNeverRepairs(t *testing.T) {
 // classification was plumbed correctly for five review rounds while this
 // consumer never read it, so the cost the fix exists to prevent was still
 // being paid. Counting the calls is the only assertion that catches that.
-func TestCompleteInto_RefusalIsDistinctAndNeverRepairs(t *testing.T) {
+func TestRunInto_RefusalIsDistinctAndNeverRepairs(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -229,7 +305,7 @@ func TestCompleteInto_RefusalIsDistinctAndNeverRepairs(t *testing.T) {
 	request := newStructuredRequest(driver, Model{}).WithResponseRepair()
 	target := structuredResult{Label: "preserved", Count: 9}
 
-	response, err := request.CompleteInto(t.Context(), &target)
+	response, err := request.RunInto(t.Context(), &target)
 	require.Error(t, err)
 	require.NotNil(t, response)
 
@@ -240,7 +316,7 @@ func TestCompleteInto_RefusalIsDistinctAndNeverRepairs(t *testing.T) {
 	assert.Equal(t, FinishReasonContentFilter, response.FinishReason)
 }
 
-func TestCompleteInto_DoesNotAssignMalformedResponse(t *testing.T) {
+func TestRunInto_DoesNotAssignMalformedResponse(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -253,13 +329,13 @@ func TestCompleteInto_DoesNotAssignMalformedResponse(t *testing.T) {
 	target := structuredResult{Label: "preserved", Count: 9}
 
 	request := newStructuredRequest(driver, Model{})
-	_, err := request.CompleteInto(t.Context(), &target)
+	_, err := request.RunInto(t.Context(), &target)
 	require.ErrorIs(t, err, ErrResponseSchemaMismatch)
 	assert.NotContains(t, err.Error(), "private-value")
 	assert.Equal(t, structuredResult{Label: "preserved", Count: 9}, target)
 }
 
-func TestCompleteInto_StrictValidationRejectsMissingField(t *testing.T) {
+func TestRunInto_StrictValidationRejectsMissingField(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -273,13 +349,13 @@ func TestCompleteInto_StrictValidationRejectsMissingField(t *testing.T) {
 
 	_, err := newStructuredRequest(driver, Model{}).
 		WithStrictResponseValidation().
-		CompleteInto(t.Context(), &target)
+		RunInto(t.Context(), &target)
 	require.ErrorIs(t, err, ErrResponseSchemaMismatch)
 	assert.NotContains(t, err.Error(), "partial")
 	assert.Equal(t, structuredResult{Label: "preserved", Count: 9}, target)
 }
 
-func TestCompleteInto_DefaultValidationAllowsMissingField(t *testing.T) {
+func TestRunInto_DefaultValidationAllowsMissingField(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -292,12 +368,12 @@ func TestCompleteInto_DefaultValidationAllowsMissingField(t *testing.T) {
 	target := structuredResult{Count: 9}
 
 	_, err := newStructuredRequest(driver, Model{}).
-		CompleteInto(t.Context(), &target)
+		RunInto(t.Context(), &target)
 	require.NoError(t, err)
 	assert.Equal(t, structuredResult{Label: "partial"}, target)
 }
 
-func TestCompleteInto_RepairsOnceAndAccumulatesAccounting(t *testing.T) {
+func TestRunInto_RepairsOnceAndAccumulatesAccounting(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -322,7 +398,7 @@ func TestCompleteInto_RepairsOnceAndAccumulatesAccounting(t *testing.T) {
 	response, err := newStructuredRequest(driver, model).
 		WithStrictResponseValidation().
 		WithResponseRepair().
-		CompleteInto(t.Context(), &target)
+		RunInto(t.Context(), &target)
 	require.NoError(t, err)
 	assert.Equal(t, structuredResult{Label: "repaired", Count: 3}, target)
 	assert.Equal(t, int64(5), response.Usage.Prompt)
@@ -359,7 +435,7 @@ func TestCompleteInto_RepairsOnceAndAccumulatesAccounting(t *testing.T) {
 	)
 }
 
-func TestCompleteInto_ResponseRepairIsBoundedToOneFollowUp(t *testing.T) {
+func TestRunInto_ResponseRepairIsBoundedToOneFollowUp(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -374,14 +450,14 @@ func TestCompleteInto_ResponseRepairIsBoundedToOneFollowUp(t *testing.T) {
 	response, err := newStructuredRequest(driver, Model{}).
 		WithStrictResponseValidation().
 		WithResponseRepair().
-		CompleteInto(t.Context(), &target)
+		RunInto(t.Context(), &target)
 	require.ErrorIs(t, err, ErrResponseSchemaMismatch)
 	assert.Equal(t, structuredResult{Label: "preserved", Count: 9}, target)
 	assert.Equal(t, int64(6), response.Usage.Total)
 	assert.Len(t, driver.Requests(), 2)
 }
 
-func TestCompleteInto_RepairFailurePreservesAllAccounting(t *testing.T) {
+func TestRunInto_RepairFailurePreservesAllAccounting(t *testing.T) {
 	t.Parallel()
 
 	driver := &structuredTestDriver{
@@ -403,7 +479,7 @@ func TestCompleteInto_RepairFailurePreservesAllAccounting(t *testing.T) {
 	response, err := newStructuredRequest(driver, Model{}).
 		WithStrictResponseValidation().
 		WithResponseRepair().
-		CompleteInto(t.Context(), &target)
+		RunInto(t.Context(), &target)
 	require.ErrorIs(t, err, assert.AnError)
 	require.NotNil(t, response)
 	assert.Equal(t, int64(5), response.Usage.Prompt)
@@ -413,7 +489,7 @@ func TestCompleteInto_RepairFailurePreservesAllAccounting(t *testing.T) {
 	assert.Len(t, driver.Requests(), 2)
 }
 
-func TestCompleteInto_SharedRequestIsConcurrencySafe(t *testing.T) {
+func TestRunInto_SharedRequestIsConcurrencySafe(t *testing.T) {
 	t.Parallel()
 
 	turns := make([]structuredTestTurn, structuredConcurrentCalls)
@@ -437,7 +513,7 @@ func TestCompleteInto_SharedRequestIsConcurrencySafe(t *testing.T) {
 		wait.Go(func() {
 			target := structuredResult{}
 
-			_, err := request.CompleteInto(t.Context(), &target)
+			_, err := request.RunInto(t.Context(), &target)
 
 			expected := structuredResult{Label: "parallel", Count: 1}
 			if err == nil && target != expected {
@@ -459,7 +535,7 @@ func TestCompleteInto_SharedRequestIsConcurrencySafe(t *testing.T) {
 	assert.Len(t, driver.Requests(), structuredConcurrentCalls)
 }
 
-func TestCompleteInto_RejectsUnsupportedSchemaType(t *testing.T) {
+func TestRunInto_RejectsUnsupportedSchemaType(t *testing.T) {
 	t.Parallel()
 
 	type invalidTarget struct {
@@ -472,7 +548,7 @@ func TestCompleteInto_RejectsUnsupportedSchemaType(t *testing.T) {
 	target := invalidTarget{}
 
 	_, err := newStructuredRequest(driver, Model{}).
-		CompleteInto(t.Context(), &target)
+		RunInto(t.Context(), &target)
 	require.ErrorIs(t, err, ErrInvalidRequest)
 	assert.Empty(t, driver.Requests())
 }
@@ -528,7 +604,7 @@ func TestRequest_ResponseFormatValidationRejectsLocally(t *testing.T) {
 			request := newStructuredRequest(driver, Model{})
 			request.params.ResponseFormat = tc.format
 
-			_, err := request.Complete(t.Context())
+			_, err := request.Run(t.Context())
 			require.ErrorIs(t, err, ErrInvalidRequest)
 			assert.Empty(t, driver.Requests())
 		})

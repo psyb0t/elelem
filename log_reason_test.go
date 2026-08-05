@@ -296,7 +296,7 @@ func TestRun_LogsRetryAttemptAndRecovery(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 	_, err := NewRequest(client).
-		WithPrompt(NewPrompt().UserText("question")).Complete(ctx)
+		WithPrompt(NewPrompt().UserText("question")).Run(ctx)
 	require.NoError(t, err)
 
 	all := records()

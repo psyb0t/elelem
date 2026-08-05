@@ -4,13 +4,13 @@ Three tiers, from most typed to least.
 
 ## Contents
 
-- [CompleteInto — typed](#completeinto--typed)
+- [RunInto — typed](#runinto--typed)
 - [WithJSONSchema — your own schema](#withjsonschema--your-own-schema)
 - [WithJSONMode — untyped](#withjsonmode--untyped)
 - [Validation and repair](#validation-and-repair)
 - [Failure modes](#failure-modes)
 
-## CompleteInto — typed
+## RunInto — typed
 
 Derives a strict JSON Schema from the destination, asks for a structured
 response, validates it, and assigns **only after a successful decode**:
@@ -29,7 +29,7 @@ response, err := elelem.NewRequest(client).
 	WithPrompt(elelem.NewPrompt().
 		WithSystem("Summarize the incident.").
 		UserText(raw)).
-	CompleteInto(ctx, &result)
+	RunInto(ctx, &result)
 ```
 
 On error, `result` is untouched — it never holds a half-decoded object.
@@ -37,6 +37,12 @@ On error, `result` is untouched — it never holds a half-decoded object.
 The destination must be a **non-nil pointer**. An invalid target, or a model
 whose capabilities don't cover structured responses, fails **locally, before
 any network call**.
+
+**A structured turn never sends tools**, even when the request carries them.
+A typed object and a tool list are competing answers to the same turn: offered
+both, the model can satisfy the request by calling the tool, and then there is
+nothing to decode. If a run needs both, run the tool loop first and pass its
+outcome into a second request that asks for the object.
 
 ## WithJSONSchema — your own schema
 

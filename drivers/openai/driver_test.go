@@ -863,3 +863,131 @@ func TestNormalizeProviderErrorClassifiesInBandStreamErrors(t *testing.T) {
 		})
 	}
 }
+
+// Complete must deliver the SAME delta shapes Stream does, because everything
+// downstream — the engine's tool-call assembler, every On* callback, the
+// content-block protocol in a consumer — is delta-shaped and has no second
+// code path for non-streaming turns.
+//
+// The fixture carries all four things the translation has to get right at
+// once: reasoning on a compat-only field, text, and TWO tool calls whose
+// ordering is implied purely by array position (a non-streaming response has
+// no per-call index to copy).
+func TestCompleteEmitsTheSameDeltaShapesAsStream(t *testing.T) {
+	t.Parallel()
+
+	server := fixtureServer(t, "testdata/completion.json")
+	driver := NewDriver(
+		WithBaseURL(server.URL),
+		WithAPIKey(testAPIKey),
+		WithHTTPClient(server.Client()),
+	)
+
+	var deltas []elelem.Delta
+
+	usage, err := driver.Complete(
+		t.Context(),
+		elelem.DriverRequest{
+			Model: elelem.Model{ID: testModel},
+			Messages: []elelem.Message{{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("weather?"),
+			}},
+		},
+		func(delta elelem.Delta) error {
+			deltas = append(deltas, delta)
+
+			return nil
+		},
+	)
+	require.NoError(t, err)
+
+	// Reasoning FIRST, matching the order deltasFromChunk uses on the stream
+	// path. It reaches elelem only through the raw body — reasoning_content is
+	// not a typed SDK field — so a regression here is silent data loss on
+	// exactly the compat backends this feature exists for.
+	require.NotEmpty(t, deltas)
+	assert.Equal(t, "the user wants the weather", deltas[0].Reasoning)
+
+	var text strings.Builder
+
+	calls := map[int]elelem.ToolCallDelta{}
+
+	for _, delta := range deltas {
+		text.WriteString(delta.Text)
+
+		if delta.ToolCall != nil {
+			calls[delta.ToolCall.Index] = *delta.ToolCall
+		}
+	}
+
+	assert.Equal(t, "checking that now", text.String())
+
+	require.Len(t, calls, 2, "both tool calls must survive translation")
+	assert.Equal(t, "get_weather", calls[0].Name)
+	assert.JSONEq(t, `{"city":"Bucharest"}`, calls[0].Arguments)
+	assert.Equal(t, "get_time", calls[1].Name)
+	assert.JSONEq(t, `{"tz":"EET"}`, calls[1].Arguments)
+
+	// Array position IS the ordering: with no provider-supplied index, getting
+	// this wrong pairs results to the wrong calls downstream.
+	assert.Equal(t, "call_a", calls[0].ID)
+	assert.Equal(t, "call_b", calls[1].ID)
+
+	assert.Equal(t, elelem.FinishReasonToolCalls, usage.FinishReason)
+	assert.Equal(t, int64(11), usage.Prompt)
+	assert.Equal(t, int64(7), usage.Completion)
+}
+
+// A nil callback is part of the Driver contract — conformance.Run passes one
+// deliberately — so Complete must still report usage rather than panicking.
+func TestCompleteWithNilCallbackStillReportsUsage(t *testing.T) {
+	t.Parallel()
+
+	server := fixtureServer(t, "testdata/completion.json")
+	driver := NewDriver(
+		WithBaseURL(server.URL),
+		WithAPIKey(testAPIKey),
+		WithHTTPClient(server.Client()),
+	)
+
+	usage, err := driver.Complete(
+		t.Context(),
+		elelem.DriverRequest{
+			Model: elelem.Model{ID: testModel},
+			Messages: []elelem.Message{{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("weather?"),
+			}},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, elelem.FinishReasonToolCalls, usage.FinishReason)
+}
+
+// Complete rejects a malformed transcript locally, exactly as Stream does. A
+// non-streaming path that skipped this check would ship an orphaned tool
+// result the provider rejects on the NEXT request, which is the worst place to
+// find out.
+func TestCompleteRejectsOrphanedToolResultLocally(t *testing.T) {
+	t.Parallel()
+
+	driver := NewDriver(WithAPIKey(testAPIKey))
+
+	_, err := driver.Complete(
+		t.Context(),
+		elelem.DriverRequest{
+			Model: elelem.Model{ID: testModel},
+			Messages: []elelem.Message{{
+				Role:       elelem.RoleTool,
+				ToolCallID: "answers-nothing",
+				Content:    elelem.Text("result"),
+			}},
+		},
+		nil,
+	)
+
+	require.ErrorIs(t, err, elelem.ErrInvalidTranscript)
+}

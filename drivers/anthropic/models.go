@@ -120,6 +120,17 @@ func (d *Driver) Capabilities(model elelem.Model) elelem.Capabilities {
 		// restriction that does not exist and silently disable caching for
 		// every unlisted or dated model id.
 		SupportsPromptCaching: true,
+
+		// StreamingUnsupported stays false: the API accepts either mode and
+		// the SDK's non-streaming call omits the field rather than sending
+		// false.
+		//
+		// That is NOT a promise every request may be non-streaming.
+		// Messages.New refuses client-side, before any HTTP, once max_tokens
+		// implies a run over ten minutes — against the vendored SDK the cutoff
+		// is exactly 21333. That depends on max_tokens, which a per-model
+		// capability cannot express, so the driver surfaces it as
+		// ErrStreamingRequired at call time instead.
 		// Image and document blocks are part of the Messages API itself, so
 		// these follow SupportsPromptCaching in being unconditional rather
 		// than gated on known-model membership.

@@ -89,6 +89,78 @@ func (_c *MockDriver_Capabilities_Call) RunAndReturn(run func(model elelem.Model
 	return _c
 }
 
+// Complete provides a mock function for the type MockDriver
+func (_mock *MockDriver) Complete(context1 context.Context, driverRequest elelem.DriverRequest, fn func(elelem.Delta) error) (elelem.Usage, error) {
+	ret := _mock.Called(context1, driverRequest, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Complete")
+	}
+
+	var r0 elelem.Usage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, elelem.DriverRequest, func(elelem.Delta) error) (elelem.Usage, error)); ok {
+		return returnFunc(context1, driverRequest, fn)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, elelem.DriverRequest, func(elelem.Delta) error) elelem.Usage); ok {
+		r0 = returnFunc(context1, driverRequest, fn)
+	} else {
+		r0 = ret.Get(0).(elelem.Usage)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, elelem.DriverRequest, func(elelem.Delta) error) error); ok {
+		r1 = returnFunc(context1, driverRequest, fn)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDriver_Complete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Complete'
+type MockDriver_Complete_Call struct {
+	*mock.Call
+}
+
+// Complete is a helper method to define mock.On call
+//   - context1 context.Context
+//   - driverRequest elelem.DriverRequest
+//   - fn func(elelem.Delta) error
+func (_e *MockDriver_Expecter) Complete(context1 interface{}, driverRequest interface{}, fn interface{}) *MockDriver_Complete_Call {
+	return &MockDriver_Complete_Call{Call: _e.mock.On("Complete", context1, driverRequest, fn)}
+}
+
+func (_c *MockDriver_Complete_Call) Run(run func(context1 context.Context, driverRequest elelem.DriverRequest, fn func(elelem.Delta) error)) *MockDriver_Complete_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 elelem.DriverRequest
+		if args[1] != nil {
+			arg1 = args[1].(elelem.DriverRequest)
+		}
+		var arg2 func(elelem.Delta) error
+		if args[2] != nil {
+			arg2 = args[2].(func(elelem.Delta) error)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDriver_Complete_Call) Return(usage elelem.Usage, err error) *MockDriver_Complete_Call {
+	_c.Call.Return(usage, err)
+	return _c
+}
+
+func (_c *MockDriver_Complete_Call) RunAndReturn(run func(context1 context.Context, driverRequest elelem.DriverRequest, fn func(elelem.Delta) error) (elelem.Usage, error)) *MockDriver_Complete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListModels provides a mock function for the type MockDriver
 func (_mock *MockDriver) ListModels(context1 context.Context) ([]string, error) {
 	ret := _mock.Called(context1)

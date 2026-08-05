@@ -1,5 +1,14 @@
 version: "2"
 
+# Build-tagged files are invisible to the linter unless the tag is listed here,
+# and nothing reports that they were skipped — the run is green because it
+# examined nothing. sdkprobe sits behind `sdkprobe` and is the only such tag in
+# the repo; a new one has to be added here or it lints as thoroughly as an
+# empty directory.
+run:
+  build-tags:
+    - sdkprobe
+
 linters:
   enable:
     - errcheck

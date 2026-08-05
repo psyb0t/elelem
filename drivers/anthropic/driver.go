@@ -167,6 +167,81 @@ func closeStream(
 	return usage, streamErr
 }
 
+// Complete sends the same Messages API request with streaming off.
+//
+// The SDK's Messages.New omits the `stream` field entirely rather than sending
+// `stream: false` — see NewStreaming, which is the one that appends
+// option.WithJSONSet("stream", true).
+//
+// It can also refuse BEFORE any request is made: Messages.New calls
+// CalculateNonStreamingTimeout, which errors when max_tokens implies a run
+// longer than ten minutes (1hr x max_tokens/128000) or exceeds the model's own
+// non-streaming cap. That is a client-side rejection with no HTTP round trip,
+// so it is wrapped into elelem's own sentinel rather than passed through as a
+// bare SDK string — a caller that asked for non-streaming needs to be able to
+// match this and decide, not string-match an error message.
+func (d *Driver) Complete(
+	ctx context.Context,
+	req elelem.DriverRequest,
+	onDelta func(elelem.Delta) error,
+) (elelem.Usage, error) {
+	params, err := toMessageParams(ctx, req)
+	if err != nil {
+		return elelem.Usage{}, ctxerrors.Wrap(
+			err,
+			"translate Anthropic request",
+		)
+	}
+
+	logger := scope.GetLogger(ctx)
+
+	logger.Debug(
+		"anthropic request starting",
+		"model", req.Model.ID,
+		"messages", len(req.Messages),
+		"tools", len(req.Tools),
+		"streaming", false,
+	)
+
+	message, err := d.client.Messages.New(ctx, params)
+	if err != nil {
+		logger.Warn(
+			"anthropic non-streaming request failed",
+			"reason", elelem.LogReasonStreamReadFailed,
+			"model", req.Model.ID,
+			"err", err,
+		)
+
+		return elelem.Usage{}, ctxerrors.Wrap(
+			normalizeNonStreamingError(err),
+			"complete Anthropic message",
+		)
+	}
+
+	// The content deltas the stream would have emitted piecemeal, emitted from
+	// the finished blocks instead. finishStream then contributes the same tail
+	// it does for a streamed turn (provider reasoning + finish reason), so both
+	// paths deliver an identical delta sequence apart from its granularity.
+	if err := emitMessageContent(*message, onDelta); err != nil {
+		return usageFromMessage(*message), err
+	}
+
+	usage, err := finishStream(req.Model.ID, *message, onDelta)
+	if err != nil {
+		return usage, err
+	}
+
+	logger.Debug(
+		"anthropic request completed",
+		"model", req.Model.ID,
+		"finish_reason", usage.FinishReason,
+		"prompt_tokens", usage.Prompt,
+		"completion_tokens", usage.Completion,
+	)
+
+	return usage, nil
+}
+
 func consumeStream(
 	stream *ssestream.Stream[anthropicsdk.MessageStreamEventUnion],
 	onDelta func(elelem.Delta) error,

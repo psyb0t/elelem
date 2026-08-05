@@ -242,6 +242,12 @@ func capabilities(model elelem.Model) elelem.Capabilities {
 		// later". Older models cache implicitly, where a hint is a harmless
 		// no-op rather than something to refuse.
 		SupportsPromptCaching: supportsExplicitPromptCaching(model.ID),
+
+		// StreamingUnsupported stays false: the API takes either mode, and the
+		// SDK's non-streaming call omits the field rather than sending false,
+		// so nothing here can make a compat backend choke on an unexpected
+		// key. Whether a given PATH can deliver a stream is a different
+		// question a driver cannot see — that is elelem.WithStreaming.
 		// Content parts are a property of the CHAT COMPLETIONS API, not of a
 		// model: the request schema accepts text, image_url, input_audio and
 		// file for every model. Whether a given model can actually SEE an

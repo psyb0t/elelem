@@ -20,7 +20,7 @@ One question: **does the test need the model to say something?**
 | It is a fake… | **model** | **neighbour** |
 | Use when testing… | code that *consumes* model output — the turn loop, tool calls, streaming, history | code that *wraps or calls* a Driver — decorators, retry, metrics, registries |
 | You assert on… | what came **out** of your code | what went **into** the Driver, and that it was called |
-| Multi-turn conversation | yes — one `Turn` per `Stream` call | no |
+| Multi-turn conversation | yes — one `Turn` per driver call | no |
 | "called twice with X" | no | yes — matchers, `.Once()`, `AssertExpectations` |
 | Honors the `Driver` contract | **yes** | **no** |
 
@@ -32,7 +32,7 @@ trap when you're not.
 
 ## ScriptedDriver
 
-Plays a sequence of turns, one per `Stream` call. No HTTP.
+Plays a sequence of turns, one per driver call. No HTTP.
 
 ```go
 driver := elelemtest.NewScriptedDriver(
@@ -43,7 +43,7 @@ driver := elelemtest.NewScriptedDriver(
 client := elelem.New(driver)
 ```
 
-Turns are constructor arguments — one is consumed per `Stream` call, so the
+Turns are constructor arguments — one is consumed per driver call, so the
 list above is a two-round conversation: the model asks for a tool, then
 answers.
 
@@ -63,10 +63,18 @@ It records what it was asked for, so you can assert on the request your code
 actually built:
 
 ```go
-driver.Calls()        // how many times Stream was called
+driver.Calls()        // how many times the driver was called
 driver.Requests()     // every DriverRequest, in order
 driver.LastRequest()  // (DriverRequest, bool)
+driver.Streamed()     // one bool per call: true if it came in via Stream
 ```
+
+`Streamed()` is what a test asserts on when the thing under test is the
+transport choice itself — `WithStreaming(false)` should move a call from
+`Stream` to `Complete` and change nothing else. Both paths replay the same
+turn through the same delta callback, so every other assertion in the test
+holds either way; that is the property, and a double that quietly reshaped
+the output on one path would hide a break in it.
 
 Programmable self-reporting, because a double that always claims full support
 can't exercise a capability gate:

@@ -43,7 +43,7 @@ response, err := elelem.NewRequest(client).
 	WithPrompt(elelem.NewPrompt().
 		WithSystem("You are a concise operations assistant.").
 		UserText("Summarize the current incident state.")).
-	Complete(ctx)
+	Run(ctx)
 ```
 
 ## Contents
@@ -110,7 +110,7 @@ Every knob those three examples don't show is in
 | **[Callbacks](docs/callbacks.md)** | Sixteen observation points — run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
 | **[History](docs/history.md)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
 | **[Retries](docs/retries.md)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and ledgers what the failed attempts cost. |
-| **[Structured output](docs/structured-output.md)** | `CompleteInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request on malformed JSON. |
+| **[Structured output](docs/structured-output.md)** | `RunInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request on malformed JSON. |
 | **[Drivers](docs/drivers.md)** | OpenAI-compatible and Anthropic transports. `KnownModels()` / `LookupModel(id)` for pre-filled models; unknown ids stay usable, so this morning's release works today. |
 | **[Test doubles](docs/testing.md)** | A scripted `Driver` importing no test framework, a generated mock, and the conformance suite for writing a third driver. |
 
@@ -237,7 +237,7 @@ drivers/anthropic/                 Anthropic transport
 Three placements the file name alone will not give you: the round/tool-loop
 lives in `engine.go`, every sentinel this package exports lives in `errors.go`
 (each driver package has its own), and
-`structured.go` holds `CompleteInto` together with the request-validation
+`structured.go` holds `RunInto` together with the request-validation
 helpers it shares with `request.go`.
 
 ## Documentation
@@ -249,7 +249,7 @@ helpers it shares with `request.go`.
 | [tools.md](docs/tools.md) | Tools, the hook lifecycle, message injection, denial, and the bounds that keep a tool loop honest. |
 | [history.md](docs/history.md) | Token budgets, transcript units, limiting handlers, counting, and what to persist. |
 | [retries.md](docs/retries.md) | The retry decorator, failure classification, and the sentinel taxonomy. |
-| [structured-output.md](docs/structured-output.md) | `CompleteInto`, JSON mode, JSON schema, validation and repair. |
+| [structured-output.md](docs/structured-output.md) | `RunInto`, JSON mode, JSON schema, validation and repair. |
 | [drivers.md](docs/drivers.md) | The `Driver` contract and how to write a third one without guessing. |
 | [testing.md](docs/testing.md) | `ScriptedDriver` vs `MockDriver` vs the conformance suite. |
 

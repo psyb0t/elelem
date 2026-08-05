@@ -91,6 +91,12 @@ type ScriptedDriver struct {
 	requests     []elelem.DriverRequest
 	capabilities elelem.Capabilities
 	counter      elelem.TokenCounter
+
+	// streamed records which driver method the engine chose per call: true for
+	// Stream, false for Complete. Both replay the scripted turn identically —
+	// WHICH ONE RAN is the only thing a streaming test can meaningfully
+	// assert here, since a double has no wire to turn streaming off on.
+	streamed []bool
 }
 
 func NewScriptedDriver(turns ...Turn) *ScriptedDriver {
@@ -158,6 +164,47 @@ func (c *ScriptedDriver) Stream(
 	request elelem.DriverRequest,
 	onDelta func(elelem.Delta) error,
 ) (elelem.Usage, error) {
+	return c.replay(ctx, request, onDelta, true)
+}
+
+// Complete replays the scripted turn EXACTLY as Stream does, recording only
+// that it was the method called.
+//
+// It deliberately does not reshape the deltas to imitate a non-streaming
+// provider. The deltas come from the test — Turn{Deltas: ...} — so rewriting
+// them would be the double second-guessing its own caller: script three
+// deltas, assert three OnText calls, and this method would silently deliver
+// something else, failing the test for a reason unrelated to elelem. A test
+// wanting the one-big-chunk shape scripts one big delta.
+//
+// The contrast worth keeping in mind is validateTranscript below, which is a
+// double being STRICTER than its caller — refusing input no provider accepts.
+// That kind of fidelity catches real bugs. Manufacturing output nobody asked
+// for is the opposite: it produces green tests about behaviour that never ran.
+func (c *ScriptedDriver) Complete(
+	ctx context.Context,
+	request elelem.DriverRequest,
+	onDelta func(elelem.Delta) error,
+) (elelem.Usage, error) {
+	return c.replay(ctx, request, onDelta, false)
+}
+
+// Streamed reports, per call in order, whether the engine reached for Stream
+// (true) or Complete (false) — the assertion a WithStreaming test is actually
+// after.
+func (c *ScriptedDriver) Streamed() []bool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	return append([]bool(nil), c.streamed...)
+}
+
+func (c *ScriptedDriver) replay(
+	ctx context.Context,
+	request elelem.DriverRequest,
+	onDelta func(elelem.Delta) error,
+	streaming bool,
+) (elelem.Usage, error) {
 	// A double that ignores cancellation makes every test of cancellation
 	// behaviour pass vacuously — the caller's ctx is dead and the double
 	// happily returns a scripted answer. Real drivers fail here, so this one
@@ -180,6 +227,8 @@ func (c *ScriptedDriver) Stream(
 	c.mutex.Lock()
 
 	c.requests = append(c.requests, request)
+	c.streamed = append(c.streamed, streaming)
+
 	if c.index >= len(c.turns) {
 		c.mutex.Unlock()
 

@@ -45,22 +45,27 @@ type Request struct {
 	transcriptRepair         bool
 	strictResponseValidation bool
 	responseRepair           bool
-	preTokenLimit            TokenLimitHandler
-	postTokenLimit           TokenLimitHandler
-	onStart                  func(context.Context, *RunEvent) error
-	onReasoning              func(context.Context, ReasoningDelta) error
-	onText                   func(context.Context, TextDelta) error
-	onToolCallFragment       func(context.Context, ToolCallDelta) error
-	onDelta                  func(context.Context, Delta) error
-	onRoundStart             func(context.Context, *RoundEvent) error
-	onRoundEnd               func(context.Context, *RoundEvent) error
-	onAssistantMessage       func(context.Context, Message) error
-	onToolCallStart          func(context.Context, ToolCallEvent) error
-	onToolResult             func(context.Context, ToolCallEvent) error
-	onMessageInjection       func(context.Context, MessageInjection) error
-	onRetry                  func(context.Context, RetryAttempt) error
-	onFinish                 func(context.Context, *Response) error
-	onError                  func(context.Context, error) error
+
+	// streaming is seeded from the client in NewRequest and overridden by
+	// WithStreaming. A plain bool works because the inheritance happens once,
+	// at construction — no layer needs to ask "did anyone set this?".
+	streaming          bool
+	preTokenLimit      TokenLimitHandler
+	postTokenLimit     TokenLimitHandler
+	onStart            func(context.Context, *RunEvent) error
+	onReasoning        func(context.Context, ReasoningDelta) error
+	onText             func(context.Context, TextDelta) error
+	onToolCallFragment func(context.Context, ToolCallDelta) error
+	onDelta            func(context.Context, Delta) error
+	onRoundStart       func(context.Context, *RoundEvent) error
+	onRoundEnd         func(context.Context, *RoundEvent) error
+	onAssistantMessage func(context.Context, Message) error
+	onToolCallStart    func(context.Context, ToolCallEvent) error
+	onToolResult       func(context.Context, ToolCallEvent) error
+	onMessageInjection func(context.Context, MessageInjection) error
+	onRetry            func(context.Context, RetryAttempt) error
+	onFinish           func(context.Context, *Response) error
+	onError            func(context.Context, error) error
 }
 
 func NewRequest(client *Client) *Request {
@@ -69,6 +74,7 @@ func NewRequest(client *Client) *Request {
 		maxRounds:          defaultMaxRounds,
 		maxConcurrentTools: defaultMaxConcurrentTools,
 		forceFinalAnswer:   true,
+		streaming:          client.config.streaming,
 	}
 }
 
@@ -600,33 +606,83 @@ func (r *Request) IsTokenLimitReached() (bool, error) {
 	return count > budget, nil
 }
 
+// WithStreaming turns the provider's streaming mode on or off for THIS
+// request, overriding whatever the client was built with. See
+// elelem.WithStreaming for what the setting means and when to reach for it.
+//
+// Prefer the client option when the reason is a property of the endpoint —
+// "everything through this gateway is queued" is true of every request, not
+// one of them.
+func (r *Request) WithStreaming(enabled bool) *Request {
+	r.streaming = enabled
+
+	return r
+}
+
+// resolvedStreaming answers whether this call streams: what the request was
+// left set to (seeded from the client, possibly overridden by WithStreaming),
+// unless the model cannot stream at all.
+//
+// A model that cannot stream overrules the preference rather than erroring —
+// there is nothing to choose between, and the driver omits the field entirely
+// rather than sending a value the provider may reject in either direction.
+func (r *Request) resolvedStreaming() bool {
+	if r.client.Capabilities(r.resolvedModel()).StreamingUnsupported {
+		return false
+	}
+
+	return r.streaming
+}
+
+// hasTools reports whether this request was configured with tools at all.
+//
+// It is what replaced the old withTools flag that Run passed as true and
+// Complete passed as false. A request either has tools or it does not, and the
+// caller already said which by building it — asking again at the call site
+// meant Complete could silently DROP tools a caller had configured, with no
+// error and no log.
+//
+// A provider counts even though its set is only known per round: configuring
+// one is the statement of intent, and a provider that returns nothing simply
+// resolves to no tools that round.
+func (r *Request) hasTools() bool {
+	if r.toolProvider != nil {
+		return true
+	}
+
+	return len(r.staticTools()) > 0
+}
+
+// Run executes the request: tools if any were configured, the agent loop if
+// WithAutoToolCalls is on, streaming per WithStreaming.
+//
+// Along with RunInto it is the whole launcher surface. It replaces
+// Run/Complete/Stream, which were one private run() behind three names
+// differing by two flags — neither of which the caller should have had to
+// restate, because both were already implied by how the request was built.
 func (r *Request) Run(ctx context.Context) (*Response, error) {
-	return r.run(ctx, true, nil)
+	return r.run(ctx)
 }
 
-func (r *Request) Complete(ctx context.Context) (*Response, error) {
-	return r.run(ctx, false, nil)
-}
-
-func (r *Request) Stream(
-	ctx context.Context,
-	onDelta func(Delta) error,
-) (*Response, error) {
-	return r.run(ctx, false, onDelta)
-}
-
-func (r *Request) CompleteInto(
+// RunInto executes the request and decodes the model's JSON reply into value,
+// which must be a non-nil pointer. On any error value is left untouched — it
+// never holds a half-decoded object. Tools are not sent, whatever the request
+// carries; see cloneForStructuredResponse.
+//
+// The target is a CALL argument rather than a builder option on purpose: a
+// fully-built Request is safe to run from several goroutines, and a decode
+// target living on the Request would be shared mutable state that every
+// concurrent run wrote into.
+func (r *Request) RunInto(
 	ctx context.Context,
 	value any,
 ) (*Response, error) {
-	return r.completeInto(ctx, value)
+	return r.runInto(ctx, value)
 }
 
-func (r *Request) run(
-	ctx context.Context,
-	withTools bool,
-	rawDelta func(Delta) error,
-) (*Response, error) {
+func (r *Request) run(ctx context.Context) (*Response, error) {
+	withTools := r.hasTools()
+
 	if err := r.validate(withTools); err != nil {
 		return nil, err
 	}
@@ -639,7 +695,7 @@ func (r *Request) run(
 	}
 
 	ctx = withRetryCallback(ctx, r.onRetry)
-	state := newRunState(r, withTools, rawDelta)
+	state := newRunState(r, withTools)
 	// The first round is round 1; withholding is decided by the one predicate
 	// on runState rather than a hardcoded specialization of it here.
 	withholdTools := withTools && state.shouldWithholdTools(1)

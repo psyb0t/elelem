@@ -1172,6 +1172,14 @@ type contentGateDriver struct {
 	streams int
 }
 
+func (d *contentGateDriver) Complete(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	return d.Stream(ctx, request, onDelta)
+}
+
 func (d *contentGateDriver) Stream(
 	context.Context,
 	DriverRequest,
@@ -1235,7 +1243,7 @@ func TestContentGate_UnsupportedContentNeverReachesTheDriver(t *testing.T) {
 					Role:    RoleUser,
 					Content: Content{TextOf("look"), tc.part},
 				})).
-				Complete(t.Context())
+				Run(t.Context())
 
 			assert.Equal(t, tc.wantStreams, driver.streams,
 				"unsupported content must not become a provider request")
@@ -1332,6 +1340,14 @@ func TestRequest_ReportsMalformedContentAsInvalidNotUnsupported(t *testing.T) {
 
 type capsDriver struct {
 	caps Capabilities
+}
+
+func (d *capsDriver) Complete(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	return d.Stream(ctx, request, onDelta)
 }
 
 func (d *capsDriver) Stream(

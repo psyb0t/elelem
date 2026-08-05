@@ -4,6 +4,76 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.4.0 — 2026-08-05
+
+One way to launch a request, and streaming becomes a choice.
+
+- **Breaking. `Request.Complete`, `Request.Stream` and `Request.CompleteInto`
+  are gone. `Run(ctx)` and `RunInto(ctx, &dst)` are the whole launcher
+  surface.**
+
+  Migration is mechanical:
+
+  | Before | After |
+  |---|---|
+  | `request.Run(ctx)` | unchanged |
+  | `request.Complete(ctx)` | `request.Run(ctx)` |
+  | `request.Stream(ctx, fn)` | `request.OnDelta(fn).Run(ctx)` |
+  | `request.CompleteInto(ctx, &v)` | `request.RunInto(ctx, &v)` |
+
+  The one behaviour change to check for: `Complete` did not send tools even
+  when the request carried them, so `WithTool(...).Complete(ctx)` silently
+  dropped them. `Run` sends whatever is configured. If a call site relied on
+  that suppression, build the request without the tools instead.
+
+  `Stream`'s callback was dispatched from the same line as `OnDelta`, with the
+  same value, differing only by not taking a `ctx` — and it also disabled tools
+  as a side effect of being a `Complete` variant. `OnDelta` chains, so a
+  library and an application can both watch the same stream, which the single
+  function pointer could not do.
+
+- **New: `WithStreaming(bool)`, on both the client and the request.** elelem
+  has always opened a streaming request; some OpenAI- and Anthropic-compatible
+  backends cannot serve one — an async job queue in front of the model has
+  nowhere to put a token stream — and reject the call outright.
+
+  ```go
+  client := elelem.New(driver, elelem.WithStreaming(false)) // every request
+  request.WithStreaming(false)                              // just this one
+  ```
+
+  The request-level setting wins over the client-level one in both directions.
+  This changes the transport, not the API: `OnDelta` / `OnText` /
+  `OnReasoning` still fire, tool calls still assemble, and the `Response` is
+  identical — it just arrives in one piece.
+
+- **`Driver` gains `Complete(ctx, DriverRequest, func(Delta) error)`** — the
+  same call with streaming off, feeding the finished response through the same
+  delta callback. A third-party driver must add it; see
+  [docs/drivers.md](docs/drivers.md). `Capabilities.StreamingUnsupported`
+  reports a provider that cannot stream at all, and then the non-streaming
+  path is taken regardless of what was asked for. The field is phrased
+  negatively on purpose: the zero value means streaming works, so a driver
+  that never sets it keeps the existing behaviour.
+
+- The Anthropic SDK refuses a non-streaming request whose `max_tokens` implies
+  a run over ten minutes, locally, before sending anything. The Anthropic
+  driver surfaces that as `ErrStreamingRequired` so it can be told apart from a
+  transport failure.
+
+- `RunInto` never sends tools, whatever the request carries — a typed object
+  and a tool list are competing answers to the same turn. This used to fall out
+  of `Complete`'s tool suppression; it is now stated where it happens.
+
+- `elelemtest.ScriptedDriver` implements both paths and records which one each
+  call took, via `Streamed()`. Both replay the same turn through the same
+  callback, so a test asserting on the transport choice can keep every other
+  assertion unchanged.
+
+- The lint configuration now lists the `sdkprobe` build tag. Build-tagged files
+  are skipped silently otherwise — the run stays green because it examined
+  nothing.
+
 ## v0.3.1 — 2026-08-05
 
 Test layout only. No API or behaviour change.

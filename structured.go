@@ -32,7 +32,7 @@ type structuredTarget struct {
 	rawSchema json.RawMessage
 }
 
-func (r *Request) completeInto(
+func (r *Request) runInto(
 	ctx context.Context,
 	value any,
 ) (*Response, error) {
@@ -50,7 +50,7 @@ func (r *Request) completeInto(
 
 	request := r.cloneForStructuredResponse(target.rawSchema)
 
-	response, err := request.Complete(ctx)
+	response, err := request.Run(ctx)
 	if err != nil {
 		return response, err
 	}
@@ -68,7 +68,7 @@ func (r *Request) completeInto(
 
 	repairRequest := request.cloneForRepair(response, validationErr)
 
-	repaired, err := repairRequest.Complete(ctx)
+	repaired, err := repairRequest.Run(ctx)
 	if repaired == nil {
 		return response, err
 	}
@@ -147,6 +147,17 @@ func newStructuredTarget(
 func (r *Request) cloneForStructuredResponse(schema json.RawMessage) *Request {
 	cloned := *r
 	cloned.params = cloneParams(r.params)
+
+	// Structured output does NOT send tools, and now says so instead of
+	// relying on a flag at the call site.
+	//
+	// This used to be implicit: the call below was Complete, whose withTools:
+	// false suppressed them. Once Run infers tools from configuration that
+	// suppression has to be stated here, or asking a tool-carrying request for
+	// a typed object would hand the model a schema AND a tool list — and get
+	// back a tool call instead of the object.
+	cloned.tools = nil
+	cloned.toolProvider = nil
 	cloned.params.ResponseFormat = &ResponseFormat{
 		Type:         ResponseFormatTypeJSONSchema,
 		Name:         structuredResponseSchemaName,
@@ -188,8 +199,8 @@ func (r *Request) cloneForRepair(
 		},
 	)
 	// NOTE: repair is bounded to one follow-up by the CALL GRAPH, not by a
-	// flag. The repair turn is dispatched with Complete, which never re-enters
-	// completeInto — the only reader of responseRepair — so a second repair
+	// flag. The repair turn is dispatched with Run, which never re-enters
+	// runInto — the only reader of responseRepair — so a second repair
 	// cannot be triggered. A `cloned.responseRepair = false` line used to sit
 	// here; inverting it to true left the entire suite green, confirming it
 	// was dead. Removed rather than left as reassuring decoration, since a

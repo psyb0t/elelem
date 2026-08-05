@@ -14,7 +14,7 @@ prompt := elelem.NewPrompt().
 response, err := elelem.NewRequest(client).
 	WithModel(model).
 	WithPrompt(prompt).
-	Complete(ctx)
+	Run(ctx)
 ```
 
 ## Contents

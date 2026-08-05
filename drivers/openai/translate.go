@@ -642,6 +642,76 @@ func validateToolCallUnit(messages []elelem.Message, assistantIndex int) error {
 	return nil
 }
 
+// chunkFromCompletion reshapes a non-streaming response into the single chunk
+// it would have been had the same answer arrived as one streamed frame.
+//
+// The point is to reuse scanChoiceSignals / publishChunk / deltasFromChunk
+// verbatim: the refusal promotion to ContentFilter, the int64 tool-call index
+// narrowing guard, and the finish-reason mapping are all subtle, all commented
+// where they live, and all wrong to write twice.
+//
+// Reasoning is NOT carried here and cannot be: it reaches elelem only through
+// the raw JSON body, and a chunk built in Go has no raw body. Complete reads
+// it from the message with reasoningFromRawJSON and emits it first, matching
+// the order deltasFromChunk uses.
+//
+// Only the first choice is taken, exactly as the streaming path does.
+func chunkFromCompletion(
+	completion openaisdk.ChatCompletion,
+) openaisdk.ChatCompletionChunk {
+	chunk := openaisdk.ChatCompletionChunk{
+		ID:      completion.ID,
+		Created: completion.Created,
+		Model:   completion.Model,
+		Usage:   completion.Usage,
+	}
+
+	if len(completion.Choices) == 0 {
+		return chunk
+	}
+
+	choice := completion.Choices[0]
+
+	toolCalls := make(
+		[]openaisdk.ChatCompletionChunkChoiceDeltaToolCall,
+		0,
+		len(choice.Message.ToolCalls),
+	)
+
+	for index, call := range choice.Message.ToolCalls {
+		function := openaisdk.ChatCompletionChunkChoiceDeltaToolCallFunction{
+			Name:      call.Function.Name,
+			Arguments: call.Function.Arguments,
+		}
+
+		toolCalls = append(
+			toolCalls,
+			openaisdk.ChatCompletionChunkChoiceDeltaToolCall{
+				// The streamed shape carries the provider's own index; a
+				// non-streaming response has none, so position in the array
+				// IS the ordering the provider gave us.
+				Index:    int64(index),
+				ID:       call.ID,
+				Type:     call.Type,
+				Function: function,
+			},
+		)
+	}
+
+	chunk.Choices = []openaisdk.ChatCompletionChunkChoice{{
+		Index:        choice.Index,
+		FinishReason: choice.FinishReason,
+		Delta: openaisdk.ChatCompletionChunkChoiceDelta{
+			Content:   choice.Message.Content,
+			Refusal:   choice.Message.Refusal,
+			Role:      string(choice.Message.Role),
+			ToolCalls: toolCalls,
+		},
+	}}
+
+	return chunk
+}
+
 func deltasFromChunk(
 	chunk openaisdk.ChatCompletionChunk,
 	refused bool,
@@ -708,7 +778,18 @@ func deltasFromChunk(
 }
 
 func reasoningFromDelta(choice chunkChoiceDelta) string {
-	raw := choice.RawJSON()
+	return reasoningFromRawJSON(choice.RawJSON())
+}
+
+// reasoningFromRawJSON pulls visible reasoning out of a raw provider payload.
+//
+// Split from reasoningFromDelta so the non-streaming path can reuse it against
+// ChatCompletionMessage.RawJSON(): neither `reasoning` nor `reasoning_content`
+// is a typed field on the SDK structs — they are compat-backend extensions —
+// so the only way to see them is the raw body, and a hand-built chunk has no
+// raw body to read. One probe, both paths, rather than two spellings of the
+// same field names drifting apart.
+func reasoningFromRawJSON(raw string) string {
 	if raw == "" {
 		return ""
 	}

@@ -118,7 +118,7 @@ func TestRequest_OnRetryFiresAndItsErrorStopsTheRun(t *testing.T) {
 
 				return nil
 			}).
-			Complete(context.Background())
+			Run(context.Background())
 		require.NoError(t, err)
 
 		// One failure, one retry, one notification — not zero (callback never
@@ -139,7 +139,7 @@ func TestRequest_OnRetryFiresAndItsErrorStopsTheRun(t *testing.T) {
 			OnRetry(func(context.Context, RetryAttempt) error {
 				return assert.AnError
 			}).
-			Complete(context.Background())
+			Run(context.Background())
 
 		require.ErrorIs(t, err, assert.AnError,
 			"OnRetry's error must stop the run like every other callback's")
@@ -653,7 +653,7 @@ func TestRetryAfterIsBoundedByMaxDelay(t *testing.T) {
 			client := New(driver, WithDefaultModel(Model{ID: "m"}))
 			_, err := NewRequest(client).
 				WithPrompt(NewPrompt().UserText("run")).
-				Complete(context.Background())
+				Run(context.Background())
 			require.NoError(t, err)
 
 			require.Len(t, clock.delays, 1)
@@ -957,7 +957,7 @@ func TestRetryAccounting_ExhaustedRetriesStillReportTheirCost(t *testing.T) {
 	response, err := NewRequest(New(retrying)).
 		WithModel(Model{ID: "test-model"}).
 		WithPrompt(NewPrompt().UserText("go")).
-		Complete(context.Background())
+		Run(context.Background())
 
 	require.ErrorIs(t, err, commonerrors.ErrRateLimited)
 	require.NotNil(t, response, "a failed run still reports what it spent")
@@ -999,7 +999,7 @@ func TestRetryAccounting_CleanRunReportsZeroWaste(t *testing.T) {
 	response, err := NewRequest(New(WithRetry(driver, RetryConfig{}))).
 		WithModel(Model{ID: "test-model"}).
 		WithPrompt(NewPrompt().UserText("go")).
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, response.Usage.Retry.TotalAttempts)

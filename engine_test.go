@@ -25,9 +25,46 @@ type scriptedDriver struct {
 	turns        []scriptedTurn
 	requests     []DriverRequest
 	capabilities Capabilities
+
+	// streamCalls / completeCalls record which half of the Driver interface
+	// the engine reached for. That routing IS the streaming feature — the
+	// replayed deltas are identical either way — so it is the only thing a
+	// WithStreaming test can meaningfully assert against a double.
+	streamCalls   int
+	completeCalls int
+}
+
+// Complete answers identically to Stream for every double in this package.
+//
+// These have no wire, so there is nothing for streaming to be on or off.
+// Reshaping the scripted deltas to imitate a non-streaming provider would mean
+// the double rewriting output its own test author wrote; a test wanting the
+// one-big-chunk shape scripts one big delta.
+func (d *scriptedDriver) Complete(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	d.mutex.Lock()
+	d.completeCalls++
+	d.mutex.Unlock()
+
+	return d.stream(ctx, request, onDelta)
 }
 
 func (d *scriptedDriver) Stream(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	d.mutex.Lock()
+	d.streamCalls++
+	d.mutex.Unlock()
+
+	return d.stream(ctx, request, onDelta)
+}
+
+func (d *scriptedDriver) stream(
 	_ context.Context,
 	request DriverRequest,
 	onDelta func(Delta) error,
@@ -91,7 +128,7 @@ func TestRequest_CancelReturnsPartialAssistant(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	response, err := NewRequest(client).
 		WithPrompt(NewPrompt().UserText("question")).
-		Complete(context.Background())
+		Run(context.Background())
 	require.ErrorIs(t, err, context.Canceled)
 	require.NotNil(t, response)
 	assert.Equal(t, "partial", response.Text)
@@ -100,29 +137,72 @@ func TestRequest_CancelReturnsPartialAssistant(t *testing.T) {
 	assert.Equal(t, MessageOriginTurn, response.Messages[1].Origin)
 }
 
-func TestRequest_CompleteIgnoresToolOnlySettings(t *testing.T) {
+// Run infers the tool loop from configuration, so tool-only settings reach the
+// wire whenever a tool is configured and stay off it otherwise.
+//
+// This replaced a test asserting the opposite. There used to be two launchers:
+// Complete deliberately dropped tools, tool choice and parallel-tool-calls even
+// when the caller had set them, so `WithTool(...).Complete(ctx)` silently sent
+// a tool-free request. That surprise is what the collapse removed; the useful
+// invariant is that the settings track the tools, and both directions of it are
+// worth pinning since only one of them can regress silently.
+func TestRequest_RunSendsToolSettingsOnlyWhenToolsAreConfigured(t *testing.T) {
 	t.Parallel()
 
-	parallel := true
-	driver := &scriptedDriver{turns: []scriptedTurn{{
-		deltas: []Delta{{Text: "done"}},
-		usage:  Usage{FinishReason: FinishReasonStop},
-	}}}
-	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
-	response, err := NewRequest(client).
-		WithPrompt(NewPrompt().UserText("question")).
-		WithTool(Tool{Name: "tool"}).
-		WithToolChoice(ToolChoiceTool("tool")).
-		WithParallelToolCalls(parallel).
-		Complete(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, "done", response.Text)
+	newDriver := func() *scriptedDriver {
+		return &scriptedDriver{
+			turns: []scriptedTurn{{
+				deltas: []Delta{{Text: "done"}},
+				usage:  Usage{FinishReason: FinishReasonStop},
+			}},
+			capabilities: Capabilities{
+				SupportsToolChoice:        true,
+				SupportsParallelToolCalls: true,
+			},
+		}
+	}
 
-	requests := driver.Requests()
-	require.Len(t, requests, 1)
-	assert.Empty(t, requests[0].Tools)
-	assert.Equal(t, ToolChoice{}, requests[0].Params.ToolChoice)
-	assert.Nil(t, requests[0].Params.ParallelToolCalls)
+	t.Run("with a tool configured", func(t *testing.T) {
+		t.Parallel()
+
+		parallel := true
+		driver := newDriver()
+		client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
+		response, err := NewRequest(client).
+			WithPrompt(NewPrompt().UserText("question")).
+			WithTool(Tool{Name: "tool"}).
+			WithToolChoice(ToolChoiceTool("tool")).
+			WithParallelToolCalls(parallel).
+			Run(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "done", response.Text)
+
+		requests := driver.Requests()
+		require.Len(t, requests, 1)
+		require.Len(t, requests[0].Tools, 1)
+		assert.Equal(t, "tool", requests[0].Tools[0].Name)
+		assert.Equal(t, ToolChoiceTool("tool"), requests[0].Params.ToolChoice)
+		require.NotNil(t, requests[0].Params.ParallelToolCalls)
+		assert.True(t, *requests[0].Params.ParallelToolCalls)
+	})
+
+	t.Run("with no tool configured", func(t *testing.T) {
+		t.Parallel()
+
+		driver := newDriver()
+		client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
+		response, err := NewRequest(client).
+			WithPrompt(NewPrompt().UserText("question")).
+			Run(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "done", response.Text)
+
+		requests := driver.Requests()
+		require.Len(t, requests, 1)
+		assert.Empty(t, requests[0].Tools)
+		assert.Equal(t, ToolChoice{}, requests[0].Params.ToolChoice)
+		assert.Nil(t, requests[0].Params.ParallelToolCalls)
+	})
 }
 
 func TestRequest_DynamicStrictToolIsRejectedBeforeDriverCall(t *testing.T) {
@@ -171,7 +251,7 @@ func TestRequest_OnRetryFiresBeforeSuccessfulRetry(t *testing.T) {
 
 			return nil
 		}).
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "done", response.Text)
 	require.Len(t, attempts, 1)
@@ -245,7 +325,7 @@ func TestRequest_CompletePreservesProviderReasoning(t *testing.T) {
 	response, err := NewRequest(client).
 		WithPrompt(NewPrompt().WithSystem("base").AppendSystem("extra").
 			UserText("question")).
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "answer", response.Text)
 	assert.Equal(t, "visible", response.Reasoning)
@@ -589,7 +669,7 @@ func TestRequest_ReasoningEffortUsesDriverCapabilities(t *testing.T) {
 		WithModel(Model{ID: "discovered-reasoning-model"}).
 		WithPrompt(NewPrompt().UserText("question")).
 		WithReasoningEffort(ReasoningEffortHigh).
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 
 	requests := driver.Requests()
@@ -658,7 +738,7 @@ func TestRequest_TokenLimitHandlersObserveFreshCounts(t *testing.T) {
 
 			return nil
 		}).
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, 40, preCount)
 	assert.Equal(t, 30, postCount)
@@ -833,7 +913,7 @@ func TestRequest_TranscriptRepairDropsUnpairedToolUnit(t *testing.T) {
 			{Role: RoleUser, Content: Text("current")},
 		})).
 		WithTranscriptRepair().
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "done", response.Text)
 
@@ -1006,6 +1086,14 @@ type bufferReusingDriver struct {
 	buffer json.RawMessage
 }
 
+func (d *bufferReusingDriver) Complete(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	return d.Stream(ctx, request, onDelta)
+}
+
 func (d *bufferReusingDriver) Stream(
 	_ context.Context,
 	_ DriverRequest,
@@ -1054,7 +1142,7 @@ func TestProviderReasoningIsCopiedFromTheDriverBuffer(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "m"}))
 
 	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
-		Complete(context.Background())
+		Run(context.Background())
 	require.NoError(t, err)
 
 	last := response.Messages[len(response.Messages)-1]
@@ -1361,6 +1449,14 @@ type identityLoggingDriver struct {
 	*scriptedDriver
 }
 
+func (d *identityLoggingDriver) Complete(
+	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	return d.Stream(ctx, request, onDelta)
+}
+
 func (d *identityLoggingDriver) Stream(
 	ctx context.Context,
 	request DriverRequest,
@@ -1406,7 +1502,7 @@ func TestEngine_CtxLoggerCarriesIdentityThroughTheWholeStack(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "probe"}))
 
 	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("hi")).
-		Stream(ctx, func(Delta) error { return nil })
+		Run(ctx)
 	require.NoError(t, err)
 
 	emitted := records()

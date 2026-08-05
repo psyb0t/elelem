@@ -900,6 +900,97 @@ func emitEventDelta(
 	return nil
 }
 
+// emitMessageContent replays a FINISHED message's content blocks as deltas,
+// for the non-streaming path where no stream events ever arrive.
+//
+// It mirrors emitEventDelta above block-for-block, and must keep mirroring it:
+// thinking becomes Reasoning, text becomes Text, and a tool_use block becomes
+// the start delta plus its arguments. The tool-call index is the ORDINAL AMONG
+// TOOL CALLS, not the content-block position — same as the streaming path,
+// which assigns len(state.toolCallIndexes) as each tool_use block opens. Using
+// the block position here instead would number calls differently depending on
+// how much text preceded them, and the engine pairs results to calls by that
+// index.
+//
+// Arguments arrive whole rather than as PartialJSON fragments, which is the
+// one real difference: the engine concatenates fragments, and one complete
+// fragment concatenates to itself.
+func emitMessageContent(
+	message anthropicsdk.Message,
+	onDelta func(elelem.Delta) error,
+) error {
+	if onDelta == nil {
+		return nil
+	}
+
+	toolCallIndex := 0
+
+	for _, block := range message.Content {
+		delta, emit := deltaFromContentBlock(block, toolCallIndex)
+		if !emit {
+			continue
+		}
+
+		if delta.ToolCall != nil {
+			toolCallIndex++
+		}
+
+		if err := onDelta(delta); err != nil {
+			return ctxerrors.Wrapf(
+				err, "emit Anthropic %s block", block.Type,
+			)
+		}
+	}
+
+	return nil
+}
+
+// deltaFromContentBlock maps one finished block to its delta, reporting
+// whether there is anything to emit at all.
+//
+// redacted_thinking and the server-tool result blocks return false: they carry
+// no caller-visible delta, and they still reach the caller through
+// finishStream's ProviderReasoning payload, which serializes the whole block
+// list — so skipping them here loses nothing.
+func deltaFromContentBlock(
+	block anthropicsdk.ContentBlockUnion,
+	toolCallIndex int,
+) (elelem.Delta, bool) {
+	switch block.Type {
+	case "thinking":
+		if block.Thinking == "" {
+			return elelem.Delta{}, false
+		}
+
+		return elelem.Delta{Reasoning: block.Thinking}, true
+	case "text":
+		if block.Text == "" {
+			return elelem.Delta{}, false
+		}
+
+		return elelem.Delta{Text: block.Text}, true
+	case "tool_use":
+		call := &elelem.ToolCallDelta{
+			Index: toolCallIndex,
+			ID:    block.ID,
+			Name:  block.Name,
+		}
+
+		// Input is json.RawMessage on the union. An absent input is a tool
+		// called with no arguments, which is legitimate, so it stays empty
+		// rather than being forced to "{}" — the engine already normalizes
+		// empty arguments, and doing it here too would be a second place for
+		// that decision to drift.
+		if len(block.Input) > 0 {
+			call.Arguments = string(block.Input)
+		}
+
+		return elelem.Delta{ToolCall: call}, true
+	default:
+		return elelem.Delta{}, false
+	}
+}
+
 // decodeReasoningBlocks turns the stored opaque blocks back into provider
 // params, refusing anything that is not reasoning state.
 //

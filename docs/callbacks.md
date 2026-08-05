@@ -107,6 +107,12 @@ arrival order; don't assume word or line boundaries.
 `OnReasoning` are the filtered convenience views. Using all three is fine;
 you'll just see the same content more than once.
 
+These are the only way to watch a reply arrive, and they fire whether or not
+the transport streams — with `WithStreaming(false)` the driver feeds the
+finished response through the same callbacks, so a renderer built on them
+still works, it just gets everything at once. See
+[requests.md](requests.md#streaming).
+
 ## Tool calls
 
 | Method | Payload |

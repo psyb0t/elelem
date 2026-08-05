@@ -82,7 +82,6 @@ type runState struct {
 	injections []MessageInjection
 	round      int
 	withTools  bool
-	rawDelta   func(Delta) error
 
 	// cappedArgumentCalls remembers which calls already reported hitting the
 	// argument size cap, so a stream that keeps sending past it logs once
@@ -93,17 +92,12 @@ type runState struct {
 	warnedToolCallCap bool
 }
 
-func newRunState(
-	request *Request,
-	withTools bool,
-	rawDelta func(Delta) error,
-) *runState {
+func newRunState(request *Request, withTools bool) *runState {
 	return &runState{
 		request:   request,
 		model:     request.resolvedModel(),
 		messages:  request.assembledMessages(),
 		withTools: withTools,
-		rawDelta:  rawDelta,
 	}
 }
 
@@ -411,7 +405,16 @@ func (s *runState) streamAssistant(
 		Tools:    cloneTools(tools),
 		Params:   s.driverParams(tools),
 	}
-	usage, err := s.request.client.driver.Stream(
+	// Both driver calls take the SAME delta callback, so nothing below this
+	// line — the tool-call assembler, every On* callback, essessey's content
+	// blocks — can tell which one ran. A non-streaming turn simply arrives as
+	// fewer, larger deltas.
+	call := s.request.client.driver.Stream
+	if !s.request.resolvedStreaming() {
+		call = s.request.client.driver.Complete
+	}
+
+	usage, err := call(
 		ctx,
 		request,
 		func(delta Delta) error {
@@ -721,20 +724,24 @@ func (s *runState) dispatchDelta(ctx context.Context, delta Delta) error {
 	return s.dispatchTextDelta(ctx, delta)
 }
 
+// dispatchRawDelta hands every driver delta to OnDelta.
+//
+// There used to be a second callback here, the function Stream took as an
+// argument, fired on the same line with the same value and differing only by
+// not taking a ctx. Two plumbing paths for one concept: a field on runState, a
+// parameter threaded through newRunState, and a branch in the hot delta path.
+// OnDelta does the same job and, since it chains, lets a library and an app
+// both watch the stream — which the single function pointer could not.
 func (s *runState) dispatchRawDelta(
 	ctx context.Context,
 	delta Delta,
 ) error {
-	if s.rawDelta != nil {
-		if err := s.rawDelta(delta); err != nil {
-			return ctxerrors.Wrap(err, "raw delta")
-		}
+	if s.request.onDelta == nil {
+		return nil
 	}
 
-	if s.request.onDelta != nil {
-		if err := s.request.onDelta(ctx, delta); err != nil {
-			return ctxerrors.Wrap(err, "on delta")
-		}
+	if err := s.request.onDelta(ctx, delta); err != nil {
+		return ctxerrors.Wrap(err, "on delta")
 	}
 
 	return nil

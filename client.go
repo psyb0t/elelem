@@ -4,6 +4,10 @@ type clientConfig struct {
 	defaultModel       Model
 	tokenCounter       TokenCounter
 	capabilityOverride func(Model, Capabilities) Capabilities
+
+	// streaming defaults to true in New, so a Request can inherit it as a
+	// plain bool at construction and no layer needs a "was this set?" flag.
+	streaming bool
 }
 
 // Option configures process-level defaults on a Client. Anything that varies
@@ -21,7 +25,10 @@ type Client struct {
 // New builds a Client over the given Driver. A nil Option is skipped, so
 // conditional wiring needs no branch at the call site.
 func New(driver Driver, opts ...Option) *Client {
-	config := clientConfig{}
+	// Streaming on unless an option says otherwise — the default every
+	// provider is built around, and the behaviour every existing caller
+	// already gets.
+	config := clientConfig{streaming: true}
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -81,6 +88,38 @@ func WithCapabilityOverride(
 ) Option {
 	return func(config *clientConfig) {
 		config.capabilityOverride = override
+	}
+}
+
+// WithStreaming turns the provider's streaming mode on or off for every
+// request this client makes. Default on.
+//
+// This is deliberately NOT a capability override. Capabilities describe what
+// the provider CAN do and WithCapabilityOverride may only ever restrict them;
+// this is a choice between two things the provider supports equally, made by
+// whoever knows what sits between you and it.
+//
+// Turn it off when the PATH cannot deliver a stream even though the model
+// can. The case that motivated it: an async queue proxy in front of the
+// endpoint accepts the request, returns a job id immediately, and stores the
+// upstream response to be fetched later — so a streamed body is buffered and
+// replayed whole, and asking for one bought nothing but a stored SSE blob
+// where a JSON object was expected. Same for a compat gateway that terminates
+// the connection its own way.
+//
+//	// everything through this endpoint is queued, so never stream
+//	elelem.New(driver, elelem.WithStreaming(false))
+//
+// When the model reports SupportsStreaming false this is moot — the field is
+// omitted entirely and the non-streaming path is the only one available.
+//
+// Turning it off does NOT change what your callbacks receive. The driver
+// feeds the completed response through the same delta callback, so OnDelta,
+// OnText and every downstream accumulator still fire; the content simply
+// arrives in one chunk instead of many.
+func WithStreaming(enabled bool) Option {
+	return func(config *clientConfig) {
+		config.streaming = enabled
 	}
 }
 

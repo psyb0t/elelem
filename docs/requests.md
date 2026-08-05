@@ -7,6 +7,7 @@ all chains.
 
 - [Client and request lifecycle](#client-and-request-lifecycle)
 - [Terminal calls](#terminal-calls)
+- [Streaming](#streaming)
 - [The prompt](#the-prompt)
 - [History](#history)
 - [Model](#model)
@@ -49,19 +50,26 @@ panicking, so a nil check at every call site isn't needed.
 
 | Call | Does |
 |---|---|
-| `Run(ctx)` | Sends the request **with tools attached**. |
-| `Complete(ctx)` | Sends the request **without tools**. |
-| `Stream(ctx, onDelta)` | Like `Complete`, plus a raw delta callback. |
-| `CompleteInto(ctx, &dst)` | Structured output — see [structured-output.md](structured-output.md). |
+| `Run(ctx)` | Sends the request. Tools go out if any are configured. |
+| `RunInto(ctx, &dst)` | Structured output — see [structured-output.md](structured-output.md). |
 
-**`Run` vs `Complete` is about whether tools are SENT, not about who executes
-them.** That trips people up, so to be explicit:
+Two launchers, and the only difference is whether you want a typed value back.
+**Whether tools are sent is not a choice made at the call site** — a request
+that carries tools sends them, one that doesn't, doesn't:
 
 ```go
+request.Run(ctx)                                      // no tools configured, none sent
 request.WithTools(tools).Run(ctx)                     // manual: you execute
 request.WithTools(tools).WithAutoToolCalls().Run(ctx) // automatic loop
-request.Complete(ctx)                                 // tools not sent at all
 ```
+
+To send no tools, configure none. `RunInto` is the one exception, and it is
+not a toggle either: a structured turn always suppresses tools, because a
+typed object and a tool list are competing answers to the same turn.
+
+Watching the reply arrive piece by piece is a callback, not a launcher —
+`OnDelta` / `OnText` / `OnReasoning`, see [callbacks.md](callbacks.md).
+Whether the HTTP call itself streams is `WithStreaming`, below.
 
 **Manual driving is the default.** A `Run` without `WithAutoToolCalls` returns
 as soon as the model asks for a tool, handing you `Response.ToolCalls` and
@@ -71,6 +79,39 @@ decide per call; see [tools.md](tools.md#driving-the-loop-by-hand).
 
 `WithAutoToolCalls()` is what makes the engine run the loop itself until the
 model stops asking for tools or `MaxRounds` is hit.
+
+## Streaming
+
+elelem streams by default: the driver opens a streaming request and the engine
+assembles the reply from the deltas as they land.
+
+Some OpenAI-compatible and Anthropic-compatible backends cannot serve that —
+an async job queue in front of the model has nowhere to put a token stream, and
+says so. `WithStreaming(false)` sends the same request with streaming off:
+
+```go
+client := elelem.New(driver, elelem.WithStreaming(false)) // every request
+request.WithStreaming(false)                              // just this one
+```
+
+The request-level setting wins over the client-level one, in both directions.
+
+**Turning streaming off changes the transport, not the API.** The driver feeds
+the finished response through the same delta callback the streaming path uses,
+so `OnDelta` / `OnText` / `OnReasoning` still fire, tool calls still assemble,
+and the `Response` is the same — it just arrives in one piece instead of many.
+
+A driver that cannot stream at all reports `Capabilities.StreamingUnsupported`,
+and then the non-streaming path is taken no matter what was asked for. Note the
+negative phrasing: the zero value means streaming works, so a driver that never
+sets the field keeps the default rather than silently moving its traffic onto a
+different transport.
+
+One provider-side limit is worth knowing before you disable streaming: the
+Anthropic SDK refuses a non-streaming request whose `max_tokens` implies a run
+longer than ten minutes, and it refuses locally without sending anything. The
+Anthropic driver surfaces that as `ErrStreamingRequired` so it can be told
+apart from a transport failure.
 
 ## The prompt
 

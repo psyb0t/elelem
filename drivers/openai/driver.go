@@ -148,6 +148,144 @@ func (d *Driver) Stream(
 	return usage, streamErr
 }
 
+// Complete issues the same chat completion with streaming off.
+//
+// Chat.Completions.New omits the `stream` field entirely rather than sending
+// `stream: false` — NewStreaming is the one that appends
+// option.WithJSONSet("stream", true) — which is what a strict compat backend
+// needs, since such a backend can reject an unexpected `stream: false` as
+// readily as `stream: true`.
+//
+// The response is adapted into ONE ChatCompletionChunk and pushed through the
+// exact same publishChunk path the stream uses. That is deliberate: the
+// refusal promotion, the tool-call index narrowing and the finish-reason
+// mapping all live in that path and are each load-bearing. A second
+// translation here would be the obvious way to write this and the reliable way
+// to make the two paths disagree.
+func (d *Driver) Complete(
+	ctx context.Context,
+	req elelem.DriverRequest,
+	onDelta func(elelem.Delta) error,
+) (elelem.Usage, error) {
+	var usage elelem.Usage
+
+	if err := validateTranscript(req.Messages); err != nil {
+		return usage, err
+	}
+
+	params, err := toOpenAIParams(req)
+	if err != nil {
+		return usage, err
+	}
+
+	logger := scope.GetLogger(ctx)
+
+	logger.Debug(
+		"openai request starting",
+		"model", req.Model.ID,
+		"messages", len(req.Messages),
+		"tools", len(req.Tools),
+		"streaming", false,
+	)
+
+	completion, err := d.api.Chat.Completions.New(
+		ctx,
+		params,
+		extraOptions(req.Params.Extra)...,
+	)
+	if err != nil {
+		logger.Warn(
+			"openai non-streaming request failed",
+			"reason", elelem.LogReasonStreamReadFailed,
+			"model", req.Model.ID,
+			"err", err,
+		)
+
+		return usage, ctxerrors.Wrap(
+			normalizeProviderError(err),
+			"complete chat completions",
+		)
+	}
+
+	rawFinishReason, err := publishCompletion(*completion, onDelta, &usage)
+	if err != nil {
+		return usage, err
+	}
+
+	warnUnmappedFinishReason(ctx, req.Model.ID, rawFinishReason, usage)
+
+	logger.Debug(
+		"openai request completed",
+		"model", usage.Model,
+		"finish_reason", usage.FinishReason,
+		"prompt_tokens", usage.Prompt,
+		"completion_tokens", usage.Completion,
+	)
+
+	return usage, nil
+}
+
+// publishCompletion turns a finished response into deltas and accumulates its
+// usage, returning the provider's raw finish reason for the unmapped-value
+// warning.
+//
+// Reasoning goes first, then everything else via the SAME chunk path the
+// stream uses — scanChoiceSignals for the stream-scoped signals, publishChunk
+// for the deltas — so the refusal promotion, the tool-call index guard and the
+// finish-reason mapping have exactly one implementation between the two modes.
+func publishCompletion(
+	completion openaisdk.ChatCompletion,
+	onDelta func(elelem.Delta) error,
+	usage *elelem.Usage,
+) (string, error) {
+	if err := publishCompletionReasoning(completion, onDelta); err != nil {
+		return "", err
+	}
+
+	chunk := chunkFromCompletion(completion)
+
+	var (
+		rawFinishReason string
+		refused         bool
+	)
+
+	scanChoiceSignals(chunk, &rawFinishReason, &refused)
+
+	if err := publishChunk(chunk, onDelta, usage, refused); err != nil {
+		return rawFinishReason, err
+	}
+
+	return rawFinishReason, nil
+}
+
+// publishCompletionReasoning emits the non-streaming response's visible
+// reasoning, ahead of everything else so the delta order matches the streaming
+// path's (deltasFromChunk emits reasoning first).
+//
+// It reads the RAW body rather than a typed field because `reasoning` and
+// `reasoning_content` are compat-backend extensions the SDK does not model —
+// which is also why this cannot live inside chunkFromCompletion: a chunk built
+// in Go has no raw body to read.
+func publishCompletionReasoning(
+	completion openaisdk.ChatCompletion,
+	onDelta func(elelem.Delta) error,
+) error {
+	if onDelta == nil || len(completion.Choices) == 0 {
+		return nil
+	}
+
+	reasoning := reasoningFromRawJSON(completion.Choices[0].Message.RawJSON())
+	if reasoning == "" {
+		return nil
+	}
+
+	if err := onDelta(elelem.Delta{Reasoning: reasoning}); err != nil {
+		return ctxerrors.Wrap(err, "publish completion delta")
+	}
+
+	return nil
+}
+
 // warnUnmappedFinishReason surfaces a provider stop reason no case matched.
 // Unknown values normalize to Unset rather than Stop so they can never
 // masquerade as a clean finish — but Unset is itself invisible, so this is how

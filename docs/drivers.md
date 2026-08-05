@@ -17,19 +17,42 @@ adding a third one, this is the contract.
 ```go
 type Driver interface {
 	Stream(context.Context, DriverRequest, func(Delta) error) (Usage, error)
+	Complete(context.Context, DriverRequest, func(Delta) error) (Usage, error)
 	ListModels(context.Context) ([]string, error)
 	Capabilities(Model) Capabilities
 	TokenCounter() TokenCounter
 }
 ```
 
-Four methods. `TokenCounter` may return nil, in which case the engine falls
+Five methods. `TokenCounter` may return nil, in which case the engine falls
 back through its own resolution order (see
 [history.md](history.md#counting)).
 
 A driver's job: translate portable requests and streams, validate provider
 transcript constraints, normalize finish reasons and usage, and report
 conservative model capabilities.
+
+**`Complete` is the same call with streaming off, and it takes the same delta
+callback deliberately.** Everything downstream of a driver is delta-shaped —
+the engine's tool-call assembler, every `On*` callback, the content-block
+protocol a consumer builds on top — and none of it has a second code path for
+a non-streaming turn. So `Complete` issues the finished request, then feeds the
+response through the callback as one delta per piece of content, and the caller
+cannot tell which path ran except by timing. Returning a whole `Message`
+instead would have forced a parallel implementation of all of it.
+
+Two details a new driver gets wrong in the same way both shipped ones did:
+
+- **Tool-call indices are the ordinal among TOOL CALLS**, not the position of
+  the block in the response. Number them by their position in the content array
+  and the engine pairs results to calls that do not exist.
+- **Validate the transcript on this path too.** Skipping it ships an orphaned
+  tool result that the provider rejects on the NEXT request, which is the worst
+  possible place to find out.
+
+If the provider cannot stream at all, say so with
+`Capabilities.StreamingUnsupported` and the engine takes `Complete` regardless
+of what the caller asked for — see [requests.md](requests.md#streaming).
 
 ## The one rule
 

@@ -252,6 +252,16 @@ func WithRetry(driver Driver, config RetryConfig) Driver {
 	}
 }
 
+// driverCall is Driver.Stream or Driver.Complete. Their signatures are
+// identical on purpose, so the retry machinery below runs unchanged over
+// either and there is exactly one implementation of the backoff, the
+// classification and the accounting.
+type driverCall func(
+	context.Context,
+	DriverRequest,
+	func(Delta) error,
+) (Usage, error)
+
 func (d *retryDriver) Stream(
 	ctx context.Context,
 	request DriverRequest,
@@ -261,18 +271,35 @@ func (d *retryDriver) Stream(
 		return Usage{}, ctxerrors.Wrap(d.configErr, "retry config")
 	}
 
-	return d.streamWithRetry(ctx, request, onDelta)
+	return d.callWithRetry(ctx, d.driver.Stream, request, onDelta)
 }
 
-func (d *retryDriver) streamWithRetry(
+// Complete retries exactly as Stream does. If anything it retries MORE
+// readily: a non-streaming attempt that fails has emitted no deltas at all,
+// so it never trips the "already streamed output, cannot safely re-run" guard
+// that stops a half-delivered stream from being retried.
+func (d *retryDriver) Complete(
 	ctx context.Context,
+	request DriverRequest,
+	onDelta func(Delta) error,
+) (Usage, error) {
+	if d.configErr != nil {
+		return Usage{}, ctxerrors.Wrap(d.configErr, "retry config")
+	}
+
+	return d.callWithRetry(ctx, d.driver.Complete, request, onDelta)
+}
+
+func (d *retryDriver) callWithRetry(
+	ctx context.Context,
+	call driverCall,
 	request DriverRequest,
 	onDelta func(Delta) error,
 ) (Usage, error) {
 	aggregate := Usage{}
 
 	for attempt := 1; attempt <= d.config.MaxAttempts; attempt++ {
-		usage, streamed, err := d.streamAttempt(ctx, request, onDelta)
+		usage, streamed, err := d.attempt(ctx, call, request, onDelta)
 
 		aggregate.Retry.TotalAttempts++
 
@@ -386,14 +413,15 @@ func (d *retryDriver) wait(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-func (d *retryDriver) streamAttempt(
+func (d *retryDriver) attempt(
 	ctx context.Context,
+	call driverCall,
 	request DriverRequest,
 	onDelta func(Delta) error,
 ) (Usage, bool, error) {
 	streamed := false
 
-	usage, err := d.driver.Stream(ctx, request, func(delta Delta) error {
+	usage, err := call(ctx, request, func(delta Delta) error {
 		streamed = true
 
 		if onDelta == nil {

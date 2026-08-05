@@ -648,3 +648,197 @@ func writeSSE(
 		flusher.Flush()
 	}
 }
+
+const (
+	completeTestAPIKey = "test-key"
+
+	// A real model id, because the SDK's non-streaming guard consults a
+	// per-model cap table on top of its time rule — a made-up id would silently
+	// exercise only half the check.
+	completeTestModel = "claude-opus-4-6"
+)
+
+// completionFixture is a finished (non-streamed) Messages response carrying
+// every block type the translation has to handle at once: thinking, text, and
+// two tool_use blocks whose ordering is implied only by array position.
+//
+//nolint:lll // Wire fixture stays single-line to match the shape a provider sends.
+const completionFixture = `{"id":"msg-complete","type":"message","role":"assistant","model":"claude-test","stop_reason":"tool_use","stop_sequence":null,"content":[{"type":"thinking","thinking":"deciding which tools to call","signature":"sig"},{"type":"text","text":"checking that now"},{"type":"tool_use","id":"call_a","name":"get_weather","input":{"city":"Bucharest"}},{"type":"tool_use","id":"call_b","name":"get_time","input":{"tz":"EET"}}],"usage":{"input_tokens":11,"output_tokens":7}}`
+
+func completionServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		_ *http.Request,
+	) {
+		writer.Header().Set(
+			aichteeteapee.HeaderNameContentType,
+			aichteeteapee.ContentTypeJSON,
+		)
+
+		_, err := writer.Write([]byte(completionFixture))
+		require.NoError(t, err)
+	}))
+
+	t.Cleanup(server.Close)
+
+	return server
+}
+
+// Complete must deliver the SAME delta shapes Stream does, since everything
+// downstream is delta-shaped and has no separate non-streaming path.
+//
+// The tool-call index is the ordinal among TOOL CALLS, not the content-block
+// position — the streaming path assigns it as each tool_use block opens. Here
+// two tool_use blocks sit at block positions 2 and 3, so using block position
+// would number them 2 and 3 and the engine would pair results to calls that do
+// not exist.
+func TestCompleteEmitsTheSameDeltaShapesAsStream(t *testing.T) {
+	t.Parallel()
+
+	server := completionServer(t)
+	driver := NewDriver(
+		WithBaseURL(server.URL),
+		WithAPIKey(completeTestAPIKey),
+		WithHTTPClient(server.Client()),
+	)
+
+	var deltas []elelem.Delta
+
+	usage, err := driver.Complete(
+		t.Context(),
+		elelem.DriverRequest{
+			Model: elelem.Model{ID: completeTestModel},
+			Messages: []elelem.Message{{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("weather?"),
+			}},
+		},
+		func(delta elelem.Delta) error {
+			deltas = append(deltas, delta)
+
+			return nil
+		},
+	)
+	require.NoError(t, err)
+
+	var reasoning, text string
+
+	calls := map[int]elelem.ToolCallDelta{}
+
+	for _, delta := range deltas {
+		reasoning += delta.Reasoning
+		text += delta.Text
+
+		if delta.ToolCall != nil {
+			calls[delta.ToolCall.Index] = *delta.ToolCall
+		}
+	}
+
+	assert.Equal(t, "deciding which tools to call", reasoning)
+	assert.Equal(t, "checking that now", text)
+
+	require.Len(t, calls, 2, "both tool calls must survive translation")
+	assert.Equal(t, "call_a", calls[0].ID,
+		"tool calls index from 0, not from block position")
+	assert.Equal(t, "get_weather", calls[0].Name)
+	assert.JSONEq(t, `{"city":"Bucharest"}`, calls[0].Arguments)
+	assert.Equal(t, "call_b", calls[1].ID)
+	assert.Equal(t, "get_time", calls[1].Name)
+	assert.JSONEq(t, `{"tz":"EET"}`, calls[1].Arguments)
+
+	assert.Equal(t, elelem.FinishReasonToolCalls, usage.FinishReason)
+	assert.Equal(t, int64(11), usage.Prompt)
+	assert.Equal(t, int64(7), usage.Completion)
+}
+
+// A nil callback is part of the Driver contract — conformance.Run passes one —
+// so Complete must still report usage rather than panicking.
+func TestCompleteWithNilCallbackStillReportsUsage(t *testing.T) {
+	t.Parallel()
+
+	server := completionServer(t)
+	driver := NewDriver(
+		WithBaseURL(server.URL),
+		WithAPIKey(completeTestAPIKey),
+		WithHTTPClient(server.Client()),
+	)
+
+	usage, err := driver.Complete(
+		t.Context(),
+		elelem.DriverRequest{
+			Model: elelem.Model{ID: completeTestModel},
+			Messages: []elelem.Message{{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("weather?"),
+			}},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, elelem.FinishReasonToolCalls, usage.FinishReason)
+}
+
+// The SDK refuses non-streaming CLIENT-SIDE once max_tokens implies a run over
+// ten minutes (1hr x max_tokens/128000). Measured against the vendored SDK the
+// cutoff is exactly 21333 — 21333 allowed, 21334 refused — and no HTTP request
+// is made either way.
+//
+// It must surface as a matchable sentinel, not the SDK's bare fmt.Errorf: a
+// caller who deliberately disabled streaming has to be able to tell THIS apart
+// from a transport failure and react by raising the ceiling or accepting a
+// stream. The server here would answer happily; that it is never reached is
+// the point.
+func TestCompleteRejectsMaxTokensAboveNonStreamingCutoff(t *testing.T) {
+	t.Parallel()
+
+	server := completionServer(t)
+	driver := NewDriver(
+		WithBaseURL(server.URL),
+		WithAPIKey(completeTestAPIKey),
+		WithHTTPClient(server.Client()),
+	)
+
+	testCases := []struct {
+		name        string
+		maxTokens   int64
+		wantRefusal bool
+	}{
+		{"at the cutoff", 21333, false},
+		{"one past the cutoff", 21334, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			maxTokens := tc.maxTokens
+
+			_, err := driver.Complete(
+				t.Context(),
+				elelem.DriverRequest{
+					Model: elelem.Model{ID: completeTestModel},
+					Messages: []elelem.Message{{
+						Role:    elelem.RoleUser,
+						Content: elelem.Text("write at length"),
+					}},
+					Params: elelem.GenerationParams{
+						MaxOutputTokens: &maxTokens,
+					},
+				},
+				nil,
+			)
+
+			if !tc.wantRefusal {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, ErrStreamingRequired,
+				"the SDK's pre-flight refusal must be matchable")
+		})
+	}
+}
