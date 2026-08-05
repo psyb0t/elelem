@@ -1,7 +1,10 @@
 # Callbacks
 
-Sixteen observation points. All optional, all chainable, all with the same
-signature shape: `func(context.Context, T) error`.
+Sixteen observation points. All optional, all with the same signature shape:
+`func(context.Context, T) error`.
+
+Registering the same one twice **appends** rather than replaces — see
+[Registering more than one handler](#registering-more-than-one-handler).
 
 **Returning an error from any callback stops the request.** They are your code,
 so a failure in one is a caller-code failure, not a model condition. If you
@@ -12,12 +15,57 @@ see a `OnToolResult` for a call whose `OnToolCallStart` hasn't fired.
 
 ## Contents
 
+- [Registering more than one handler](#registering-more-than-one-handler)
 - [Run and round lifecycle](#run-and-round-lifecycle)
 - [Streaming output](#streaming-output)
 - [Tool calls](#tool-calls)
 - [Retries and errors](#retries-and-errors)
 - [Token limits](#token-limits)
 - [A worked example](#a-worked-example)
+
+## Registering more than one handler
+
+Calling the same `On*` method twice **appends**. Both handlers run, in the order
+they were registered, and the first one to return an error stops the chain — the
+later handlers never see that event.
+
+```go
+request.
+	OnText(logIt).      // runs first
+	OnText(renderIt)    // then this
+```
+
+This matters when a library builds part of the request and your code adds to it.
+Under replace semantics, whichever side registered last would silently
+unregister the other: no error, no log, just a handler that stopped running.
+
+To go the other way — replace instead of add — clear the chain first:
+
+| Method | Effect |
+|---|---|
+| `ResetCallback(kinds...)` | Clears the chain for each named kind; the others are untouched. |
+| `ResetCallbacks()` | Clears every chain at once. |
+
+```go
+base.
+	ResetCallback(elelem.CallbackText).   // drop the inherited text handler
+	OnText(myOwnRenderer)                 // ...and only mine runs
+```
+
+The `CallbackKind` constants (`CallbackStart`, `CallbackText`,
+`CallbackRoundStart`, `CallbackToolResult`, ... — one per `On*` method) are the
+whole valid set. An unrecognized kind is ignored rather than clearing something
+else by accident.
+
+A `Request` is re-executable, so "configure a base request once, then derive
+variants" is a real pattern; these two methods are how a variant gets back out
+of what the base registered.
+
+**The two token-limit handlers are the exception.** `PreMaxTokensReached` and
+`PostMaxTokensReached` still REPLACE — `PreMaxTokensReached` has a built-in
+default it is meant to displace, and chaining onto a handler that rewrites the
+transcript in place would run the second one against the first one's output.
+See [Token limits](#token-limits).
 
 ## Run and round lifecycle
 

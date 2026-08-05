@@ -1,0 +1,19 @@
+title = "elelem secret scanning"
+
+[extend]
+useDefault = true
+
+# gitleaks' `dir` mode walks the working tree and does NOT honour .gitignore,
+# so anything ignored there has to be named again here or a local scratch dir
+# fails the release for a file that was never going to be committed.
+[[allowlists]]
+description = "Local scratch and vendored deps — never committed"
+paths = [
+  '''(^|/)\.research_files(?:/|$)''',
+  '''(^|/)\.agent_notes(?:/|$)''',
+  '''(^|/)\.anustimes(?:/|$)''',
+  '''(^|/)\.brutal_reviews(?:/|$)''',
+  '''(^|/)\.plan-and-delegate(?:/|$)''',
+  '''(^|/)\.telemetry(?:/|$)''',
+  '''(^|/)vendor(?:/|$)''',
+]

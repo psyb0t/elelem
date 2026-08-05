@@ -4,6 +4,43 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.3.0 — 2026-08-05
+
+Registering a callback twice adds a handler instead of discarding the first.
+
+- **Breaking (behaviour, not signature): every `On*` method now APPENDS to a
+  chain rather than replacing what was registered.** Both handlers run, in
+  registration order, and the first to return an error stops the chain.
+
+  The old behaviour failed by absence. A library that wired part of a request
+  and a caller that added its own hook for the same event silently
+  unregistered each other — no error, no log, just a handler that stopped
+  running — and neither side could see the other to know it had happened.
+  Found while composing an adapter with an application's own per-round hook.
+
+  Code that registered exactly one handler per event is unaffected. Code that
+  relied on the second registration winning must now clear the chain first.
+
+- **New: `ResetCallback(kinds ...CallbackKind)` and `ResetCallbacks()`** are
+  how a caller replaces rather than adds. `ResetCallbacks` clears every chain;
+  `ResetCallback` clears only the kinds named, so a single handler can be
+  swapped on a shared base request without disturbing the others:
+
+  ```go
+  base.
+      ResetCallback(elelem.CallbackText).
+      OnText(myOwnRenderer)
+  ```
+
+  `CallbackKind` is a typed string with one constant per `On*` method
+  (`CallbackStart`, `CallbackText`, `CallbackRoundStart`, `CallbackToolResult`,
+  ...). An unrecognized kind is ignored rather than clearing the wrong chain.
+
+- `PreMaxTokensReached` and `PostMaxTokensReached` deliberately keep REPLACE
+  semantics. `PreMaxTokensReached` exists to displace a built-in default, and
+  both rewrite the transcript in place — chaining would run the second handler
+  against the first one's output. Documented in `docs/callbacks.md`.
+
 ## v0.2.0 — 2026-08-05
 
 Prompts are one immutable value, and messages carry multimodal content.

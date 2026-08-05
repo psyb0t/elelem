@@ -332,8 +332,157 @@ func (r *Request) PostMaxTokensReached(handler TokenLimitHandler) *Request {
 	return r
 }
 
+// chainCallback composes two handlers for the same event so BOTH run, in
+// registration order.
+//
+// Every On* setter goes through this because assignment was the wrong default.
+// "OnRoundStart" reads as subscribing to an event, so a second registration
+// looks additive — but plain assignment silently DISCARDED the first, and the
+// symptom is absence: no error, no log, just a handler that stops running.
+// That bites hardest when one of the two registrations came from a library the
+// caller is composing with, since neither side can see the other.
+//
+// The first error stops the chain and is returned, matching the existing rule
+// that an error from any callback aborts the run — a handler that failed has
+// no business letting the next one act on the same event.
+//
+// It does NOT pass values between handlers. These are observation points: the
+// engine holds its own copy and never reads one back, so a "result" threaded
+// handler-to-handler would look like it steered the run when it cannot. Two
+// handlers that genuinely need to share state are closures written by the same
+// caller and can simply close over a variable. Note that events carrying a
+// POINTER (*RunEvent, *RoundEvent, *Response) already share one value across
+// the chain, which covers the case where mutation is meaningful.
+func chainCallback[T any](
+	prev, next func(context.Context, T) error,
+) func(context.Context, T) error {
+	if prev == nil {
+		return next
+	}
+
+	if next == nil {
+		return prev
+	}
+
+	return func(ctx context.Context, event T) error {
+		if err := prev(ctx, event); err != nil {
+			return err
+		}
+
+		return next(ctx, event)
+	}
+}
+
+// CallbackKind names one event's handler chain, for ResetCallback.
+//
+// A defined type rather than a bare string so a call site cannot pass an
+// arbitrary name, and one shared enum rather than fourteen ResetOnX methods so
+// clearing a handler does not double the callback API surface.
+type CallbackKind string
+
+const (
+	CallbackStart            CallbackKind = "start"
+	CallbackReasoning        CallbackKind = "reasoning"
+	CallbackText             CallbackKind = "text"
+	CallbackToolCallFragment CallbackKind = "tool_call_fragment"
+	CallbackDelta            CallbackKind = "delta"
+	CallbackRoundStart       CallbackKind = "round_start"
+	CallbackRoundEnd         CallbackKind = "round_end"
+	CallbackAssistantMessage CallbackKind = "assistant_message"
+	CallbackToolCallStart    CallbackKind = "tool_call_start"
+	CallbackToolResult       CallbackKind = "tool_result"
+	CallbackMessageInjection CallbackKind = "message_injection"
+	CallbackRetry            CallbackKind = "retry"
+	CallbackFinish           CallbackKind = "finish"
+	CallbackError            CallbackKind = "error"
+)
+
+// ResetCallback clears the handler chain for each named event, so the next On*
+// call for it starts fresh instead of extending what is there.
+//
+// This is how you replace ONE handler while leaving the others alone — swapping
+// the text handler on a shared base request without disturbing its tool or
+// error handling. ResetCallbacks does the same for all of them at once.
+//
+// An unrecognized kind is ignored rather than silently clearing the wrong
+// chain; the typed constants above are the whole valid set.
+//
+// The switch below is one flat arm per kind with no nesting. Cyclomatic
+// complexity counts all fourteen, but the only shape that scores lower is a
+// map of clearing closures — which allocates on every call and hides the
+// exhaustiveness this switch makes obvious.
+//
+//nolint:cyclop // flat 14-arm dispatch; see the note above
+func (r *Request) ResetCallback(kinds ...CallbackKind) *Request {
+	for _, kind := range kinds {
+		switch kind {
+		case CallbackStart:
+			r.onStart = nil
+		case CallbackReasoning:
+			r.onReasoning = nil
+		case CallbackText:
+			r.onText = nil
+		case CallbackToolCallFragment:
+			r.onToolCallFragment = nil
+		case CallbackDelta:
+			r.onDelta = nil
+		case CallbackRoundStart:
+			r.onRoundStart = nil
+		case CallbackRoundEnd:
+			r.onRoundEnd = nil
+		case CallbackAssistantMessage:
+			r.onAssistantMessage = nil
+		case CallbackToolCallStart:
+			r.onToolCallStart = nil
+		case CallbackToolResult:
+			r.onToolResult = nil
+		case CallbackMessageInjection:
+			r.onMessageInjection = nil
+		case CallbackRetry:
+			r.onRetry = nil
+		case CallbackFinish:
+			r.onFinish = nil
+		case CallbackError:
+			r.onError = nil
+		}
+	}
+
+	return r
+}
+
+// ResetCallbacks drops every registered handler, so the next On* call starts a
+// fresh chain instead of extending the existing one.
+//
+// This is how you REPLACE rather than add. It exists because a Request is
+// re-executable and safe to run from several goroutines once built, which makes
+// "configure a base request once, then derive variants" a real pattern — and
+// chaining alone gives no way back out of it.
+//
+// One method rather than fourteen ResetOnX: swapping a single handler on a
+// shared template is not a thing worth a per-event API, while starting over is.
+// Mirrors Prompt.ResetSystemAppends, which solves the same append-by-default
+// problem the same way.
+func (r *Request) ResetCallbacks() *Request {
+	r.onStart = nil
+	r.onReasoning = nil
+	r.onText = nil
+	r.onToolCallFragment = nil
+	r.onDelta = nil
+	r.onRoundStart = nil
+	r.onRoundEnd = nil
+	r.onAssistantMessage = nil
+	r.onToolCallStart = nil
+	r.onToolResult = nil
+	r.onMessageInjection = nil
+	r.onRetry = nil
+	r.onFinish = nil
+	r.onError = nil
+
+	return r
+}
+
 func (r *Request) OnStart(fn func(context.Context, *RunEvent) error) *Request {
-	r.onStart = fn
+	r.onStart = chainCallback(r.onStart, fn)
 
 	return r
 }
@@ -341,13 +490,13 @@ func (r *Request) OnStart(fn func(context.Context, *RunEvent) error) *Request {
 func (r *Request) OnReasoning(
 	fn func(context.Context, ReasoningDelta) error,
 ) *Request {
-	r.onReasoning = fn
+	r.onReasoning = chainCallback(r.onReasoning, fn)
 
 	return r
 }
 
 func (r *Request) OnText(fn func(context.Context, TextDelta) error) *Request {
-	r.onText = fn
+	r.onText = chainCallback(r.onText, fn)
 
 	return r
 }
@@ -355,13 +504,13 @@ func (r *Request) OnText(fn func(context.Context, TextDelta) error) *Request {
 func (r *Request) OnToolCallFragment(
 	fn func(context.Context, ToolCallDelta) error,
 ) *Request {
-	r.onToolCallFragment = fn
+	r.onToolCallFragment = chainCallback(r.onToolCallFragment, fn)
 
 	return r
 }
 
 func (r *Request) OnDelta(fn func(context.Context, Delta) error) *Request {
-	r.onDelta = fn
+	r.onDelta = chainCallback(r.onDelta, fn)
 
 	return r
 }
@@ -369,7 +518,7 @@ func (r *Request) OnDelta(fn func(context.Context, Delta) error) *Request {
 func (r *Request) OnRoundStart(
 	fn func(context.Context, *RoundEvent) error,
 ) *Request {
-	r.onRoundStart = fn
+	r.onRoundStart = chainCallback(r.onRoundStart, fn)
 
 	return r
 }
@@ -377,7 +526,7 @@ func (r *Request) OnRoundStart(
 func (r *Request) OnRoundEnd(
 	fn func(context.Context, *RoundEvent) error,
 ) *Request {
-	r.onRoundEnd = fn
+	r.onRoundEnd = chainCallback(r.onRoundEnd, fn)
 
 	return r
 }
@@ -385,7 +534,7 @@ func (r *Request) OnRoundEnd(
 func (r *Request) OnAssistantMessage(
 	fn func(context.Context, Message) error,
 ) *Request {
-	r.onAssistantMessage = fn
+	r.onAssistantMessage = chainCallback(r.onAssistantMessage, fn)
 
 	return r
 }
@@ -393,7 +542,7 @@ func (r *Request) OnAssistantMessage(
 func (r *Request) OnToolCallStart(
 	fn func(context.Context, ToolCallEvent) error,
 ) *Request {
-	r.onToolCallStart = fn
+	r.onToolCallStart = chainCallback(r.onToolCallStart, fn)
 
 	return r
 }
@@ -401,7 +550,7 @@ func (r *Request) OnToolCallStart(
 func (r *Request) OnToolResult(
 	fn func(context.Context, ToolCallEvent) error,
 ) *Request {
-	r.onToolResult = fn
+	r.onToolResult = chainCallback(r.onToolResult, fn)
 
 	return r
 }
@@ -409,7 +558,7 @@ func (r *Request) OnToolResult(
 func (r *Request) OnMessageInjection(
 	fn func(context.Context, MessageInjection) error,
 ) *Request {
-	r.onMessageInjection = fn
+	r.onMessageInjection = chainCallback(r.onMessageInjection, fn)
 
 	return r
 }
@@ -417,19 +566,19 @@ func (r *Request) OnMessageInjection(
 func (r *Request) OnRetry(
 	fn func(context.Context, RetryAttempt) error,
 ) *Request {
-	r.onRetry = fn
+	r.onRetry = chainCallback(r.onRetry, fn)
 
 	return r
 }
 
 func (r *Request) OnFinish(fn func(context.Context, *Response) error) *Request {
-	r.onFinish = fn
+	r.onFinish = chainCallback(r.onFinish, fn)
 
 	return r
 }
 
 func (r *Request) OnError(fn func(context.Context, error) error) *Request {
-	r.onError = fn
+	r.onError = chainCallback(r.onError, fn)
 
 	return r
 }
