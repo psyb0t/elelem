@@ -112,7 +112,7 @@ func TestRequest_OnRetryFiresAndItsErrorStopsTheRun(t *testing.T) {
 		client := New(newRetryingDriver(), WithDefaultModel(Model{ID: "m"}))
 
 		_, err := NewRequest(client).
-			WithPrompt("run").
+			WithPrompt(NewPrompt().UserText("run")).
 			OnRetry(func(_ context.Context, attempt RetryAttempt) error {
 				attempts = append(attempts, attempt)
 
@@ -135,8 +135,7 @@ func TestRequest_OnRetryFiresAndItsErrorStopsTheRun(t *testing.T) {
 
 		client := New(newRetryingDriver(), WithDefaultModel(Model{ID: "m"}))
 
-		_, err := NewRequest(client).
-			WithPrompt("run").
+		_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 			OnRetry(func(context.Context, RetryAttempt) error {
 				return assert.AnError
 			}).
@@ -653,7 +652,7 @@ func TestRetryAfterIsBoundedByMaxDelay(t *testing.T) {
 
 			client := New(driver, WithDefaultModel(Model{ID: "m"}))
 			_, err := NewRequest(client).
-				WithPrompt("run").
+				WithPrompt(NewPrompt().UserText("run")).
 				Complete(context.Background())
 			require.NoError(t, err)
 
@@ -874,7 +873,7 @@ func TestRetryAccounting_AccumulatesAcrossToolLoopRounds(t *testing.T) {
 	// without it the run stops after the round that asked for the tool.
 	response, err := NewRequest(New(retrying)).
 		WithModel(Model{ID: "test-model"}).
-		WithPrompt("go").
+		WithPrompt(NewPrompt().UserText("go")).
 		WithAutoToolCalls().
 		WithTool(Tool{
 			Name: "lookup",
@@ -957,7 +956,7 @@ func TestRetryAccounting_ExhaustedRetriesStillReportTheirCost(t *testing.T) {
 
 	response, err := NewRequest(New(retrying)).
 		WithModel(Model{ID: "test-model"}).
-		WithPrompt("go").
+		WithPrompt(NewPrompt().UserText("go")).
 		Complete(context.Background())
 
 	require.ErrorIs(t, err, commonerrors.ErrRateLimited)
@@ -999,7 +998,7 @@ func TestRetryAccounting_CleanRunReportsZeroWaste(t *testing.T) {
 
 	response, err := NewRequest(New(WithRetry(driver, RetryConfig{}))).
 		WithModel(Model{ID: "test-model"}).
-		WithPrompt("go").
+		WithPrompt(NewPrompt().UserText("go")).
 		Complete(context.Background())
 	require.NoError(t, err)
 

@@ -503,7 +503,7 @@ func (s *runState) driverParams(tools []Tool) GenerationParams {
 	// model before we got here. It stays because Capabilities is a published
 	// extension point and a third-party driver may answer
 	// non-deterministically — stripping an unsupported param beats shipping it.
-	capabilities := s.request.client.driver.Capabilities(s.model)
+	capabilities := s.request.client.Capabilities(s.model)
 	if !capabilities.SupportsReasoningEffort {
 		params.ReasoningEffort = ReasoningEffortUnset
 	}
@@ -522,7 +522,9 @@ func (s *runState) consumeDelta(
 	calls map[int]*ToolCall,
 	delta Delta,
 ) error {
-	assistant.Content += delta.Text
+	if delta.Text != "" {
+		assistant.Content = appendText(assistant.Content, delta.Text)
+	}
 
 	assistant.Reasoning += delta.Reasoning
 
@@ -1023,7 +1025,7 @@ func (s *runState) recordToolOutcomes(
 func (s *runState) recordToolResultMessage(call ToolCall, result ToolResult) {
 	s.messages = append(s.messages, Message{
 		Role:              RoleTool,
-		Content:           s.truncateToolResult(result.Content),
+		Content:           Text(s.truncateToolResult(result.Content)),
 		ToolCallID:        call.ID,
 		ToolResultIsError: result.IsError,
 		Origin:            MessageOriginTurn,
@@ -1107,7 +1109,7 @@ func (s *runState) recordInjections(
 		copied := injection
 		s.messages = append(s.messages, Message{
 			Role:      injection.Type,
-			Content:   injection.Content,
+			Content:   Text(injection.Content),
 			Origin:    MessageOriginInjection,
 			Injection: &copied,
 		})
@@ -1353,7 +1355,9 @@ func executeToolHandler(
 					"stack", string(debug.Stack()),
 				)
 
-				outcome.err = ctxerrors.New("tool handler panicked")
+				outcome.err = ctxerrors.Wrap(
+					ErrToolHandlerPanicked, "recovered",
+				)
 			}
 
 			outcomes <- outcome
@@ -1694,7 +1698,7 @@ func (s *runState) reportedModel(served string) string {
 
 func (s *runState) responseFromAssistant(assistant Message) *Response {
 	return &Response{
-		Text:         assistant.Content,
+		Text:         assistant.Text(),
 		Reasoning:    assistant.Reasoning,
 		ToolCalls:    cloneToolCalls(assistant.ToolCalls),
 		Usage:        s.usage,
@@ -1743,7 +1747,7 @@ func (s *runState) partialResponseWithAssistant(
 	totalUsage := addUsage(s.usage, usage)
 
 	return &Response{
-		Text:         assistant.Content,
+		Text:         assistant.Text(),
 		Reasoning:    assistant.Reasoning,
 		ToolCalls:    cloneToolCalls(assistant.ToolCalls),
 		Usage:        totalUsage,
@@ -1756,7 +1760,7 @@ func (s *runState) partialResponseWithAssistant(
 }
 
 func hasAssistantOutput(assistant Message) bool {
-	return assistant.Content != "" ||
+	return assistant.Text() != "" ||
 		assistant.Reasoning != "" ||
 		len(assistant.ToolCalls) > 0 ||
 		len(assistant.ProviderReasoning) > 0

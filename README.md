@@ -30,7 +30,7 @@ frameworks are one `go get` and several regrets away, and this is the layer
 they'd sit on.
 
 Built on the official `openai-go` and `anthropic-sdk-go`, plus an embedded
-`o200k_base` tokenizer so budgeting needs no network. 194 tests at 91%+
+`o200k_base` tokenizer so budgeting needs no network. 227 tests at 91%+
 coverage, and both shipped drivers run the same conformance suite a third-party
 driver would — the `Driver` contract is executable rather than aspirational.
 
@@ -40,8 +40,9 @@ client := elelem.New(driver)
 
 response, err := elelem.NewRequest(client).
 	WithModel(elelem.Model{ID: "some-model-id", ContextSize: 200_000}).
-	WithSystemMessage("You are a concise operations assistant.").
-	WithPrompt("Summarize the current incident state.").
+	WithPrompt(elelem.NewPrompt().
+		WithSystem("You are a concise operations assistant.").
+		UserText("Summarize the current incident state.")).
 	Complete(ctx)
 ```
 
@@ -79,7 +80,7 @@ Streaming, a tool loop, and a budget — still one chain:
 ```go
 response, err := elelem.NewRequest(client).
 	WithModel(model).
-	WithPrompt(prompt).
+	WithPrompt(elelem.NewPrompt().UserText(question)).
 	WithTools(tools).
 	WithAutoToolCalls().          // without this you drive the loop yourself
 	WithMaxRounds(8).
@@ -104,6 +105,7 @@ Every knob those three examples don't show is in
 | Area | What you get |
 |---|---|
 | **[Requests](docs/requests.md)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
+| **[Prompts](docs/prompts.md)** | An immutable `Prompt` carrying the system message, the history and this turn — build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read is refused locally rather than by the provider a round trip later. |
 | **[Tools](docs/tools.md)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of a crash, per-call denial, and tools that inject messages. |
 | **[Callbacks](docs/callbacks.md)** | Sixteen observation points — run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
 | **[History](docs/history.md)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |

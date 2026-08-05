@@ -127,7 +127,8 @@ func dropUntilEstimatedToFit(
 	for estimate > event.BudgetTokens && len(event.Messages) > 1 {
 		index := firstDroppableUnit(event.Messages)
 		if index < 0 {
-			logger.Warn("still over budget with nothing droppable left",
+			logger.Warn(
+				"still over budget with nothing droppable left",
 				"reason", LogReasonNoDroppableUnit,
 				"messages", len(event.Messages),
 			)
@@ -144,7 +145,8 @@ func dropUntilEstimatedToFit(
 			return dropped, ctxerrors.Wrap(err, "count droppable unit")
 		}
 
-		logger.Debug("dropping oldest transcript unit",
+		logger.Debug(
+			"dropping oldest transcript unit",
 			"reason", LogReasonTokenBudgetExceeded,
 			"unit_start", index,
 			"unit_end", end,

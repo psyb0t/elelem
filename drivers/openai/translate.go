@@ -339,7 +339,8 @@ func toOpenAIToolChoice(choice elelem.ToolChoice) (toolChoiceParam, error) {
 		}, nil
 	case elelem.ToolChoiceModeTool:
 		if strings.TrimSpace(choice.Name) == "" {
-			return toolChoiceParam{}, ctxerrors.New(
+			return toolChoiceParam{}, ctxerrors.Wrap(
+				ErrUnsupportedParameter,
 				"specific tool choice requires a name",
 			)
 		}
@@ -350,8 +351,8 @@ func toOpenAIToolChoice(choice elelem.ToolChoice) (toolChoiceParam, error) {
 			},
 		), nil
 	default:
-		return toolChoiceParam{}, ctxerrors.New(
-			"unsupported tool choice mode",
+		return toolChoiceParam{}, ctxerrors.Wrap(
+			ErrUnsupportedParameter, "tool choice mode",
 		)
 	}
 }
@@ -375,8 +376,8 @@ func toOpenAIResponseFormat(
 	case elelem.ResponseFormatTypeJSONSchema:
 		return toOpenAIJSONSchemaResponseFormat(format)
 	default:
-		return responseFormatParam{}, ctxerrors.New(
-			"unsupported response format type",
+		return responseFormatParam{}, ctxerrors.Wrap(
+			ErrUnsupportedParameter, "response format type",
 		)
 	}
 }
@@ -385,7 +386,8 @@ func toOpenAIJSONSchemaResponseFormat(
 	format *elelem.ResponseFormat,
 ) (responseFormatParam, error) {
 	if strings.TrimSpace(format.Name) == "" {
-		return responseFormatParam{}, ctxerrors.New(
+		return responseFormatParam{}, ctxerrors.Wrap(
+			ErrUnsupportedParameter,
 			"JSON schema response format requires a name",
 		)
 	}
@@ -464,9 +466,11 @@ func toOpenAIMessages(messages []elelem.Message) ([]messageParam, error) {
 func toOpenAIMessage(message elelem.Message) (messageParam, error) {
 	switch message.Role {
 	case elelem.RoleSystem:
-		return openaisdk.SystemMessage(message.Content), nil
+		// OpenAI's system message takes text only — the spec's
+		// SystemMessageContentPart union has exactly one member.
+		return openaisdk.SystemMessage(message.Text()), nil
 	case elelem.RoleUser:
-		return openaisdk.UserMessage(message.Content), nil
+		return toUserMessage(message)
 	case elelem.RoleTool:
 		return openaisdk.ToolMessage(
 			toolResultContent(message),
@@ -494,28 +498,30 @@ const toolErrorPrefix = "Error: "
 // notice its own tool failed would depend on which driver was configured. The
 // flag rides in the text rather than vanishing.
 func toolResultContent(message elelem.Message) string {
+	text := message.Text()
+
 	if !message.ToolResultIsError {
-		return message.Content
+		return text
 	}
 
 	// Not applied twice: a transcript replayed from storage already carries the
 	// prefix, and stacking them on every round would grow the text without
 	// adding meaning.
-	if strings.HasPrefix(message.Content, toolErrorPrefix) {
-		return message.Content
+	if strings.HasPrefix(text, toolErrorPrefix) {
+		return text
 	}
 
-	return toolErrorPrefix + message.Content
+	return toolErrorPrefix + text
 }
 
 func assistantMessage(message elelem.Message) messageParam {
 	if len(message.ToolCalls) == 0 {
-		return openaisdk.AssistantMessage(message.Content)
+		return openaisdk.AssistantMessage(message.Text())
 	}
 
 	assistant := openaisdk.ChatCompletionAssistantMessageParam{}
-	if message.Content != "" {
-		assistant.Content.OfString = openaisdk.String(message.Content)
+	if text := message.Text(); text != "" {
+		assistant.Content.OfString = openaisdk.String(text)
 	}
 
 	for _, call := range message.ToolCalls {

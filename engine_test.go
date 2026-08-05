@@ -67,7 +67,7 @@ func TestRequest_HandlerErrorContinuesToolLoop(t *testing.T) {
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	request := NewRequest(client).
-		WithPrompt("run").
+		WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name: "broken",
 			Handler: func(context.Context, ToolInput) (ToolResult, error) {
@@ -90,13 +90,13 @@ func TestRequest_CancelReturnsPartialAssistant(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	response, err := NewRequest(client).
-		WithPrompt("question").
+		WithPrompt(NewPrompt().UserText("question")).
 		Complete(context.Background())
 	require.ErrorIs(t, err, context.Canceled)
 	require.NotNil(t, response)
 	assert.Equal(t, "partial", response.Text)
 	require.Len(t, response.Messages, 2)
-	assert.Equal(t, "partial", response.Messages[1].Content)
+	assert.Equal(t, "partial", response.Messages[1].Text())
 	assert.Equal(t, MessageOriginTurn, response.Messages[1].Origin)
 }
 
@@ -110,7 +110,7 @@ func TestRequest_CompleteIgnoresToolOnlySettings(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	response, err := NewRequest(client).
-		WithPrompt("question").
+		WithPrompt(NewPrompt().UserText("question")).
 		WithTool(Tool{Name: "tool"}).
 		WithToolChoice(ToolChoiceTool("tool")).
 		WithParallelToolCalls(parallel).
@@ -130,8 +130,7 @@ func TestRequest_DynamicStrictToolIsRejectedBeforeDriverCall(t *testing.T) {
 
 	driver := &scriptedDriver{}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
-	request := NewRequest(client).
-		WithPrompt("question").
+	request := NewRequest(client).WithPrompt(NewPrompt().UserText("question")).
 		WithToolProvider(func(context.Context) (*ToolSet, error) {
 			return NewToolSet(Tool{
 				Name:            "lookup",
@@ -166,7 +165,7 @@ func TestRequest_OnRetryFiresBeforeSuccessfulRetry(t *testing.T) {
 
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	response, err := NewRequest(client).
-		WithPrompt("question").
+		WithPrompt(NewPrompt().UserText("question")).
 		OnRetry(func(_ context.Context, attempt RetryAttempt) error {
 			attempts = append(attempts, attempt)
 
@@ -244,9 +243,8 @@ func TestRequest_CompletePreservesProviderReasoning(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	response, err := NewRequest(client).
-		WithSystemMessage("base").
-		WithSystemMessageAppend("extra").
-		WithPrompt("question").
+		WithPrompt(NewPrompt().WithSystem("base").AppendSystem("extra").
+			UserText("question")).
 		Complete(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "answer", response.Text)
@@ -257,7 +255,7 @@ func TestRequest_CompletePreservesProviderReasoning(t *testing.T) {
 
 	requests := driver.Requests()
 	require.Len(t, requests, 1)
-	assert.Equal(t, "base\n\nextra", requests[0].Messages[0].Content)
+	assert.Equal(t, "base\n\nextra", requests[0].Messages[0].Text())
 	assert.Equal(t, MessageOriginSeed, requests[0].Messages[0].Origin)
 	assert.Equal(t, MessageOriginTurn, lastResponseMessage.Origin)
 }
@@ -295,8 +293,7 @@ func TestRequest_ManualToolLoopIsExactlyOnce(t *testing.T) {
 		},
 	}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
-	request := NewRequest(client).
-		WithPrompt("run it").
+	request := NewRequest(client).WithPrompt(NewPrompt().UserText("run it")).
 		WithTool(tool)
 	first, err := request.Run(context.Background())
 	require.NoError(t, err)
@@ -336,8 +333,7 @@ func TestRequest_DeniedToolProducesErrorResult(t *testing.T) {
 	var calls atomic.Int32
 
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
-	request := NewRequest(client).
-		WithPrompt("do it").
+	request := NewRequest(client).WithPrompt(NewPrompt().UserText("do it")).
 		WithTool(Tool{
 			Name: "danger",
 			Handler: func(context.Context, ToolInput) (ToolResult, error) {
@@ -355,7 +351,7 @@ func TestRequest_DeniedToolProducesErrorResult(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, calls.Load())
 	assert.True(t, second.Messages[2].ToolResultIsError)
-	assert.Equal(t, NewToolDeniedResult().Content, second.Messages[2].Content)
+	assert.Equal(t, NewToolDeniedResult().Content, second.Messages[2].Text())
 }
 
 func TestDropOldestUnits_PreservesSystemAndNewestUser(t *testing.T) {
@@ -389,10 +385,10 @@ func TestDropOldestUnits_PreservesSystemAndNewestUser(t *testing.T) {
 
 			event := &TokenLimitEvent{
 				Messages: []Message{
-					{Role: RoleSystem, Content: "system"},
-					{Role: RoleUser, Content: "old"},
-					{Role: RoleAssistant, Content: "old answer"},
-					{Role: RoleUser, Content: "new"},
+					{Role: RoleSystem, Content: Text("system")},
+					{Role: RoleUser, Content: Text("old")},
+					{Role: RoleAssistant, Content: Text("old answer")},
+					{Role: RoleUser, Content: Text("new")},
 				},
 				BudgetTokens: tc.budget,
 				counter:      counter,
@@ -402,7 +398,7 @@ func TestDropOldestUnits_PreservesSystemAndNewestUser(t *testing.T) {
 
 			require.Len(t, event.Messages, 2)
 			assert.Equal(t, RoleSystem, event.Messages[0].Role)
-			assert.Equal(t, "new", event.Messages[1].Content)
+			assert.Equal(t, "new", event.Messages[1].Text())
 		})
 	}
 }
@@ -419,10 +415,10 @@ func TestDropOldestUnits_LogsWhatItDiscarded(t *testing.T) {
 	counter := fixedCounter(10)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
-			{Role: RoleUser, Content: "old"},
-			{Role: RoleAssistant, Content: "old answer"},
-			{Role: RoleUser, Content: "new"},
+			{Role: RoleSystem, Content: Text("system")},
+			{Role: RoleUser, Content: Text("old")},
+			{Role: RoleAssistant, Content: Text("old answer")},
+			{Role: RoleUser, Content: Text("new")},
 		},
 		BudgetTokens: 20,
 		counter:      counter,
@@ -465,8 +461,8 @@ func TestDropOldestUnits_WarnsWhenNothingIsDroppableAndStillOverBudget(
 	counter := fixedCounter(10)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
-			{Role: RoleUser, Content: "new"},
+			{Role: RoleSystem, Content: Text("system")},
+			{Role: RoleUser, Content: Text("new")},
 		},
 		BudgetTokens: 10,
 		counter:      counter,
@@ -506,8 +502,8 @@ func TestDropOldestUnits_SilentWhenNothingIsDropped(t *testing.T) {
 	counter := fixedCounter(10)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
-			{Role: RoleUser, Content: "new"},
+			{Role: RoleSystem, Content: Text("system")},
+			{Role: RoleUser, Content: Text("new")},
 		},
 		BudgetTokens: 1000,
 		counter:      counter,
@@ -524,13 +520,13 @@ func TestDropOldestUnits_DropsClosedToolExchangeBeforeLaterUser(t *testing.T) {
 	counter := fixedCounter(10)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
+			{Role: RoleSystem, Content: Text("system")},
 			{
 				Role:      RoleAssistant,
 				ToolCalls: []ToolCall{{ID: "call-1", Name: "lookup"}},
 			},
-			{Role: RoleTool, ToolCallID: "call-1", Content: "done"},
-			{Role: RoleUser, Content: "current"},
+			{Role: RoleTool, ToolCallID: "call-1", Content: Text("done")},
+			{Role: RoleUser, Content: Text("current")},
 		},
 		BudgetTokens: 20,
 		counter:      counter,
@@ -539,8 +535,8 @@ func TestDropOldestUnits_DropsClosedToolExchangeBeforeLaterUser(t *testing.T) {
 	err := DropOldestUnits(counter)(context.Background(), event)
 	require.NoError(t, err)
 	assert.Equal(t, []Message{
-		{Role: RoleSystem, Content: "system"},
-		{Role: RoleUser, Content: "current"},
+		{Role: RoleSystem, Content: Text("system")},
+		{Role: RoleUser, Content: Text("current")},
 	}, event.Messages)
 }
 
@@ -548,8 +544,9 @@ func TestDropOldestUnits_PinsOnlyCurrentToolUnit(t *testing.T) {
 	t.Parallel()
 
 	messages := make([]Message, 0, 5)
-	messages = append(messages,
-		Message{Role: RoleSystem, Content: "system"},
+	messages = append(
+		messages,
+		Message{Role: RoleSystem, Content: Text("system")},
 		Message{
 			Role: RoleAssistant,
 			ToolCalls: []ToolCall{
@@ -557,7 +554,7 @@ func TestDropOldestUnits_PinsOnlyCurrentToolUnit(t *testing.T) {
 				{ID: "call-2", Name: "lookup"},
 			},
 		},
-		Message{Role: RoleTool, ToolCallID: "call-1", Content: "partial"},
+		Message{Role: RoleTool, ToolCallID: "call-1", Content: Text("partial")},
 	)
 
 	assert.True(t, isLiveToolExchange(messages, 1))
@@ -566,13 +563,13 @@ func TestDropOldestUnits_PinsOnlyCurrentToolUnit(t *testing.T) {
 	messages = append(messages, Message{
 		Role:       RoleTool,
 		ToolCallID: "call-2",
-		Content:    "complete",
+		Content:    Text("complete"),
 	})
 	assert.True(t, isLiveToolExchange(messages, 1))
 
 	messages = append(messages, Message{
 		Role:      RoleSystem,
-		Content:   "transient injection",
+		Content:   Text("transient injection"),
 		Injection: &MessageInjection{},
 	})
 	assert.False(t, isLiveToolExchange(messages, 4))
@@ -590,7 +587,7 @@ func TestRequest_ReasoningEffortUsesDriverCapabilities(t *testing.T) {
 	}
 	_, err := NewRequest(New(driver)).
 		WithModel(Model{ID: "discovered-reasoning-model"}).
-		WithPrompt("question").
+		WithPrompt(NewPrompt().UserText("question")).
 		WithReasoningEffort(ReasoningEffortHigh).
 		Complete(context.Background())
 	require.NoError(t, err)
@@ -610,7 +607,7 @@ func TestRequest_OneRoundForceFinalAnswerWithholdsTools(t *testing.T) {
 	response, err := NewRequest(New(
 		driver,
 		WithDefaultModel(Model{ID: "test-model"}),
-	)).WithPrompt("question").
+	)).WithPrompt(NewPrompt().UserText("question")).
 		WithTool(Tool{Name: "lookup"}).
 		WithMaxRounds(1).
 		WithForceFinalAnswer(true).
@@ -636,11 +633,11 @@ func TestRequest_TokenLimitHandlersObserveFreshCounts(t *testing.T) {
 	_, err := NewRequest(New(
 		driver,
 		WithDefaultModel(Model{ID: "test-model"}),
-	)).WithHistory([]Message{
-		{Role: RoleUser, Content: "one"},
-		{Role: RoleAssistant, Content: "two"},
-		{Role: RoleUser, Content: "three"},
-	}).WithPrompt("current").
+	)).WithPrompt(NewPrompt().WithHistory([]Message{
+		{Role: RoleUser, Content: Text("one")},
+		{Role: RoleAssistant, Content: Text("two")},
+		{Role: RoleUser, Content: Text("three")},
+	}).UserText("current")).
 		WithTokenCounter(counter).
 		WithMaxContextTokens(25).
 		PreMaxTokensReached(func(
@@ -697,7 +694,7 @@ func TestRequest_UnknownToolDecisionIsIgnored(t *testing.T) {
 	request := NewRequest(New(
 		driver,
 		WithDefaultModel(Model{ID: "test-model"}),
-	)).WithPrompt("run").WithTool(Tool{
+	)).WithPrompt(NewPrompt().UserText("run")).WithTool(Tool{
 		Name: "lookup",
 		Handler: func(context.Context, ToolInput) (ToolResult, error) {
 			calls.Add(1)
@@ -796,8 +793,7 @@ func TestRequest_ToolTimeoutBecomesErrorResult(t *testing.T) {
 		},
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
-	request := NewRequest(client).
-		WithPrompt("run").
+	request := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithToolTimeout(time.Millisecond).
 		WithTool(Tool{
 			Name: "slow",
@@ -826,7 +822,7 @@ func TestRequest_TranscriptRepairDropsUnpairedToolUnit(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 	response, err := NewRequest(client).
-		WithHistory([]Message{
+		WithPrompt(NewPrompt().WithHistory([]Message{
 			{
 				Role: RoleAssistant,
 				ToolCalls: []ToolCall{{
@@ -834,8 +830,8 @@ func TestRequest_TranscriptRepairDropsUnpairedToolUnit(t *testing.T) {
 					Name: "tool",
 				}},
 			},
-			{Role: RoleUser, Content: "current"},
-		}).
+			{Role: RoleUser, Content: Text("current")},
+		})).
 		WithTranscriptRepair().
 		Complete(context.Background())
 	require.NoError(t, err)
@@ -874,8 +870,7 @@ func TestRunPreservesModelAcrossAFailingFinalRound(t *testing.T) {
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name: "probe",
 			Handler: func(context.Context, ToolInput) (ToolResult, error) {
@@ -984,8 +979,7 @@ func TestEmptyToolArgumentsNormalizeInTheTranscript(t *testing.T) {
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "m"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{Name: "probe", Handler: okHandler("ok")}).
 		WithAutoToolCalls().
 		Run(context.Background())
@@ -1059,8 +1053,7 @@ func TestProviderReasoningIsCopiedFromTheDriverBuffer(t *testing.T) {
 	}
 	client := New(driver, WithDefaultModel(Model{ID: "m"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		Complete(context.Background())
 	require.NoError(t, err)
 
@@ -1109,8 +1102,7 @@ func TestSparseToolCallIndicesAreAllDrained(t *testing.T) {
 		called     []string
 	)
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name: "probe",
 			Handler: func(
@@ -1179,7 +1171,7 @@ func TestPartialResponseReportsNoFinishReason(t *testing.T) {
 			client := New(driver, WithDefaultModel(Model{ID: "m"}))
 
 			request := NewRequest(client).
-				WithPrompt("run").
+				WithPrompt(NewPrompt().UserText("run")).
 				WithTool(Tool{
 					Name:    "probe",
 					Handler: okHandler("ok"),
@@ -1216,7 +1208,8 @@ func TestPartialResponseReportsNoFinishReason(t *testing.T) {
 			// turn over" signals must AGREE. A stale "tool_calls" made
 			// IsTerminal() report the turn continues while the only way to
 			// continue it was nil.
-			assert.Equal(t,
+			assert.Equal(
+				t,
 				response.ExecuteToolCalls == nil,
 				response.FinishReason.IsTerminal(),
 				"IsTerminal disagrees with ExecuteToolCalls",
@@ -1245,35 +1238,35 @@ func TestRepairTranscript_DropsOrphanResultAdjacentToValidUnit(t *testing.T) {
 		{
 			name: "orphan adjacent to a complete unit",
 			messages: []Message{
-				{Role: RoleUser, Content: "run"},
+				{Role: RoleUser, Content: Text("run")},
 				{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "c1"}}},
-				{Role: RoleTool, ToolCallID: "c1", Content: "ok"},
-				{Role: RoleTool, ToolCallID: "GHOST", Content: "orphan"},
-				{Role: RoleUser, Content: "next"},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("ok")},
+				{Role: RoleTool, ToolCallID: "GHOST", Content: Text("orphan")},
+				{Role: RoleUser, Content: Text("next")},
 			},
 			want: []string{"run", "", "ok", "next"},
 		},
 		{
 			name: "orphan separated from the unit",
 			messages: []Message{
-				{Role: RoleUser, Content: "run"},
+				{Role: RoleUser, Content: Text("run")},
 				{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "c1"}}},
-				{Role: RoleTool, ToolCallID: "c1", Content: "ok"},
-				{Role: RoleUser, Content: "next"},
-				{Role: RoleTool, ToolCallID: "GHOST", Content: "orphan"},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("ok")},
+				{Role: RoleUser, Content: Text("next")},
+				{Role: RoleTool, ToolCallID: "GHOST", Content: Text("orphan")},
 			},
 			want: []string{"run", "", "ok", "next"},
 		},
 		{
 			name: "complete unit is preserved intact",
 			messages: []Message{
-				{Role: RoleUser, Content: "run"},
+				{Role: RoleUser, Content: Text("run")},
 				{
 					Role:      RoleAssistant,
 					ToolCalls: []ToolCall{{ID: "c1"}, {ID: "c2"}},
 				},
-				{Role: RoleTool, ToolCallID: "c1", Content: "one"},
-				{Role: RoleTool, ToolCallID: "c2", Content: "two"},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("one")},
+				{Role: RoleTool, ToolCallID: "c2", Content: Text("two")},
 			},
 			want: []string{"run", "", "one", "two"},
 		},
@@ -1282,10 +1275,10 @@ func TestRepairTranscript_DropsOrphanResultAdjacentToValidUnit(t *testing.T) {
 			// orphan and both drivers reject it.
 			name: "duplicate result for one call",
 			messages: []Message{
-				{Role: RoleUser, Content: "run"},
+				{Role: RoleUser, Content: Text("run")},
 				{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "c1"}}},
-				{Role: RoleTool, ToolCallID: "c1", Content: "first"},
-				{Role: RoleTool, ToolCallID: "c1", Content: "dupe"},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("first")},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("dupe")},
 			},
 			want: []string{"run", "", "first"},
 		},
@@ -1296,25 +1289,25 @@ func TestRepairTranscript_DropsOrphanResultAdjacentToValidUnit(t *testing.T) {
 			// the misleading "tool calls are missing results".
 			name: "duplicate call id on the assistant message",
 			messages: []Message{
-				{Role: RoleUser, Content: "run"},
+				{Role: RoleUser, Content: Text("run")},
 				{
 					Role:      RoleAssistant,
 					ToolCalls: []ToolCall{{ID: "c1"}, {ID: "c1"}},
 				},
-				{Role: RoleTool, ToolCallID: "c1", Content: "ok"},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("ok")},
 			},
 			want: []string{"run", "", "ok"},
 		},
 		{
 			name: "results arriving out of call order",
 			messages: []Message{
-				{Role: RoleUser, Content: "run"},
+				{Role: RoleUser, Content: Text("run")},
 				{
 					Role:      RoleAssistant,
 					ToolCalls: []ToolCall{{ID: "c1"}, {ID: "c2"}},
 				},
-				{Role: RoleTool, ToolCallID: "c2", Content: "two"},
-				{Role: RoleTool, ToolCallID: "c1", Content: "one"},
+				{Role: RoleTool, ToolCallID: "c2", Content: Text("two")},
+				{Role: RoleTool, ToolCallID: "c1", Content: Text("one")},
 			},
 			want: []string{"run", "", "two", "one"},
 		},
@@ -1328,7 +1321,7 @@ func TestRepairTranscript_DropsOrphanResultAdjacentToValidUnit(t *testing.T) {
 
 			contents := make([]string, 0, len(repaired))
 			for _, message := range repaired {
-				contents = append(contents, message.Content)
+				contents = append(contents, message.Text())
 			}
 
 			assert.Equal(t, tc.want, contents)
@@ -1394,7 +1387,8 @@ func (d *identityLoggingDriver) Stream(
 func TestEngine_CtxLoggerCarriesIdentityThroughTheWholeStack(t *testing.T) {
 	// Deliberately not parallel: captureLogs swaps slog.Default(), which is
 	// process-wide.
-	ctx, records := captureLogsWith(t,
+	ctx, records := captureLogsWith(
+		t,
 		scope.Attr("request_id", "req-123"),
 		scope.Attr("user_id", "user-456"),
 	)
@@ -1411,8 +1405,7 @@ func TestEngine_CtxLoggerCarriesIdentityThroughTheWholeStack(t *testing.T) {
 
 	client := New(driver, WithDefaultModel(Model{ID: "probe"}))
 
-	_, err := NewRequest(client).
-		WithPrompt("hi").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("hi")).
 		Stream(ctx, func(Delta) error { return nil })
 	require.NoError(t, err)
 
@@ -1456,8 +1449,7 @@ func TestEngine_ProviderReasoningReplacesAcrossDeltas(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("go").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("go")).
 		Run(context.Background())
 	require.NoError(t, err)
 
@@ -1510,8 +1502,7 @@ func TestEngine_RoundEventSeparatesRoundUsageFromRunningTotal(t *testing.T) {
 
 	var rounds []RoundEvent
 
-	_, err := NewRequest(client).
-		WithPrompt("go").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("go")).
 		WithTool(Tool{Name: probeToolName, Handler: okHandler("ok")}).
 		OnRoundEnd(func(_ context.Context, event *RoundEvent) error {
 			rounds = append(rounds, *event)
@@ -1562,8 +1553,7 @@ func TestEngine_ToolEventReportsTheRoundTheCallWasMadeIn(t *testing.T) {
 
 	var observed []int
 
-	_, err := NewRequest(client).
-		WithPrompt("go").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("go")).
 		WithTool(Tool{
 			Name:    probeToolName,
 			Handler: okHandler("ok"),
@@ -1622,7 +1612,7 @@ func TestEngine_ResponseModelFallsBackToTheRequestedModel(t *testing.T) {
 			client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 			response, err := NewRequest(client).
-				WithPrompt("go").
+				WithPrompt(NewPrompt().UserText("go")).
 				Run(context.Background())
 			require.NoError(t, err)
 
@@ -1647,8 +1637,7 @@ func TestEngine_ReasoningIsDeliveredBeforeText(t *testing.T) {
 
 	var order []string
 
-	_, err := NewRequest(client).
-		WithPrompt("go").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("go")).
 		OnReasoning(func(context.Context, ReasoningDelta) error {
 			order = append(order, "reasoning")
 

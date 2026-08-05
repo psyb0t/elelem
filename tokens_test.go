@@ -41,7 +41,7 @@ func TestBuiltInTokenCounter_Count(t *testing.T) {
 
 	withContent, err := counter.Count([]Message{{
 		Role:    RoleUser,
-		Content: "a sentence with several words in it",
+		Content: Text("a sentence with several words in it"),
 	}}, nil)
 	require.NoError(t, err)
 	assert.Greater(t, withContent, empty)
@@ -50,14 +50,14 @@ func TestBuiltInTokenCounter_Count(t *testing.T) {
 	// omitting it made the budget undercount every reasoning transcript.
 	withReasoning, err := counter.Count([]Message{{
 		Role:      RoleAssistant,
-		Content:   "answer",
+		Content:   Text("answer"),
 		Reasoning: "a long chain of thought that costs real tokens",
 	}}, nil)
 	require.NoError(t, err)
 
 	withoutReasoning, err := counter.Count([]Message{{
 		Role:    RoleAssistant,
-		Content: "answer",
+		Content: Text("answer"),
 	}}, nil)
 	require.NoError(t, err)
 	assert.Greater(t, withReasoning, withoutReasoning)

@@ -74,41 +74,32 @@ model stops asking for tools or `MaxRounds` is hit.
 
 ## The prompt
 
-```go
-request.
-	WithSystemMessage("You are a concise operations assistant.").
-	WithSystemMessageAppend("Never speculate about root cause.").
-	WithPrompt("Summarize the current incident state.")
-```
-
-| Method | Notes |
-|---|---|
-| `WithSystemMessage(s)` | Replaces the base system message. |
-| `WithSystemMessagef(format, args...)` | Same, with `fmt.Sprintf` formatting. |
-| `WithSystemMessageAppend(s)` | Appends a fragment. Call repeatedly; they accumulate in order. |
-| `WithSystemMessageAppendf(format, args...)` | Same, formatted. |
-| `WithSystemMessageAppendReset()` | Drops every appended fragment. The base message set by `WithSystemMessage` survives. |
-| `WithPrompt(s)` | The current user message. Pinned against history limiting. |
-
-The append list exists so composed code can add its own instructions without
-having to know, or clobber, what the base prompt said.
-
-## History
+The whole conversation — system message, history, and this turn's question —
+is one `Prompt`, handed over in one call:
 
 ```go
-request.WithHistory(storedMessages)          // a slice
-request.WithHistoryFrom(seq)                 // an iter.Seq[Message], for a DB cursor
-request.WithMessages(msgA, msgB)             // variadic, explicit
+request.WithPrompt(elelem.NewPrompt().
+	WithSystem("You are a concise operations assistant.").
+	AppendSystem("Never speculate about root cause.").
+	WithHistory(previousResponse.Messages).
+	UserText("Summarize the current incident state."))
 ```
 
-**All three drop messages marked `MessageOriginInjection`.** This is not a
-convenience — replaying an injection hands the model instruction about a tool
-result that is no longer the subject, and every later turn inherits it. See
-[tools.md](tools.md#message-injection).
+`Prompt` is immutable, so one can be built once and run repeatedly, against
+several models, from several goroutines. `WithPrompt` REPLACES whatever the
+request held — build the conversation on the prompt, not by calling it twice.
 
-Continuing a conversation is `WithHistory(previousResponse.Messages)`.
-`Response.Messages` is an independent deep copy, so retaining or mutating it
-cannot disturb the run that produced it.
+Images, audio and documents ride on a user message as content parts:
+
+```go
+elelem.NewPrompt().User(
+	elelem.TextOf("What is going on in this screenshot?"),
+	elelem.ImageBytes(png, elelem.MediaTypePNG),
+)
+```
+
+Every builder method, the origin rules, the content-part constructors, and what
+each provider actually accepts are in [prompts.md](prompts.md).
 
 ## Model
 

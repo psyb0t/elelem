@@ -120,7 +120,18 @@ func (d *Driver) Capabilities(model elelem.Model) elelem.Capabilities {
 		// restriction that does not exist and silently disable caching for
 		// every unlisted or dated model id.
 		SupportsPromptCaching: true,
-		MaxReasoningEffort:    maxReasoningEffort(id),
+		// Image and document blocks are part of the Messages API itself, so
+		// these follow SupportsPromptCaching in being unconditional rather
+		// than gated on known-model membership.
+		//
+		// Audio is FALSE because the API has no audio block at all — not a
+		// media type we could map, an absent concept. This is the one
+		// content flag that genuinely differs between the two drivers, and
+		// it is what makes an audio part fail locally here.
+		SupportsImageInput: true,
+		SupportsAudioInput: false,
+		SupportsFileInput:  true,
+		MaxReasoningEffort: maxReasoningEffort(id),
 	}
 }
 

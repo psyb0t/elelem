@@ -147,9 +147,9 @@ trusting you to:
 - Once an assistant message follows it, it's ordinary history and droppable —
   pinning every injection for a whole run would grow the pinned set with the
   tool loop until the budget became unreachable.
-- `WithMessages`, `WithHistory` and `WithHistoryFrom` all **drop** messages
-  marked `MessageOriginInjection`, so feeding `Response.Messages` back in is
-  safe.
+- Every `Prompt` entry point — `WithHistory`, `WithHistoryFrom`, `Add` —
+  **drops** messages marked `MessageOriginInjection`, so feeding
+  `Response.Messages` back in is safe.
 
 `Response.Injections` is the audit trail, in firing order. The messages are
 already in `Response.Messages`; this is a separate list for when you want your

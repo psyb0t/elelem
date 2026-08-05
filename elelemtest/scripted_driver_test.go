@@ -337,7 +337,7 @@ func TestScriptedDriverSatisfiesTheDriverContract(t *testing.T) {
 			Request: elelem.DriverRequest{
 				Model: elelem.Model{ID: "test-model", ContextSize: 1000},
 				Messages: []elelem.Message{
-					{Role: elelem.RoleUser, Content: "hi"},
+					{Role: elelem.RoleUser, Content: elelem.Text("hi")},
 				},
 			},
 		},

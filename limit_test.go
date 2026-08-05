@@ -49,12 +49,15 @@ func TestDropOldestUnits_DoesNotRecountTheWorldPerDroppedUnit(t *testing.T) {
 	)
 
 	messages := make([]Message, 0, messageCount)
-	messages = append(messages, Message{Role: RoleSystem, Content: "system"})
+	messages = append(
+		messages,
+		Message{Role: RoleSystem, Content: Text("system")},
+	)
 
 	for i := range messageCount - 1 {
 		messages = append(messages, Message{
 			Role:    RoleUser,
-			Content: fmt.Sprintf("message %d", i),
+			Content: Text(fmt.Sprintf("message %d", i)),
 		})
 	}
 
@@ -128,13 +131,13 @@ func TestDropOldestUnits_NeverStopsPartWayThroughAUnit(t *testing.T) {
 	counter := fixedCounter(perMessage)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
+			{Role: RoleSystem, Content: Text("system")},
 			{
 				Role:      RoleAssistant,
 				ToolCalls: []ToolCall{{ID: "call-1", Name: "lookup"}},
 			},
-			{Role: RoleTool, ToolCallID: "call-1", Content: "done"},
-			{Role: RoleUser, Content: "current"},
+			{Role: RoleTool, ToolCallID: "call-1", Content: Text("done")},
+			{Role: RoleUser, Content: Text("current")},
 		},
 		// Four messages cost 40. A budget of 30 is satisfied by removing ONE
 		// message — so a per-message dropper stops with the result orphaned,
@@ -150,8 +153,8 @@ func TestDropOldestUnits_NeverStopsPartWayThroughAUnit(t *testing.T) {
 
 	assertNoOrphanedToolResults(t, event.Messages)
 	assert.Equal(t, []Message{
-		{Role: RoleSystem, Content: "system"},
-		{Role: RoleUser, Content: "current"},
+		{Role: RoleSystem, Content: Text("system")},
+		{Role: RoleUser, Content: Text("current")},
 	}, event.Messages,
 		"the assistant call and its result must leave together")
 }
@@ -175,14 +178,14 @@ func TestDropOldestUnits_KeepsTheLiveToolExchangeEvenWhenStillOverBudget(
 	counter := fixedCounter(perMessage)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
-			{Role: RoleAssistant, Content: "old chatter"},
-			{Role: RoleUser, Content: "current"},
+			{Role: RoleSystem, Content: Text("system")},
+			{Role: RoleAssistant, Content: Text("old chatter")},
+			{Role: RoleUser, Content: Text("current")},
 			{
 				Role:      RoleAssistant,
 				ToolCalls: []ToolCall{{ID: "call-1", Name: "lookup"}},
 			},
-			{Role: RoleTool, ToolCallID: "call-1", Content: "in flight"},
+			{Role: RoleTool, ToolCallID: "call-1", Content: Text("in flight")},
 		},
 		// Far below what the pinned messages alone cost, so the handler runs
 		// out of droppable units while still over budget.
@@ -199,13 +202,13 @@ func TestDropOldestUnits_KeepsTheLiveToolExchangeEvenWhenStillOverBudget(
 	// outright: "A pinned suffix may remain above a soft limit rather than
 	// being corrupted" — staying over budget here is the CORRECT outcome.
 	assert.Equal(t, []Message{
-		{Role: RoleSystem, Content: "system"},
-		{Role: RoleUser, Content: "current"},
+		{Role: RoleSystem, Content: Text("system")},
+		{Role: RoleUser, Content: Text("current")},
 		{
 			Role:      RoleAssistant,
 			ToolCalls: []ToolCall{{ID: "call-1", Name: "lookup"}},
 		},
-		{Role: RoleTool, ToolCallID: "call-1", Content: "in flight"},
+		{Role: RoleTool, ToolCallID: "call-1", Content: Text("in flight")},
 	}, event.Messages,
 		"the in-flight exchange must survive even at the cost of the budget")
 
@@ -255,16 +258,22 @@ func TestDropOldestUnits_AZeroCostUnitDoesNotStripTheTranscript(t *testing.T) {
 	counter := nonAdditiveCounter{perMessage: perMessage}
 
 	messages := make([]Message, 0, droppable+totalPinned)
-	messages = append(messages, Message{Role: RoleSystem, Content: "system"})
+	messages = append(
+		messages,
+		Message{Role: RoleSystem, Content: Text("system")},
+	)
 
 	for i := range droppable {
 		messages = append(messages, Message{
 			Role:    RoleAssistant,
-			Content: fmt.Sprintf("old chatter %d", i),
+			Content: Text(fmt.Sprintf("old chatter %d", i)),
 		})
 	}
 
-	messages = append(messages, Message{Role: RoleUser, Content: "current"})
+	messages = append(
+		messages,
+		Message{Role: RoleUser, Content: Text("current")},
+	)
 
 	event := &TokenLimitEvent{
 		Messages:     messages,
@@ -311,16 +320,16 @@ func TestDropOldestUnits_AnInjectionNeverOutranksTheUsersQuestion(
 	counter := fixedCounter(perMessage)
 	event := &TokenLimitEvent{
 		Messages: []Message{
-			{Role: RoleSystem, Content: "system"},
-			{Role: RoleUser, Content: "REAL USER PROMPT"},
+			{Role: RoleSystem, Content: Text("system")},
+			{Role: RoleUser, Content: Text("REAL USER PROMPT")},
 			{
 				Role:      RoleAssistant,
 				ToolCalls: []ToolCall{{ID: "call-1", Name: "lookup"}},
 			},
-			{Role: RoleTool, ToolCallID: "call-1", Content: "result"},
+			{Role: RoleTool, ToolCallID: "call-1", Content: Text("result")},
 			{
 				Role:      RoleUser,
-				Content:   "EPHEMERAL",
+				Content:   Text("EPHEMERAL"),
 				Origin:    MessageOriginInjection,
 				Injection: &injection,
 			},
@@ -333,7 +342,7 @@ func TestDropOldestUnits_AnInjectionNeverOutranksTheUsersQuestion(
 
 	contents := make([]string, 0, len(event.Messages))
 	for _, message := range event.Messages {
-		contents = append(contents, message.Content)
+		contents = append(contents, message.Text())
 	}
 
 	assert.Contains(t, contents, "REAL USER PROMPT",
@@ -382,9 +391,10 @@ func TestDropOldestUnits_PinsInjectionsOnlyUntilTheModelAnswers(t *testing.T) {
 	const messagesPerTool = 3
 
 	messages := make([]Message, 0, 2+messagesPerTool*toolsPer*rounds)
-	messages = append(messages,
-		Message{Role: RoleSystem, Content: "system"},
-		Message{Role: RoleUser, Content: "go"},
+	messages = append(
+		messages,
+		Message{Role: RoleSystem, Content: Text("system")},
+		Message{Role: RoleUser, Content: Text("go")},
 	)
 
 	// The shape a tool loop with an injector actually produces: per round, an
@@ -392,15 +402,20 @@ func TestDropOldestUnits_PinsInjectionsOnlyUntilTheModelAnswers(t *testing.T) {
 	for round := range rounds {
 		for tool := range toolsPer {
 			id := fmt.Sprintf("c%d-%d", round, tool)
-			messages = append(messages,
+			messages = append(
+				messages,
 				Message{
 					Role:      RoleAssistant,
 					ToolCalls: []ToolCall{{ID: id, Name: "lookup"}},
 				},
-				Message{Role: RoleTool, ToolCallID: id, Content: "result"},
+				Message{
+					Role:       RoleTool,
+					ToolCallID: id,
+					Content:    Text("result"),
+				},
 				Message{
 					Role:    RoleSystem,
-					Content: "note " + id,
+					Content: Text("note " + id),
 					Origin:  MessageOriginInjection,
 				},
 			)
@@ -429,7 +444,7 @@ func TestDropOldestUnits_PinsInjectionsOnlyUntilTheModelAnswers(t *testing.T) {
 	survivors := make([]string, 0, len(event.Messages))
 	for _, message := range event.Messages {
 		if message.Origin == MessageOriginInjection {
-			survivors = append(survivors, message.Content)
+			survivors = append(survivors, message.Text())
 		}
 	}
 
@@ -459,16 +474,16 @@ func BenchmarkDropOldestUnits(b *testing.B) {
 	original := make([]Message, 0, messageCount)
 	original = append(original, Message{
 		Role:    RoleSystem,
-		Content: "You are a helpful assistant with a long system prompt.",
+		Content: Text("You are a helpful assistant with a long system prompt."),
 	})
 
 	for i := range messageCount - 1 {
 		original = append(original, Message{
 			Role: RoleUser,
-			Content: fmt.Sprintf(
+			Content: Text(fmt.Sprintf(
 				"message %d with enough prose to cost a realistic "+
 					"number of tokens rather than a handful", i,
-			),
+			)),
 		})
 	}
 
@@ -511,12 +526,12 @@ func TestTokenLimit_HandlerCannotCorruptEngineTranscript(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 	request := NewRequest(client).
-		WithMessages(
-			Message{Role: RoleUser, Content: "one"},
-			Message{Role: RoleUser, Content: "two"},
-			Message{Role: RoleUser, Content: "three"},
-			Message{Role: RoleUser, Content: "four"},
-		).
+		WithPrompt(NewPrompt().Add(
+			Message{Role: RoleUser, Content: Text("one")},
+			Message{Role: RoleUser, Content: Text("two")},
+			Message{Role: RoleUser, Content: Text("three")},
+			Message{Role: RoleUser, Content: Text("four")},
+		)).
 		WithTokenCounter(fixedCounter(10)).
 		WithMaxContextTokens(20).
 		PreMaxTokensReached(func(
@@ -544,7 +559,7 @@ func TestTokenLimit_HandlerCannotCorruptEngineTranscript(t *testing.T) {
 
 	contents := make([]string, 0, len(response.Messages))
 	for _, message := range response.Messages {
-		contents = append(contents, message.Content)
+		contents = append(contents, message.Text())
 	}
 
 	assert.Equal(

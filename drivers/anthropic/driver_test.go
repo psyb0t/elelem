@@ -112,10 +112,12 @@ func TestDriverConformance(t *testing.T) {
 					ID:                "claude-opus-4-6",
 					SupportsReasoning: true,
 				},
-				Messages: []elelem.Message{{
-					Role:    elelem.RoleUser,
-					Content: "conformance request",
-				}},
+				Messages: []elelem.Message{
+					{
+						Role:    elelem.RoleUser,
+						Content: elelem.Text("conformance request"),
+					},
+				},
 			},
 			NetworkCalls: networkCalls.Load,
 		},
@@ -197,10 +199,12 @@ func TestDriverStreamAndListModels(t *testing.T) {
 
 	usage, err := driver.Stream(context.Background(), elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
-		Messages: []elelem.Message{{
-			Role:    elelem.RoleUser,
-			Content: "status?",
-		}},
+		Messages: []elelem.Message{
+			{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("status?"),
+			},
+		},
 	}, func(delta elelem.Delta) error {
 		deltas = append(deltas, delta)
 
@@ -276,10 +280,12 @@ func TestDriverStreamCancellation(t *testing.T) {
 
 	usage, err := driver.Stream(ctx, elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
-		Messages: []elelem.Message{{
-			Role:    elelem.RoleUser,
-			Content: "status?",
-		}},
+		Messages: []elelem.Message{
+			{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("status?"),
+			},
+		},
 	}, func(delta elelem.Delta) error {
 		if delta.Text != "" {
 			cancel()
@@ -320,10 +326,12 @@ func TestDriverRejectsInvalidTranscriptBeforeNetwork(t *testing.T) {
 
 	_, err := driver.Stream(context.Background(), elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
-		Messages: []elelem.Message{{
-			Role:       elelem.RoleTool,
-			ToolCallID: "orphan",
-		}},
+		Messages: []elelem.Message{
+			{
+				Role:       elelem.RoleTool,
+				ToolCallID: "orphan",
+			},
+		},
 	}, nil)
 	require.ErrorIs(t, err, elelem.ErrInvalidTranscript, "orphan tool result")
 
@@ -364,10 +372,12 @@ func TestDriverReturnsPartialUsageOnCallbackError(t *testing.T) {
 
 	usage, err := driver.Stream(context.Background(), elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
-		Messages: []elelem.Message{{
-			Role:    elelem.RoleUser,
-			Content: "status?",
-		}},
+		Messages: []elelem.Message{
+			{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("status?"),
+			},
+		},
 	}, func(delta elelem.Delta) error {
 		if delta.Text != "" {
 			return wantErr
@@ -409,10 +419,12 @@ func TestDriverDisablesSDKRetries(t *testing.T) {
 
 	_, err := driver.Stream(context.Background(), elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
-		Messages: []elelem.Message{{
-			Role:    elelem.RoleUser,
-			Content: "status?",
-		}},
+		Messages: []elelem.Message{
+			{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("status?"),
+			},
+		},
 	}, nil)
 	require.Error(t, err, "upstream 5xx must surface")
 
@@ -511,10 +523,12 @@ func TestDriverNormalizesProviderErrors(t *testing.T) {
 
 			_, err := driver.Stream(context.Background(), elelem.DriverRequest{
 				Model: elelem.Model{ID: "claude-opus-4-6"},
-				Messages: []elelem.Message{{
-					Role:    elelem.RoleUser,
-					Content: "status?",
-				}},
+				Messages: []elelem.Message{
+					{
+						Role:    elelem.RoleUser,
+						Content: elelem.Text("status?"),
+					},
+				},
 			}, nil)
 			require.Error(t, err, "provider error must surface")
 
@@ -590,10 +604,12 @@ func TestRefusalAgreesAcrossBothChannels(t *testing.T) {
 		t.Context(),
 		elelem.DriverRequest{
 			Model: elelem.Model{ID: modelOpus46},
-			Messages: []elelem.Message{{
-				Role:    elelem.RoleUser,
-				Content: "something disallowed",
-			}},
+			Messages: []elelem.Message{
+				{
+					Role:    elelem.RoleUser,
+					Content: elelem.Text("something disallowed"),
+				},
+			},
 		},
 		func(delta elelem.Delta) error {
 			if delta.FinishReason != elelem.FinishReasonUnset {

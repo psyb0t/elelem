@@ -88,7 +88,7 @@ func newToolRequest(tool Tool, turns []scriptedTurn) *Request {
 	)
 
 	return NewRequest(client).
-		WithPrompt("run").
+		WithPrompt(NewPrompt().UserText("run")).
 		WithTool(tool).
 		WithAutoToolCalls()
 }
@@ -148,7 +148,7 @@ func TestToolCallArgumentsAreCopiedAtEveryPublishSite(t *testing.T) {
 			)
 
 			response, err := NewRequest(client).
-				WithPrompt("run").
+				WithPrompt(NewPrompt().UserText("run")).
 				WithTool(Tool{
 					Name: probeToolName,
 					Handler: func(
@@ -217,7 +217,7 @@ func TestToolCallArgumentsAreCopiedAtEveryPublishSite(t *testing.T) {
 			client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 			request := NewRequest(client).
-				WithPrompt("run").
+				WithPrompt(NewPrompt().UserText("run")).
 				WithTool(Tool{
 					Name:    probeToolName,
 					Handler: okHandler("ok"),
@@ -250,8 +250,7 @@ func TestToolCallArgumentsAreCopiedAtEveryPublishSite(t *testing.T) {
 		}
 		client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-		_, err := NewRequest(client).
-			WithPrompt("run").
+		_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 			WithTool(Tool{
 				Name: probeToolName,
 				Handler: func(
@@ -298,8 +297,7 @@ func TestToolSchemaIsCopiedBeforeReachingHooksAndTheWire(t *testing.T) {
 	}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	_, err := NewRequest(client).
-		WithPrompt("run").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(tool).
 		OnRoundStart(func(_ context.Context, ev *RoundEvent) error {
 			for index := range ev.Tools {
@@ -432,7 +430,7 @@ func TestToolLifecycle_PostRunRewritesResult(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, response.Messages, 4)
-	assert.Equal(t, "rewritten", response.Messages[2].Content)
+	assert.Equal(t, "rewritten", response.Messages[2].Text())
 	assert.True(t, response.Messages[2].ToolResultIsError)
 }
 
@@ -504,8 +502,8 @@ func TestToolLifecycle_PanicsBecomeToolErrors(t *testing.T) {
 			require.Len(t, response.Messages, 4)
 			assert.Equal(t, RoleTool, response.Messages[2].Role)
 			assert.True(t, response.Messages[2].ToolResultIsError)
-			assert.Contains(t, response.Messages[2].Content, "panicked")
-			assert.NotContains(t, response.Messages[2].Content, panicValue)
+			assert.Contains(t, response.Messages[2].Text(), "panicked")
+			assert.NotContains(t, response.Messages[2].Text(), panicValue)
 		})
 	}
 }
@@ -549,7 +547,7 @@ func TestToolLifecycle_BadCallsBecomeToolErrors(t *testing.T) {
 			assert.True(t, response.Messages[2].ToolResultIsError)
 			assert.Contains(
 				t,
-				strings.ToLower(response.Messages[2].Content),
+				strings.ToLower(response.Messages[2].Text()),
 				tc.contains,
 			)
 		})
@@ -681,7 +679,7 @@ func TestToolLifecycle_ResultTruncation(t *testing.T) {
 					// fixed message like "tool has no handler" legitimately
 					// fits and must not be mangled. Measured with the same
 					// counter the engine truncates against.
-					count, countErr := countText(message.Content)
+					count, countErr := countText(message.Text())
 					require.NoError(t, countErr)
 
 					assert.LessOrEqual(
@@ -703,8 +701,7 @@ func TestToolLifecycle_ResultTruncation(t *testing.T) {
 			&scriptedDriver{turns: toolCallTurn(probeToolName, emptyToolArgs)},
 			WithDefaultModel(Model{ID: "test-model"}),
 		)
-		request := NewRequest(client).
-			WithPrompt("run").
+		request := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 			WithTool(Tool{Name: probeToolName, Handler: okHandler("ok")}).
 			WithMaxToolResultTokens(10)
 
@@ -822,8 +819,7 @@ func TestToolLifecycle_InjectionsFollowAllToolResults(t *testing.T) {
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name:    probeToolName,
 			Handler: okHandler("ok"),
@@ -927,8 +923,7 @@ func TestToolLifecycle_ResultsKeepCallOrderWhenHandlersFinishReversed(
 		delivered     []string
 	)
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithMaxConcurrentTools(callCount).
 		WithTool(Tool{
 			Name: probeToolName,
@@ -1036,8 +1031,7 @@ func TestToolLifecycle_ConcurrencyLimitBoundsGoroutines(t *testing.T) {
 		executed atomic.Int64
 	)
 
-	_, err := NewRequest(client).
-		WithPrompt("run").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithMaxConcurrentTools(concurrency).
 		WithTool(Tool{
 			Name: probeToolName,
@@ -1216,7 +1210,7 @@ func TestToolLifecycle_MalformedToolCallStreamsAreRepairedAtIngest(
 			client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 			response, err := NewRequest(client).
-				WithPrompt("run").
+				WithPrompt(NewPrompt().UserText("run")).
 				WithTool(Tool{
 					Name:    probeToolName,
 					Handler: okHandler("ok"),
@@ -1296,8 +1290,7 @@ func TestToolLifecycle_ToolCallArgumentsAreBounded(t *testing.T) {
 
 	var handled atomic.Int64
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name: probeToolName,
 			Handler: func(context.Context, ToolInput) (ToolResult, error) {
@@ -1352,8 +1345,7 @@ func TestToolLifecycle_AbortLeavesAUsableTranscript(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{Name: probeToolName, Handler: okHandler("ok")}).
 		OnToolCallStart(func(context.Context, ToolCallEvent) error {
 			return assert.AnError
@@ -1408,8 +1400,7 @@ func TestToolLifecycle_ErroredResponseAdvertisesNoExecutor(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithMaxRounds(1).
 		WithForceFinalAnswer(false).
 		WithTool(Tool{Name: probeToolName, Handler: okHandler("ok")}).
@@ -1452,8 +1443,7 @@ func TestToolLifecycle_DistinctToolCallsAreCappedPerRound(t *testing.T) {
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).
-		WithPrompt("run").
+	response, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithMaxConcurrentTools(8).
 		WithTool(Tool{Name: probeToolName, Handler: okHandler("ok")}).
 		WithAutoToolCalls().

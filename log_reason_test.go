@@ -91,7 +91,8 @@ func TestRun_LogsRoundStart(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	_, err := NewRequest(client).WithPrompt("question").Run(ctx)
+	_, err := NewRequest(client).
+		WithPrompt(NewPrompt().UserText("question")).Run(ctx)
 	require.NoError(t, err)
 
 	record := findRecord(records(), "round starting")
@@ -119,7 +120,8 @@ func TestRun_LogsEmptyAssistantTurn(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	response, err := NewRequest(client).WithPrompt("question").Run(ctx)
+	response, err := NewRequest(client).
+		WithPrompt(NewPrompt().UserText("question")).Run(ctx)
 	require.NoError(t, err, "an empty turn is diagnosed, not rejected")
 	assert.Empty(t, response.Text)
 
@@ -145,7 +147,8 @@ func TestRun_DoesNotWarnOnANormalTurn(t *testing.T) {
 	}}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	_, err := NewRequest(client).WithPrompt("question").Run(ctx)
+	_, err := NewRequest(client).
+		WithPrompt(NewPrompt().UserText("question")).Run(ctx)
 	require.NoError(t, err)
 
 	assert.Nil(
@@ -185,7 +188,7 @@ func TestRun_ContextCeilingWarningDiscriminates(t *testing.T) {
 		}))
 
 		_, err := NewRequest(client).
-			WithPrompt("question").
+			WithPrompt(NewPrompt().UserText("question")).
 			WithTokenCounter(fixedCounter(perMessage)).
 			Run(ctx)
 		require.NoError(t, err)
@@ -212,7 +215,7 @@ func TestRun_ContextCeilingWarningDiscriminates(t *testing.T) {
 
 		// Priced so the estimate lands at the window itself.
 		_, err := NewRequest(client).
-			WithPrompt("question").
+			WithPrompt(NewPrompt().UserText("question")).
 			WithTokenCounter(fixedCounter(contextSize)).
 			Run(ctx)
 		require.NoError(t, err)
@@ -247,7 +250,7 @@ func TestRun_LogsDeniedToolCallWithReason(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 	response, err := NewRequest(client).
-		WithPrompt("question").
+		WithPrompt(NewPrompt().UserText("question")).
 		WithTool(Tool{
 			Name: "lookup",
 			Handler: func(context.Context, ToolInput) (ToolResult, error) {
@@ -292,7 +295,8 @@ func TestRun_LogsRetryAttemptAndRecovery(t *testing.T) {
 	})
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	_, err := NewRequest(client).WithPrompt("question").Complete(ctx)
+	_, err := NewRequest(client).
+		WithPrompt(NewPrompt().UserText("question")).Complete(ctx)
 	require.NoError(t, err)
 
 	all := records()
@@ -322,8 +326,7 @@ func TestRun_LogsBudgetCompaction(t *testing.T) {
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 	// A counter that always reports over budget forces the compaction path.
-	_, err := NewRequest(client).
-		WithPrompt("question").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("question")).
 		WithMaxContextTokens(10).
 		WithTokenCounter(fixedCounter(999)).
 		Run(ctx)

@@ -44,8 +44,13 @@ func TestDriverStream(t *testing.T) {
 	)
 
 	usage, err := driver.Stream(t.Context(), elelem.DriverRequest{
-		Model:    elelem.Model{ID: testModel},
-		Messages: []elelem.Message{{Role: elelem.RoleUser, Content: "hi"}},
+		Model: elelem.Model{ID: testModel},
+		Messages: []elelem.Message{
+			{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("hi"),
+			},
+		},
 	}, func(delta elelem.Delta) error {
 		text += delta.Text
 		reasoning += delta.Reasoning
@@ -120,10 +125,12 @@ func TestDriverConformance(t *testing.T) {
 					ID:                modelGPT56,
 					SupportsReasoning: true,
 				},
-				Messages: []elelem.Message{{
-					Role:    elelem.RoleUser,
-					Content: "conformance request",
-				}},
+				Messages: []elelem.Message{
+					{
+						Role:    elelem.RoleUser,
+						Content: elelem.Text("conformance request"),
+					},
+				},
 			},
 			NetworkCalls: networkCalls.Load,
 			// The families differ in what they accept, so pin one of each:
@@ -176,14 +183,19 @@ func TestDriverStreamMapsRequestFields(t *testing.T) {
 	parallel := false
 	driver := NewDriver(WithBaseURL(server.URL), WithAPIKey(testAPIKey))
 	_, err = driver.Stream(t.Context(), elelem.DriverRequest{
-		Model:    elelem.Model{ID: testModel},
-		Messages: []elelem.Message{{Role: elelem.RoleUser, Content: "analyze"}},
-		Tools: []elelem.Tool{{
-			Name:            "search",
-			Description:     "Search records",
-			StrictArguments: true,
-			ArgumentsSchema: json.RawMessage(strictToolSchema),
+		Model: elelem.Model{ID: testModel},
+		Messages: []elelem.Message{{
+			Role:    elelem.RoleUser,
+			Content: elelem.Text("analyze"),
 		}},
+		Tools: []elelem.Tool{
+			{
+				Name:            "search",
+				Description:     "Search records",
+				StrictArguments: true,
+				ArgumentsSchema: json.RawMessage(strictToolSchema),
+			},
+		},
 		Params: elelem.GenerationParams{
 			Temperature: &temperature, TopP: &topP,
 			ReasoningEffort:   elelem.ReasoningEffortHigh,
@@ -243,10 +255,12 @@ func TestDriverRejectsMalformedTranscriptBeforeNetwork(t *testing.T) {
 	driver := NewDriver(WithHTTPClient(client), WithAPIKey(testAPIKey))
 	_, err := driver.Stream(t.Context(), elelem.DriverRequest{
 		Model: elelem.Model{ID: testModel},
-		Messages: []elelem.Message{{
-			Role:      elelem.RoleAssistant,
-			ToolCalls: []elelem.ToolCall{{ID: "call-1", Name: "search"}},
-		}},
+		Messages: []elelem.Message{
+			{
+				Role:      elelem.RoleAssistant,
+				ToolCalls: []elelem.ToolCall{{ID: "call-1", Name: "search"}},
+			},
+		},
 	}, func(elelem.Delta) error { return nil })
 	require.ErrorIs(t, err, elelem.ErrInvalidTranscript)
 	assert.Zero(t, requests.Load())
@@ -266,12 +280,17 @@ func TestDriverRejectsInvalidToolSchemaBeforeNetwork(t *testing.T) {
 	}
 	driver := NewDriver(WithHTTPClient(client), WithAPIKey(testAPIKey))
 	_, err := driver.Stream(t.Context(), elelem.DriverRequest{
-		Model:    elelem.Model{ID: testModel},
-		Messages: []elelem.Message{{Role: elelem.RoleUser, Content: "hi"}},
-		Tools: []elelem.Tool{{
-			Name:            "broken",
-			ArgumentsSchema: json.RawMessage(`{"type":`),
+		Model: elelem.Model{ID: testModel},
+		Messages: []elelem.Message{{
+			Role:    elelem.RoleUser,
+			Content: elelem.Text("hi"),
 		}},
+		Tools: []elelem.Tool{
+			{
+				Name:            "broken",
+				ArgumentsSchema: json.RawMessage(`{"type":`),
+			},
+		},
 	}, func(elelem.Delta) error { return nil })
 	require.Error(t, err)
 	assert.Zero(t, requests.Load())
@@ -288,8 +307,16 @@ func TestValidateTranscriptAcceptsReorderedToolResults(t *testing.T) {
 				{ID: "call-b", Name: "second"},
 			},
 		},
-		{Role: elelem.RoleTool, ToolCallID: "call-b", Content: "second result"},
-		{Role: elelem.RoleTool, ToolCallID: "call-a", Content: "first result"},
+		{
+			Role:       elelem.RoleTool,
+			ToolCallID: "call-b",
+			Content:    elelem.Text("second result"),
+		},
+		{
+			Role:       elelem.RoleTool,
+			ToolCallID: "call-a",
+			Content:    elelem.Text("first result"),
+		},
 	})
 	require.NoError(t, err)
 }
@@ -316,8 +343,11 @@ func TestDriverClosesStreamBody(t *testing.T) {
 	}
 	driver := NewDriver(WithHTTPClient(client), WithAPIKey(testAPIKey))
 	_, err = driver.Stream(t.Context(), elelem.DriverRequest{
-		Model:    elelem.Model{ID: testModel},
-		Messages: []elelem.Message{{Role: elelem.RoleUser, Content: "hi"}},
+		Model: elelem.Model{ID: testModel},
+		Messages: []elelem.Message{{
+			Role:    elelem.RoleUser,
+			Content: elelem.Text("hi"),
+		}},
 	}, func(elelem.Delta) error { return nil })
 	require.NoError(t, err)
 	assert.True(t, streamBody.closed.Load())
@@ -339,8 +369,11 @@ func TestDriverCancellationStopsRequest(t *testing.T) {
 
 	driver := NewDriver(WithBaseURL(server.URL), WithAPIKey(testAPIKey))
 	_, err := driver.Stream(ctx, elelem.DriverRequest{
-		Model:    elelem.Model{ID: testModel},
-		Messages: []elelem.Message{{Role: elelem.RoleUser, Content: "hi"}},
+		Model: elelem.Model{ID: testModel},
+		Messages: []elelem.Message{{
+			Role:    elelem.RoleUser,
+			Content: elelem.Text("hi"),
+		}},
 	}, func(elelem.Delta) error { return nil })
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, context.Canceled))
@@ -457,9 +490,11 @@ func TestDriverNormalizesProviderErrors(t *testing.T) {
 			driver := NewDriver(WithBaseURL(server.URL), WithAPIKey(testAPIKey))
 			_, err := driver.Stream(t.Context(), elelem.DriverRequest{
 				Model: elelem.Model{ID: testModel},
-				Messages: []elelem.Message{{
-					Role: elelem.RoleUser, Content: "hi",
-				}},
+				Messages: []elelem.Message{
+					{
+						Role: elelem.RoleUser, Content: elelem.Text("hi"),
+					},
+				},
 			}, func(elelem.Delta) error { return nil })
 			require.Error(t, err)
 
@@ -648,10 +683,12 @@ func TestCapabilitiesGateSamplingParamsPerModel(t *testing.T) {
 
 			_, err := toOpenAIParams(elelem.DriverRequest{
 				Model: model,
-				Messages: []elelem.Message{{
-					Role:    elelem.RoleUser,
-					Content: "hi",
-				}},
+				Messages: []elelem.Message{
+					{
+						Role:    elelem.RoleUser,
+						Content: elelem.Text("hi"),
+					},
+				},
 				Params: elelem.GenerationParams{Temperature: &temperature},
 			})
 
@@ -730,7 +767,7 @@ func TestToolResultContentCarriesTheErrorFlag(t *testing.T) {
 			name: "a failed result is marked in the only channel available",
 			message: elelem.Message{
 				Role:              elelem.RoleTool,
-				Content:           "boom",
+				Content:           elelem.Text("boom"),
 				ToolResultIsError: true,
 			},
 			want:    toolErrorPrefix + "boom",
@@ -740,7 +777,7 @@ func TestToolResultContentCarriesTheErrorFlag(t *testing.T) {
 			name: "a successful result is untouched",
 			message: elelem.Message{
 				Role:    elelem.RoleTool,
-				Content: "all good",
+				Content: elelem.Text("all good"),
 			},
 			want: "all good",
 		},
@@ -750,7 +787,7 @@ func TestToolResultContentCarriesTheErrorFlag(t *testing.T) {
 			name: "an already-marked result is not marked twice",
 			message: elelem.Message{
 				Role:              elelem.RoleTool,
-				Content:           toolErrorPrefix + "boom",
+				Content:           elelem.Text(toolErrorPrefix + "boom"),
 				ToolResultIsError: true,
 			},
 			want: toolErrorPrefix + "boom",

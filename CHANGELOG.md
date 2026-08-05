@@ -4,6 +4,65 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.2.0 — 2026-08-05
+
+Prompts are one immutable value, and messages carry multimodal content.
+
+- **Breaking. `Message.Content` is now `Content` (an ordered `[]Part`), not
+  `string`.** Text-only content is `elelem.Text("...")`; read it back with
+  `Message.Text()`, which is what the engine, logging, and every provider field
+  taking a bare string use. `ToolResult.Content` and `MessageInjection.Content`
+  are unchanged — those are still plain strings.
+- **Breaking. `WithSystemMessage`, `WithSystemMessagef`,
+  `WithSystemMessageAppend`, `WithSystemMessageAppendf`,
+  `WithSystemMessageAppendReset`, `WithHistory`, `WithHistoryFrom` and
+  `WithMessages` are removed from `Request`.** They are now methods on a new
+  `Prompt`, handed over in one call:
+
+  ```go
+  // before
+  request.WithSystemMessage(rules).WithHistory(stored).WithPrompt(question)
+
+  // after
+  request.WithPrompt(elelem.NewPrompt().
+      WithSystem(rules).WithHistory(stored).UserText(question))
+  ```
+
+  The old surface split one conversation across four builders and made the
+  current turn a separate kind of thing from the messages before it, which it
+  is not. `Prompt` is immutable — every method returns a new one — so a prompt
+  can be built once and run repeatedly, against several models, from several
+  goroutines.
+- The system message is a field on `Prompt` rather than `messages[0]`. Two
+  unrelated places used to depend on that position — the Anthropic driver
+  hoisting it into that API's top-level `system` parameter, and history
+  limiting pinning it against eviction — so "system is special" was a
+  convention two files agreed on by hand. `Prompt.Messages()` is now the one
+  place that decides where it goes.
+- **Images, audio and documents.** `ImageURL`, `ImageBytes`, `AudioBytes`,
+  `FileBytes` and `FileRef` build content parts for a user message. The
+  providers disagree about how inline bytes travel — OpenAI packs them into the
+  same `url` field as a `data:` URI, Anthropic uses a tagged source carrying
+  `media_type` separately — and the drivers translate.
+- **Content the model cannot read is refused locally**, with
+  `ErrUnsupportedContent`, before the request is sent. `Capabilities` gained
+  `SupportsImageInput`, `SupportsAudioInput` and `SupportsFileInput`. The flag
+  is necessary but not sufficient: the driver still makes the final per-value
+  call, so Anthropic's four-media-type image whitelist and its absent audio
+  block still refuse. A structurally broken part is reported as invalid rather
+  than unsupported, since switching models would not fix it.
+- **`elelem.WithCapabilityOverride(fn)`** adjusts what a driver reports it can
+  do, for a driver aimed at a compatible gateway whose model does not share the
+  provider's abilities. It is a function of the model because capabilities are
+  per-model, and it can only be trusted to restrict — widening a capability the
+  driver cannot express moves the error later rather than removing it.
+- Fixed: `cloneMessages` did not copy message content. With content as a string
+  that was harmless; with byte payloads it left the engine's transcript
+  aliasing the caller's image buffer, so a caller reusing that buffer would
+  rewrite history already sent.
+- New [docs/prompts.md](docs/prompts.md) covers the builder, the origin rules,
+  the content parts, and what each provider accepts.
+
 ## v0.1.3 — 2026-08-05
 
 **Relicensed from WTFPL to MIT.**

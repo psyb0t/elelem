@@ -99,7 +99,7 @@ func newStructuredRequest(
 
 	client := New(driver, WithDefaultModel(model))
 
-	return NewRequest(client).WithPrompt("analyze")
+	return NewRequest(client).WithPrompt(NewPrompt().UserText("analyze"))
 }
 
 func successfulStructuredUsage(prompt, completion int64) Usage {
@@ -338,20 +338,20 @@ func TestCompleteInto_RepairsOnceAndAccumulatesAccounting(t *testing.T) {
 	// The repair turn must carry BOTH the instruction and the reason the
 	// previous reply was rejected — a repair prompt that never says what broke
 	// is a re-roll, not a repair.
-	assert.Contains(t, repairMessage.Content, repairResponsePrompt)
+	assert.Contains(t, repairMessage.Text(), repairResponsePrompt)
 	assert.Contains(
 		t,
-		repairMessage.Content,
+		repairMessage.Text(),
 		"failed validation",
 		"repair turn feeds the validation error back",
 	)
 	assert.Contains(
 		t,
-		repairMessage.Content,
+		repairMessage.Text(),
 		"schema validation",
 		"repair turn names the specific failure",
 	)
-	assert.NotContains(t, repairMessage.Content, "private-value")
+	assert.NotContains(t, repairMessage.Text(), "private-value")
 	assert.Equal(
 		t,
 		requests[0].Params.ResponseFormat,

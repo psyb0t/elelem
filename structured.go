@@ -166,7 +166,6 @@ func (r *Request) cloneForRepair(
 ) *Request {
 	cloned := *r
 	cloned.params = cloneParams(r.params)
-	cloned.messages = cloneMessages(r.messages)
 
 	content := repairResponsePrompt
 	if validationErr != nil {
@@ -177,12 +176,14 @@ func (r *Request) cloneForRepair(
 		)
 	}
 
-	cloned.messages = append(
-		cloned.messages,
+	// Prompt is immutable, so appending here cannot disturb the request this
+	// repair was derived from — which matters because that request may still
+	// be running, or be re-run afterwards.
+	cloned.prompt = r.prompt.Add(
 		lastAssistantMessage(response),
 		Message{
 			Role:    RoleUser,
-			Content: content,
+			Content: Text(content),
 			Origin:  MessageOriginTurn,
 		},
 	)
@@ -205,7 +206,7 @@ func lastAssistantMessage(response *Response) Message {
 
 	return Message{
 		Role:      RoleAssistant,
-		Content:   response.Text,
+		Content:   Text(response.Text),
 		Reasoning: response.Reasoning,
 		Origin:    MessageOriginTurn,
 	}

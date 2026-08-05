@@ -26,8 +26,9 @@ var result IncidentSummary
 
 response, err := elelem.NewRequest(client).
 	WithModel(model).
-	WithSystemMessage("Summarize the incident.").
-	WithPrompt(raw).
+	WithPrompt(elelem.NewPrompt().
+		WithSystem("Summarize the incident.").
+		UserText(raw)).
 	CompleteInto(ctx, &result)
 ```
 

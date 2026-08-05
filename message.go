@@ -51,8 +51,14 @@ const (
 // Origin, Injection and CacheHint are NON-WIRE — stripped before the provider
 // request and used only by the engine and the caller.
 type Message struct {
-	Role              Role
-	Content           string
+	Role Role
+
+	// Content is an ordered list of parts. Build the text-only case with
+	// Text("..."); read it back with Message.Text() when a string is what you
+	// need. Only user messages carry non-text parts on either provider — see
+	// Capabilities for what each one accepts.
+	Content Content
+
 	ToolCalls         []ToolCall
 	ToolCallID        string
 	ToolResultIsError bool
@@ -109,18 +115,41 @@ func cloneToolCalls(calls []ToolCall) []ToolCall {
 func cloneMessages(messages []Message) []Message {
 	result := make([]Message, len(messages))
 	for index, message := range messages {
-		result[index] = message
-		result[index].ToolCalls = cloneToolCalls(message.ToolCalls)
-
-		result[index].ProviderReasoning = append(
-			json.RawMessage(nil),
-			message.ProviderReasoning...,
-		)
-		if message.Injection != nil {
-			injection := *message.Injection
-			result[index].Injection = &injection
-		}
+		result[index] = message.clone()
 	}
 
 	return result
+}
+
+// clone deep-copies everything a Message points at.
+//
+// Content is included and must stay included: it went from a string to a slice
+// of parts carrying byte payloads, so copying the struct alone leaves the
+// engine's transcript aliasing the caller's image bytes, and a caller reusing
+// that buffer would rewrite history already sent.
+func (m Message) clone() Message {
+	cloned := m
+	cloned.Content = m.Content.Clone()
+	cloned.ToolCalls = cloneToolCalls(m.ToolCalls)
+
+	cloned.ProviderReasoning = append(
+		json.RawMessage(nil),
+		m.ProviderReasoning...,
+	)
+
+	if m.Injection != nil {
+		injection := *m.Injection
+		cloned.Injection = &injection
+	}
+
+	return cloned
+}
+
+// Text returns the message's text content, ignoring any non-text parts.
+//
+// Shorthand for Content.String(), which is what nearly every caller wants: the
+// engine's own text handling, logging, and any provider field that takes a
+// bare string all read through here.
+func (m Message) Text() string {
+	return m.Content.String()
 }

@@ -148,27 +148,27 @@ func TestRequest_ResolvedBudget(t *testing.T) {
 func TestRequest_WithMessagesDropsInjectionsFromEarlierRuns(t *testing.T) {
 	t.Parallel()
 
-	request := NewRequest(New(&scriptedDriver{})).WithMessages(
+	request := NewRequest(New(&scriptedDriver{})).WithPrompt(NewPrompt().Add(
 		Message{
 			Role:    RoleUser,
-			Content: "real question",
+			Content: Text("real question"),
 			Origin:  MessageOriginTurn,
 		},
 		Message{
 			Role:    RoleSystem,
-			Content: "stale injection",
+			Content: Text("stale injection"),
 			Origin:  MessageOriginInjection,
 		},
 		Message{
 			Role:    RoleAssistant,
-			Content: "real answer",
+			Content: Text("real answer"),
 			Origin:  MessageOriginTurn,
 		},
-	)
+	))
 
-	contents := make([]string, 0, len(request.messages))
-	for _, message := range request.messages {
-		contents = append(contents, message.Content)
+	contents := make([]string, 0, len(request.prompt.messages))
+	for _, message := range request.prompt.messages {
+		contents = append(contents, message.Text())
 	}
 
 	assert.Equal(t, []string{"real question", "real answer"}, contents,
@@ -177,11 +177,11 @@ func TestRequest_WithMessagesDropsInjectionsFromEarlierRuns(t *testing.T) {
 	// An untagged message is still adopted as ordinary history — the filter
 	// keys on the injection marker, not on the role, so a caller passing a
 	// legitimate system message is unaffected.
-	plain := NewRequest(New(&scriptedDriver{})).WithMessages(
-		Message{Role: RoleSystem, Content: "caller system prompt"},
-	)
-	require.Len(t, plain.messages, 1)
-	assert.Equal(t, MessageOriginTurn, plain.messages[0].Origin)
+	plain := NewRequest(New(&scriptedDriver{})).WithPrompt(NewPrompt().Add(
+		Message{Role: RoleSystem, Content: Text("caller system prompt")},
+	))
+	require.Len(t, plain.prompt.messages, 1)
+	assert.Equal(t, MessageOriginTurn, plain.prompt.messages[0].Origin)
 }
 
 // There are THREE ways history enters a Request, and the rule has to hold at
@@ -196,13 +196,13 @@ func TestRequest_EveryHistoryEntryPointDropsInjections(t *testing.T) {
 	t.Parallel()
 
 	history := []Message{
-		{Role: RoleUser, Content: "real question"},
+		{Role: RoleUser, Content: Text("real question")},
 		{
 			Role:    RoleSystem,
-			Content: "stale injection",
+			Content: Text("stale injection"),
 			Origin:  MessageOriginInjection,
 		},
-		{Role: RoleAssistant, Content: "real answer"},
+		{Role: RoleAssistant, Content: Text("real answer")},
 	}
 
 	testCases := []struct {
@@ -212,19 +212,21 @@ func TestRequest_EveryHistoryEntryPointDropsInjections(t *testing.T) {
 		{
 			name: "WithMessages",
 			seed: func(r *Request) *Request {
-				return r.WithMessages(history...)
+				return r.WithPrompt(NewPrompt().Add(history...))
 			},
 		},
 		{
 			name: "WithHistory",
 			seed: func(r *Request) *Request {
-				return r.WithHistory(history)
+				return r.WithPrompt(NewPrompt().WithHistory(history))
 			},
 		},
 		{
 			name: "WithHistoryFrom",
 			seed: func(r *Request) *Request {
-				return r.WithHistoryFrom(slices.Values(history))
+				return r.
+					WithPrompt(NewPrompt().
+						WithHistoryFrom(slices.Values(history)))
 			},
 		},
 	}
@@ -235,9 +237,9 @@ func TestRequest_EveryHistoryEntryPointDropsInjections(t *testing.T) {
 
 			request := tc.seed(NewRequest(New(&scriptedDriver{})))
 
-			contents := make([]string, 0, len(request.messages))
-			for _, message := range request.messages {
-				contents = append(contents, message.Content)
+			contents := make([]string, 0, len(request.prompt.messages))
+			for _, message := range request.prompt.messages {
+				contents = append(contents, message.Text())
 			}
 
 			assert.Equal(
@@ -416,7 +418,7 @@ func TestRequest_EveryCallbackErrorStopsTheRun(t *testing.T) {
 			client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
 			request := NewRequest(client).
-				WithPrompt("run").
+				WithPrompt(NewPrompt().UserText("run")).
 				WithTool(Tool{
 					Name:    probeToolName,
 					Handler: okHandler("ok"),
@@ -485,8 +487,7 @@ func TestRequest_TheCallbackScriptFiresEveryCallback(t *testing.T) {
 	}}
 	client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-	_, err := NewRequest(client).
-		WithPrompt("run").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name:    probeToolName,
 			Handler: okHandler("ok"),
@@ -621,8 +622,7 @@ func TestRequest_OnErrorFiresOncePerFailureInBothModes(t *testing.T) {
 		}}
 		client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
 
-		_, err := NewRequest(client).
-			WithPrompt("run").
+		_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 			WithTool(Tool{Name: probeToolName, Handler: okHandler("ok")}).
 			OnError(func(context.Context, error) error {
 				fired.Add(1)
@@ -654,7 +654,7 @@ func TestRequest_OnErrorFiresOncePerFailureInBothModes(t *testing.T) {
 				)
 
 				request := NewRequest(client).
-					WithPrompt("run").
+					WithPrompt(NewPrompt().UserText("run")).
 					WithTool(tc.tool).
 					WithMaxRounds(tc.maxRound).
 					OnError(func(context.Context, error) error {
@@ -723,8 +723,7 @@ func TestRequest_ToolGoroutinesAreWaitedOnEarlyReturn(t *testing.T) {
 
 	var started atomic.Int64
 
-	_, err := NewRequest(client).
-		WithPrompt("run").
+	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("run")).
 		WithTool(Tool{
 			Name: probeToolName,
 			Handler: func(context.Context, ToolInput) (ToolResult, error) {
@@ -775,35 +774,42 @@ func TestRequestBuilders_LandOnTheFieldTheyName(t *testing.T) {
 		check func(*testing.T, *Request)
 	}{
 		{
-			name: "WithSystemMessagef formats",
+			name: "WithSystemf formats",
 			build: func(r *Request) *Request {
-				return r.WithSystemMessagef("hello %s", "world")
+				return r.WithPrompt(
+					NewPrompt().WithSystemf("hello %s", "world"),
+				)
 			},
 			check: func(t *testing.T, r *Request) {
 				t.Helper()
-				assert.Equal(t, "hello world", r.baseSystemMessage)
+				assert.Equal(t, "hello world", r.prompt.SystemMessage())
 			},
 		},
 		{
-			name: "WithSystemMessageAppendf formats and appends",
+			name: "AppendSystemf formats and appends after the base",
 			build: func(r *Request) *Request {
-				return r.WithSystemMessageAppendf("n=%d", 1)
+				return r.WithPrompt(
+					NewPrompt().WithSystem("base").AppendSystemf("n=%d", 1),
+				)
 			},
 			check: func(t *testing.T, r *Request) {
 				t.Helper()
-				assert.Equal(t, []string{"n=1"}, r.systemMessageAppends)
+				assert.Equal(t, "base\n\nn=1", r.prompt.SystemMessage())
 			},
 		},
 		{
-			name: "WithSystemMessageAppendReset clears appends",
+			name: "ResetSystemAppends keeps the base and drops fragments",
 			build: func(r *Request) *Request {
-				return r.
-					WithSystemMessageAppend("first").
-					WithSystemMessageAppendReset()
+				return r.WithPrompt(
+					NewPrompt().
+						WithSystem("base").
+						AppendSystem("first").
+						ResetSystemAppends(),
+				)
 			},
 			check: func(t *testing.T, r *Request) {
 				t.Helper()
-				assert.Empty(t, r.systemMessageAppends)
+				assert.Equal(t, "base", r.prompt.SystemMessage())
 			},
 		},
 		{
@@ -1052,7 +1058,8 @@ func TestRequest_IsTokenLimitReached(t *testing.T) {
 	t.Run("no resolvable budget reports false", func(t *testing.T) {
 		t.Parallel()
 
-		request := NewRequest(New(&scriptedDriver{})).WithPrompt("hi")
+		request := NewRequest(New(&scriptedDriver{})).
+			WithPrompt(NewPrompt().UserText("hi"))
 
 		reached, err := request.IsTokenLimitReached()
 		require.NoError(t, err)
@@ -1063,7 +1070,7 @@ func TestRequest_IsTokenLimitReached(t *testing.T) {
 		t.Parallel()
 
 		request := NewRequest(New(&scriptedDriver{})).
-			WithPrompt("hi").
+			WithPrompt(NewPrompt().UserText("hi")).
 			WithMaxContextTokens(largeBudget)
 
 		reached, err := request.IsTokenLimitReached()
@@ -1083,8 +1090,9 @@ func TestRequest_IsTokenLimitReached(t *testing.T) {
 		)
 
 		request := NewRequest(client).
-			WithSystemMessage("a reasonably long system prompt here").
-			WithPrompt("and a prompt on top of it").
+			WithPrompt(NewPrompt().
+				WithSystem("a reasonably long system prompt here").
+				UserText("and a prompt on top of it")).
 			WithMaxContextTokens(tinyBudget)
 
 		reached, err := request.IsTokenLimitReached()
@@ -1107,7 +1115,7 @@ func TestRequest_CounterResolutionOrder(t *testing.T) {
 
 	// fixedCounter scales by message count, so an empty transcript would
 	// report 0 from every tier and prove nothing about which one answered.
-	oneMessage := []Message{{Role: RoleUser, Content: "hi"}}
+	oneMessage := []Message{{Role: RoleUser, Content: Text("hi")}}
 
 	t.Run("request beats client", func(t *testing.T) {
 		t.Parallel()
@@ -1148,4 +1156,195 @@ func TestRequest_CounterResolutionOrder(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, driverCount, count)
 	})
+}
+
+// contentGateDriver records whether Stream was reached at all. The whole
+// point of the content gate is that unsupported content never becomes a
+// request, so the assertion that matters is a call count of zero — not the
+// error alone, which a provider could also have produced after a round trip.
+type contentGateDriver struct {
+	caps    Capabilities
+	streams int
+}
+
+func (d *contentGateDriver) Stream(
+	context.Context,
+	DriverRequest,
+	func(Delta) error,
+) (Usage, error) {
+	d.streams++
+
+	return Usage{FinishReason: FinishReasonStop}, nil
+}
+
+func (d *contentGateDriver) ListModels(context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (d *contentGateDriver) Capabilities(Model) Capabilities {
+	return d.caps
+}
+
+func (d *contentGateDriver) TokenCounter() TokenCounter {
+	return nil
+}
+
+func TestContentGate_UnsupportedContentNeverReachesTheDriver(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		caps        Capabilities
+		part        Part
+		wantStreams int
+	}{
+		{
+			name:        "audio against a driver without audio",
+			caps:        Capabilities{SupportsImageInput: true},
+			part:        AudioBytes([]byte("wav"), AudioFormatWAV),
+			wantStreams: 0,
+		},
+		{
+			name:        "image against a driver without images",
+			caps:        Capabilities{},
+			part:        ImageBytes([]byte("png"), MediaTypePNG),
+			wantStreams: 0,
+		},
+		{
+			name:        "image against a driver with images",
+			caps:        Capabilities{SupportsImageInput: true},
+			part:        ImageBytes([]byte("png"), MediaTypePNG),
+			wantStreams: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			driver := &contentGateDriver{caps: tc.caps}
+
+			_, err := NewRequest(New(driver)).
+				WithModel(Model{ID: "m", ContextSize: 100_000}).
+				WithPrompt(NewPrompt().Add(Message{
+					Role:    RoleUser,
+					Content: Content{TextOf("look"), tc.part},
+				})).
+				Complete(t.Context())
+
+			assert.Equal(t, tc.wantStreams, driver.streams,
+				"unsupported content must not become a provider request")
+
+			if tc.wantStreams == 0 {
+				require.ErrorIs(t, err, ErrUnsupportedContent)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// The gate must refuse locally. Without it the request ships and the provider
+// answers with a message about a block type the caller never wrote.
+func TestRequest_RejectsContentTheModelCannotCarry(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		caps    Capabilities
+		part    Part
+		wantErr error
+	}{
+		{
+			"audio against a driver without audio",
+			Capabilities{SupportsImageInput: true},
+			AudioBytes([]byte{1}, AudioFormatWAV),
+			ErrUnsupportedContent,
+		},
+		{
+			"image against a driver without images",
+			Capabilities{},
+			ImageURL("https://x/y.png"),
+			ErrUnsupportedContent,
+		},
+		{
+			"file against a driver without files",
+			Capabilities{},
+			FileRef("f-1"),
+			ErrUnsupportedContent,
+		},
+		{
+			"image against a driver with images",
+			Capabilities{SupportsImageInput: true},
+			ImageURL("https://x/y.png"),
+			nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			request := NewRequest(New(&capsDriver{caps: tc.caps})).
+				WithModel(Model{ID: "m", ContextSize: 1000}).
+				WithPrompt(NewPrompt().Add(Message{
+					Role:    RoleUser,
+					Content: Content{tc.part},
+				}))
+
+			err := request.validateContentCapabilities(tc.caps)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}
+
+// Structure is checked BEFORE capability: a malformed part is wrong for every
+// provider, and reporting it as unsupported would send the caller to a
+// different model to fix a payload bug.
+func TestRequest_ReportsMalformedContentAsInvalidNotUnsupported(t *testing.T) {
+	t.Parallel()
+
+	caps := Capabilities{SupportsImageInput: true}
+	request := NewRequest(New(&capsDriver{caps: caps})).
+		WithPrompt(NewPrompt().Add(Message{
+			Role:    RoleUser,
+			Content: Content{{Type: PartTypeImage, Image: &ImageSource{}}},
+		}))
+
+	err := request.validateContentCapabilities(caps)
+
+	require.ErrorIs(t, err, ErrImageSourceAmbiguous)
+	assert.NotErrorIs(t, err, ErrUnsupportedContent)
+}
+
+type capsDriver struct {
+	caps Capabilities
+}
+
+func (d *capsDriver) Stream(
+	context.Context,
+	DriverRequest,
+	func(Delta) error,
+) (Usage, error) {
+	return Usage{}, nil
+}
+
+func (d *capsDriver) ListModels(context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (d *capsDriver) Capabilities(Model) Capabilities {
+	return d.caps
+}
+
+func (d *capsDriver) TokenCounter() TokenCounter {
+	return nil
 }

@@ -122,7 +122,7 @@ func toAnthropicMessages(
 		}
 
 		if index == 0 && message.Role == elelem.RoleSystem {
-			block := anthropicsdk.TextBlockParam{Text: message.Content}
+			block := anthropicsdk.TextBlockParam{Text: message.Text()}
 			applyTextCacheHint(&block, message.CacheHint)
 			system = append(system, block)
 
@@ -217,7 +217,7 @@ func toToolResultMessage(
 
 		block := anthropicsdk.NewToolResultBlock(
 			message.ToolCallID,
-			message.Content,
+			message.Text(),
 			message.ToolResultIsError,
 		)
 		applyBlockCacheHint(&block, message.CacheHint)
@@ -237,7 +237,7 @@ func toToolResultMessage(
 // table to consult. Gating it would silently downgrade tool-driven system
 // injection, which is this path's primary producer.
 func toMidConvSystemMessage(message elelem.Message) anthropicsdk.MessageParam {
-	system := []anthropicsdk.TextBlockParam{{Text: message.Content}}
+	system := []anthropicsdk.TextBlockParam{{Text: message.Text()}}
 	block := anthropicsdk.NewMidConvSystemBlock(system)
 	applyBlockCacheHint(&block, message.CacheHint)
 
@@ -254,10 +254,19 @@ func toAnthropicMessage(
 ) (anthropicsdk.MessageParam, error) {
 	switch message.Role {
 	case elelem.RoleUser:
-		block := anthropicsdk.NewTextBlock(message.Content)
-		applyBlockCacheHint(&block, message.CacheHint)
+		blocks, err := toUserBlocks(message)
+		if err != nil {
+			return anthropicsdk.MessageParam{}, err
+		}
 
-		return anthropicsdk.NewUserMessage(block), nil
+		// The hint belongs on the LAST block: Anthropic caches the prefix up
+		// to a breakpoint, so marking an earlier block would leave the rest of
+		// this same message outside the cached span.
+		if len(blocks) > 0 {
+			applyBlockCacheHint(&blocks[len(blocks)-1], message.CacheHint)
+		}
+
+		return anthropicsdk.NewUserMessage(blocks...), nil
 	case elelem.RoleAssistant:
 		blocks, err := toAssistantBlocks(ctx, modelID, message)
 		if err != nil {
@@ -298,8 +307,8 @@ func toAssistantBlocks(
 		0,
 		1+len(message.ToolCalls),
 	)
-	if message.Content != "" {
-		blocks = append(blocks, anthropicsdk.NewTextBlock(message.Content))
+	if message.Text() != "" {
+		blocks = append(blocks, anthropicsdk.NewTextBlock(message.Text()))
 	}
 
 	for _, call := range message.ToolCalls {
@@ -574,7 +583,9 @@ func integerValue(value any) (int64, error) {
 		return typed, nil
 	case float64:
 		if math.Trunc(typed) != typed {
-			return 0, ctxerrors.New("value must be an integer")
+			return 0, ctxerrors.Wrap(
+				elelem.ErrInvalidRequest, "value must be an integer",
+			)
 		}
 
 		// Integrality is not enough. math.Trunc(1e300) == 1e300, so a value far
@@ -582,7 +593,10 @@ func integerValue(value any) (int64, error) {
 		// implementation-defined — on amd64 it yields MinInt64, turning a
 		// nonsense parameter into a plausible-looking negative one.
 		if typed < math.MinInt64 || typed > math.MaxInt64 {
-			return 0, ctxerrors.New("value is outside the integer range")
+			return 0, ctxerrors.Wrap(
+				elelem.ErrInvalidRequest,
+				"value is outside the integer range",
+			)
 		}
 
 		return int64(typed), nil
@@ -594,7 +608,9 @@ func integerValue(value any) (int64, error) {
 
 		return parsed, nil
 	default:
-		return 0, ctxerrors.New("value must be an integer")
+		return 0, ctxerrors.Wrap(
+			elelem.ErrInvalidRequest, "value must be an integer",
+		)
 	}
 }
 

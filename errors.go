@@ -56,6 +56,37 @@ var (
 	)
 	ErrContextExceeded = errors.New("provider context limit exceeded")
 
+	// ErrToolHandlerPanicked is what a recovered handler panic becomes. A
+	// sentinel rather than a bare error so a caller can tell a panic apart
+	// from a handler that returned a failure deliberately — the two say very
+	// different things about the tool.
+	ErrToolHandlerPanicked = errors.New("tool handler panicked")
+
+	ErrPartTypeUnknown     = errors.New("unknown content part type")
+	ErrPartPayloadMissing  = errors.New("content part has no payload")
+	ErrPartPayloadMismatch = errors.New(
+		"content part carries a payload its type does not use",
+	)
+	ErrImageSourceAmbiguous = errors.New(
+		"image source needs exactly one of URL or Data",
+	)
+	ErrImageMediaTypeRequired = errors.New(
+		"image source with Data requires MediaType",
+	)
+	ErrAudioDataRequired   = errors.New("audio source requires Data")
+	ErrAudioFormatUnknown  = errors.New("unsupported audio format")
+	ErrFileSourceAmbiguous = errors.New(
+		"file source needs exactly one of Data or FileID",
+	)
+	ErrDataURIMalformed = errors.New("malformed data URI")
+
+	// ErrUnsupportedContent is what a driver returns for a part type the
+	// provider has no equivalent for — audio against Anthropic, say. Distinct
+	// from ErrInvalidRequest: the content is well-formed, this provider just
+	// cannot carry it, so the caller's fix is a different model, not a
+	// different payload.
+	ErrUnsupportedContent = errors.New("provider does not support content type")
+
 	ErrRetryMaxAttempts = errors.New("retry max attempts must be positive")
 	ErrRetryDelays      = errors.New("retry delays must not be negative")
 	ErrRetryDelayOrder  = errors.New(

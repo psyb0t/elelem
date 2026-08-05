@@ -67,6 +67,20 @@ type Capabilities struct {
 	SupportsDisablingReasoning       bool
 	SupportsPromptCaching            bool
 
+	// Content-part support. Text needs no flag — every provider takes it, and
+	// a model that could not would not be a chat model.
+	//
+	// These are NECESSARY, not sufficient, exactly like MaxReasoningEffort.
+	// SupportsImageInput says the provider has an image block at all; it says
+	// nothing about which media types, and Anthropic accepts only four. The
+	// driver makes the final per-value call and returns its own
+	// ErrUnsupportedParameter. Claiming a capability the driver does not
+	// enforce is worse than not claiming it: the engine lets the request
+	// through on the strength of the flag and the provider rejects it.
+	SupportsImageInput bool
+	SupportsAudioInput bool
+	SupportsFileInput  bool
+
 	// MaxReasoningEffort is a CEILING, not a whitelist. A model's supported
 	// effort set can be non-contiguous — a model may accept `max` while
 	// rejecting `xhigh` — and a single ceiling cannot express that. So passing

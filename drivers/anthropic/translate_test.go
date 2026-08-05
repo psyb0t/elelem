@@ -36,13 +36,13 @@ func TestToMessageParams(t *testing.T) {
 		Messages: []elelem.Message{
 			{
 				Role:      elelem.RoleSystem,
-				Content:   "be exact",
+				Content:   elelem.Text("be exact"),
 				CacheHint: elelem.CacheHintLong,
 			},
-			{Role: elelem.RoleUser, Content: "check service"},
+			{Role: elelem.RoleUser, Content: elelem.Text("check service")},
 			{
 				Role:              elelem.RoleAssistant,
-				Content:           "I will inspect it.",
+				Content:           elelem.Text("I will inspect it."),
 				ProviderReasoning: reasoning,
 				ToolCalls: []elelem.ToolCall{{
 					ID:        "call-1",
@@ -53,7 +53,7 @@ func TestToMessageParams(t *testing.T) {
 			{
 				Role:              elelem.RoleTool,
 				ToolCallID:        "call-1",
-				Content:           `{"error":"unavailable"}`,
+				Content:           elelem.Text(`{"error":"unavailable"}`),
 				ToolResultIsError: true,
 				CacheHint:         elelem.CacheHintShort,
 			},
@@ -164,7 +164,10 @@ func TestToMessageParams_CoalescesParallelToolResults(t *testing.T) {
 	req := elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
 		Messages: []elelem.Message{
-			{Role: elelem.RoleUser, Content: "check both services"},
+			{
+				Role:    elelem.RoleUser,
+				Content: elelem.Text("check both services"),
+			},
 			{
 				Role: elelem.RoleAssistant,
 				ToolCalls: []elelem.ToolCall{
@@ -183,12 +186,12 @@ func TestToMessageParams_CoalescesParallelToolResults(t *testing.T) {
 			{
 				Role:       elelem.RoleTool,
 				ToolCallID: "call-1",
-				Content:    `{"status":"ok"}`,
+				Content:    elelem.Text(`{"status":"ok"}`),
 			},
 			{
 				Role:              elelem.RoleTool,
 				ToolCallID:        "call-2",
-				Content:           `{"error":"down"}`,
+				Content:           elelem.Text(`{"error":"down"}`),
 				ToolResultIsError: true,
 			},
 		},
@@ -256,10 +259,10 @@ func TestInsertProviderReasoning_SurvivesRebuiltContentLayout(t *testing.T) {
 	req := elelem.DriverRequest{
 		Model: elelem.Model{ID: "claude-opus-4-6"},
 		Messages: []elelem.Message{
-			{Role: elelem.RoleUser, Content: "go"},
+			{Role: elelem.RoleUser, Content: elelem.Text("go")},
 			{
 				Role:              elelem.RoleAssistant,
-				Content:           "merged answer",
+				Content:           elelem.Text("merged answer"),
 				ProviderReasoning: reasoning,
 			},
 		},
@@ -304,7 +307,7 @@ func TestValidateTranscript(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string][]elelem.Message{
-		"unknown role": {{Content: "bad"}},
+		"unknown role": {{Content: elelem.Text("bad")}},
 		"orphan result": {{
 			Role:       elelem.RoleTool,
 			ToolCallID: "missing",
@@ -324,7 +327,7 @@ func TestValidateTranscript(t *testing.T) {
 					Name: "lookup",
 				}},
 			},
-			{Role: elelem.RoleUser, Content: "too soon"},
+			{Role: elelem.RoleUser, Content: elelem.Text("too soon")},
 		},
 	}
 
@@ -371,7 +374,7 @@ func TestDriverRejectsUnsupportedParamsLocally(t *testing.T) {
 			Model: elelem.Model{ID: modelOpus5},
 			Messages: []elelem.Message{{
 				Role:    elelem.RoleUser,
-				Content: "hello",
+				Content: elelem.Text("hello"),
 			}},
 			Params: elelem.GenerationParams{Temperature: &temperature},
 		},
@@ -379,7 +382,7 @@ func TestDriverRejectsUnsupportedParamsLocally(t *testing.T) {
 			Model: elelem.Model{ID: "claude-opus-4-6"},
 			Messages: []elelem.Message{{
 				Role:    elelem.RoleUser,
-				Content: "hello",
+				Content: elelem.Text("hello"),
 			}},
 			Params: elelem.GenerationParams{
 				ReasoningEffort: elelem.ReasoningEffortXHigh,
@@ -560,10 +563,10 @@ func TestProviderReasoningRejectsNonReasoningBlocks(t *testing.T) {
 				context.Background(),
 				"claude-opus-4-6",
 				[]elelem.Message{
-					{Role: elelem.RoleUser, Content: "hi"},
+					{Role: elelem.RoleUser, Content: elelem.Text("hi")},
 					{
 						Role:              elelem.RoleAssistant,
-						Content:           "answer",
+						Content:           elelem.Text("answer"),
 						ProviderReasoning: envelope,
 					},
 				},
@@ -606,7 +609,7 @@ func TestMaxOutputTokensIsValidatedLocally(t *testing.T) {
 			req := elelem.DriverRequest{
 				Model: elelem.Model{ID: "claude-opus-4-6"},
 				Messages: []elelem.Message{
-					{Role: elelem.RoleUser, Content: "hi"},
+					{Role: elelem.RoleUser, Content: elelem.Text("hi")},
 				},
 			}
 			req.Params.MaxOutputTokens = &tc.value
@@ -843,7 +846,7 @@ func TestToMidConvSystemMessage(t *testing.T) {
 
 	message := toMidConvSystemMessage(elelem.Message{
 		Role:    elelem.RoleSystem,
-		Content: "you are now in maintenance mode",
+		Content: elelem.Text("you are now in maintenance mode"),
 	})
 
 	assert.Equal(t, anthropicsdk.MessageParamRoleSystem, message.Role)

@@ -3,8 +3,6 @@ package elelem
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"iter"
 	"maps"
 	"strings"
 	"time"
@@ -30,9 +28,7 @@ const (
 type Request struct {
 	client                   *Client
 	model                    Model
-	baseSystemMessage        string
-	systemMessageAppends     []string
-	messages                 []Message
+	prompt                   Prompt
 	tools                    *ToolSet
 	toolProvider             func(context.Context) (*ToolSet, error)
 	params                   GenerationParams
@@ -82,99 +78,18 @@ func (r *Request) WithModel(model Model) *Request {
 	return r
 }
 
-func (r *Request) WithSystemMessage(message string) *Request {
-	r.baseSystemMessage = message
-
-	return r
-}
-
-func (r *Request) WithSystemMessagef(format string, args ...any) *Request {
-	r.baseSystemMessage = fmt.Sprintf(format, args...)
-
-	return r
-}
-
-func (r *Request) WithSystemMessageAppend(message string) *Request {
-	r.systemMessageAppends = append(r.systemMessageAppends, message)
-
-	return r
-}
-
-func (r *Request) WithSystemMessageAppendf(
-	format string,
-	args ...any,
-) *Request {
-	return r.WithSystemMessageAppend(fmt.Sprintf(format, args...))
-}
-
-func (r *Request) WithSystemMessageAppendReset() *Request {
-	r.systemMessageAppends = nil
-
-	return r
-}
-
-// WithHistory seeds stored conversation history. Messages a tool injected
-// during an earlier run are dropped — see WithMessages for why replaying one
-// is never correct.
-func (r *Request) WithHistory(messages []Message) *Request {
-	for _, message := range messages {
-		if message.Origin == MessageOriginInjection {
-			continue
-		}
-
-		message.Origin = MessageOriginSeed
-		r.messages = append(r.messages, message)
-	}
-
-	return r
-}
-
-// WithHistoryFrom is WithHistory over a sequence, with the same injection rule.
-func (r *Request) WithHistoryFrom(sequence iter.Seq[Message]) *Request {
-	for message := range sequence {
-		if message.Origin == MessageOriginInjection {
-			continue
-		}
-
-		message.Origin = MessageOriginSeed
-		r.messages = append(r.messages, message)
-	}
-
-	return r
-}
-
-func (r *Request) WithPrompt(prompt string) *Request {
-	r.messages = append(r.messages, Message{
-		Role:    RoleUser,
-		Content: prompt,
-		Origin:  MessageOriginTurn,
-	})
-
-	return r
-}
-
-// WithMessages seeds the conversation history, dropping messages a tool
-// injected during an earlier run.
+// WithPrompt sets the conversation to send: system message and every message,
+// built with Prompt.
 //
-// An injection is scoped to the run that produced it, and its injector
-// re-creates it when the situation recurs. Replaying a stored one instructs the
-// model about a tool result that is no longer the subject, and every later turn
-// inherits it. Dropping is the default because Response.Messages contains the
-// injections and feeding it straight back is the documented way to continue.
-// Injections added during the CURRENT run are unaffected — they arrive after
-// this point and are live instruction, not history.
-func (r *Request) WithMessages(messages ...Message) *Request {
-	for _, message := range messages {
-		if message.Origin == MessageOriginInjection {
-			continue
-		}
-
-		if message.Origin == MessageOriginUnknown {
-			message.Origin = MessageOriginTurn
-		}
-
-		r.messages = append(r.messages, message)
-	}
+// This replaces the previous WithSystemMessage / WithHistory / WithPrompt /
+// WithMessages family. Those presented three concepts — a system message, a
+// history, and "the prompt" — over a data model that was already one ordered
+// list, and every one of them appended to the same slice. Naming the whole
+// thing Prompt says what actually gets sent, and it is where multimodal
+// content belongs, since a user turn is the only place a provider takes an
+// image.
+func (r *Request) WithPrompt(prompt Prompt) *Request {
+	r.prompt = prompt
 
 	return r
 }
@@ -682,7 +597,7 @@ func (r *Request) validateOutputLimit(model Model) error {
 }
 
 func (r *Request) validateCapabilities(model Model, tools []Tool) error {
-	caps := r.client.driver.Capabilities(model)
+	caps := r.client.Capabilities(model)
 	if err := r.validateParameterCapabilities(caps); err != nil {
 		return err
 	}
@@ -699,6 +614,10 @@ func (r *Request) validateCapabilities(model Model, tools []Tool) error {
 		r.params.ResponseFormat,
 		caps,
 	); err != nil {
+		return err
+	}
+
+	if err := r.validateContentCapabilities(caps); err != nil {
 		return err
 	}
 
@@ -808,19 +727,7 @@ func (r *Request) resolvedModel() Model {
 }
 
 func (r *Request) assembledMessages() []Message {
-	result := make([]Message, 0, len(r.messages)+1)
-	sections := append([]string{r.baseSystemMessage}, r.systemMessageAppends...)
-
-	system := strings.Join(nonEmptyStrings(sections), "\n\n")
-	if system != "" {
-		result = append(result, Message{
-			Role:    RoleSystem,
-			Content: system,
-			Origin:  MessageOriginSeed,
-		})
-	}
-
-	return append(result, cloneMessages(r.messages)...)
+	return r.prompt.Messages()
 }
 
 func (r *Request) staticTools() []Tool {
@@ -894,4 +801,45 @@ func cloneParams(params GenerationParams) GenerationParams {
 	}
 
 	return params
+}
+
+// validateContentCapabilities refuses content this model cannot carry, before
+// any network call.
+//
+// Structure is checked first and separately: an image part with neither a URL
+// nor bytes is malformed for EVERY provider, and reporting that as "this model
+// does not support images" would send the caller to a different model to fix a
+// payload bug.
+//
+// Passing here is necessary, not sufficient. SupportsImageInput says the
+// provider has an image block at all; it cannot say which media types, and
+// Anthropic accepts only four. The driver makes the final per-value call — the
+// same split MaxReasoningEffort already uses.
+func (r *Request) validateContentCapabilities(caps Capabilities) error {
+	supported := map[PartType]bool{
+		PartTypeText:  true,
+		PartTypeImage: caps.SupportsImageInput,
+		PartTypeAudio: caps.SupportsAudioInput,
+		PartTypeFile:  caps.SupportsFileInput,
+	}
+
+	for i, message := range r.prompt.Messages() {
+		if err := message.Content.Validate(); err != nil {
+			return ctxerrors.Wrapf(err, "message %d", i)
+		}
+
+		for _, partType := range message.Content.Types() {
+			if supported[partType] {
+				continue
+			}
+
+			return ctxerrors.Wrapf(
+				ErrUnsupportedContent,
+				"message %d carries %s content, which model %q does not accept",
+				i, partType, r.resolvedModel().ID,
+			)
+		}
+	}
+
+	return nil
 }

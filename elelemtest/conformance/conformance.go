@@ -158,7 +158,7 @@ func runInvalidTranscript(
 	request.Messages = []elelem.Message{{
 		Role:       elelem.RoleTool,
 		ToolCallID: "orphaned-call",
-		Content:    "result",
+		Content:    elelem.Text("result"),
 	}}
 	before := networkCalls(options)
 

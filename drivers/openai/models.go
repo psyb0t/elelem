@@ -242,7 +242,17 @@ func capabilities(model elelem.Model) elelem.Capabilities {
 		// later". Older models cache implicitly, where a hint is a harmless
 		// no-op rather than something to refuse.
 		SupportsPromptCaching: supportsExplicitPromptCaching(model.ID),
-		MaxReasoningEffort:    maxReasoningEffort(model.ID),
+		// Content parts are a property of the CHAT COMPLETIONS API, not of a
+		// model: the request schema accepts text, image_url, input_audio and
+		// file for every model. Whether a given model can actually SEE an
+		// image is a model fact the API does not expose, and guessing it from
+		// an id would refuse content the provider would have accepted. So the
+		// flags describe the wire format, and a model that cannot read an
+		// image answers about the text instead — the provider's call to make.
+		SupportsImageInput: true,
+		SupportsAudioInput: true,
+		SupportsFileInput:  true,
+		MaxReasoningEffort: maxReasoningEffort(model.ID),
 	}
 }
 

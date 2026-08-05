@@ -113,7 +113,10 @@ func TestDriverConformance(t *testing.T) {
 		conformance.Options{
 			Request: elelem.DriverRequest{
 				Model:    elelem.Model{ID: "some-model"},
-				Messages: []elelem.Message{{Role: elelem.RoleUser, Content: "hi"}},
+				Messages: []elelem.Message{{
+					Role:    elelem.RoleUser,
+					Content: elelem.Text("hi"),
+				}},
 			},
 			NetworkCalls: func() int64 { return atomic.LoadInt64(&calls) },
 			Models:       []elelem.Model{modelA, modelB},

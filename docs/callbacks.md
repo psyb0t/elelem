@@ -149,8 +149,9 @@ var answer strings.Builder
 
 response, err := elelem.NewRequest(client).
 	WithModel(model).
-	WithSystemMessage(systemPrompt).
-	WithPrompt(userPrompt).
+	WithPrompt(elelem.NewPrompt().
+		WithSystem(instructions).
+		UserText(question)).
 	WithTools(tools).
 	WithAutoToolCalls().
 	WithMaxRounds(8).

@@ -195,7 +195,7 @@ func TestRefusalPromotionSurvivesRealChunkBoundaries(t *testing.T) {
 			Model: elelem.Model{ID: testModel},
 			Messages: []elelem.Message{{
 				Role:    elelem.RoleUser,
-				Content: "something disallowed",
+				Content: elelem.Text("something disallowed"),
 			}},
 		},
 		func(delta elelem.Delta) error {
@@ -257,7 +257,7 @@ func TestUsageModelIsCapturedWithoutAUsageFrame(t *testing.T) {
 			Model: elelem.Model{ID: testModel},
 			Messages: []elelem.Message{{
 				Role:    elelem.RoleUser,
-				Content: "hi",
+				Content: elelem.Text("hi"),
 			}},
 		},
 		func(elelem.Delta) error { return nil },
@@ -290,7 +290,7 @@ func TestUsageSurvivesAMissingTotalTokens(t *testing.T) {
 			Model: elelem.Model{ID: testModel},
 			Messages: []elelem.Message{{
 				Role:    elelem.RoleUser,
-				Content: "hi",
+				Content: elelem.Text("hi"),
 			}},
 		},
 		func(elelem.Delta) error { return nil },
@@ -393,7 +393,7 @@ func TestToOpenAIMessages_AssistantWithToolCalls(t *testing.T) {
 
 	messages, err := toOpenAIMessages([]elelem.Message{{
 		Role:    elelem.RoleAssistant,
-		Content: "calling a tool",
+		Content: elelem.Text("calling a tool"),
 		ToolCalls: []elelem.ToolCall{{
 			ID:        "call-1",
 			Name:      "lookup",
@@ -462,7 +462,7 @@ func TestToOpenAIMessages_AssistantWithoutToolCalls(t *testing.T) {
 
 	messages, err := toOpenAIMessages([]elelem.Message{{
 		Role:    elelem.RoleAssistant,
-		Content: "plain answer",
+		Content: elelem.Text("plain answer"),
 	}})
 	require.NoError(t, err)
 	require.Len(t, messages, 1)

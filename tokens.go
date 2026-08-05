@@ -67,7 +67,7 @@ func (builtInTokenCounter) Count(
 			len(message.ToolCalls)*2+messageTokenBaseParts,
 		)
 
-		parts = append(parts, message.Role, message.Content, message.ToolCallID)
+		parts = append(parts, message.Role, message.Text(), message.ToolCallID)
 
 		// Reasoning rides the wire too — drivers round-trip thinking blocks
 		// back to the provider. Omitting it made the budget undercount the
