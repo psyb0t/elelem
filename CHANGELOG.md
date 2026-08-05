@@ -4,6 +4,18 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.1.3 — 2026-08-05
+
+**Relicensed from WTFPL to MIT.**
+
+- MIT is the license every Go project here ships, and pkg.go.dev treats WTFPL
+  poorly. The text is the canonical MIT wording verbatim so GitHub and
+  pkg.go.dev both detect it.
+- Nothing copyleft is linked in: the GPL and MPL modules under `vendor/`
+  (`golangci-lint`, `grouper`, `sloglint`) are `tool` block dependencies used
+  to build the linter, and `go list -deps ./...` confirms none of them appear
+  in this module's import graph.
+
 ## v0.1.2 — 2026-08-05
 
 README wording only. No code, no documentation-content change.

@@ -268,7 +268,6 @@ make help           # every target
 
 ## License
 
-WTFPL. The operative clause is nine words long and you can almost certainly
-guess all nine. See [LICENSE](LICENSE) to check your work.
+MIT. See [LICENSE](LICENSE).
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
