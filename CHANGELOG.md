@@ -4,6 +4,14 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.1.2 — 2026-08-05
+
+README wording only. No code, no documentation-content change.
+
+- Replaced the opening line and one section heading, which had been written by
+  borrowing phrasing from a sibling project's README rather than saying what
+  this one needed to say.
+
 ## v0.1.1 — 2026-08-04
 
 Documentation accuracy pass. No API or behavior changes — every Go change in

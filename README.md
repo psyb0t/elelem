@@ -6,7 +6,7 @@
 [![version](https://raw.githubusercontent.com/psyb0t/elelem/badges/version.svg)](https://github.com/psyb0t/elelem/tags)
 [![license](https://raw.githubusercontent.com/psyb0t/elelem/badges/license.svg)](LICENSE)
 
-Say the letters out loud: L, L, M. The name is the whole joke. Moving on.
+elelem is LLM, spelled out loud.
 
 A Go engine for talking to LLMs that doesn't care which one. Streaming, tool
 loops, history that fits the context window, retries that don't hand your user
@@ -48,7 +48,7 @@ response, err := elelem.NewRequest(client).
 ## Contents
 
 - [Quick start](#quick-start)
-- [What's in the box](#whats-in-the-box)
+- [The pieces](#the-pieces)
 - [Drivers](#drivers)
 - [Trust boundaries](#trust-boundaries)
 - [Logging](#logging)
@@ -99,7 +99,7 @@ calls back to approve or reject yourself.
 Every knob those three examples don't show is in
 [docs/requests.md](docs/requests.md).
 
-## What's in the box
+## The pieces
 
 | Area | What you get |
 |---|---|
