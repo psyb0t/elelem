@@ -4,6 +4,15 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.3.1 — 2026-08-05
+
+Test layout only. No API or behaviour change.
+
+- The callback-chaining tests shipped in v0.3.0 as `callback_chain_test.go`,
+  which names no source file. They cover `Request`'s `On*` setters and
+  `ResetCallback`/`ResetCallbacks`, so they now live in `request_test.go`
+  alongside the rest of that type's tests.
+
 ## v0.3.0 — 2026-08-05
 
 Registering a callback twice adds a handler instead of discarding the first.
