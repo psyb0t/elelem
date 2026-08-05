@@ -4,6 +4,25 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.4.1 — 2026-08-05
+
+README only. No code, no API, no behaviour change.
+
+- The README now reads like the rest of the psyb0t libraries instead of a
+  whitepaper. Same facts, same structure, same links — the voice matches
+  [ctxerrors](https://github.com/psyb0t/ctxerrors) and
+  [servicepack](https://github.com/psyb0t/servicepack), which is where it
+  should have been from the start.
+- Corrected the test/coverage claim, which had gone stale: 247 tests at 90%+,
+  not 227 at 91%+.
+- Documented `WithStreaming` in the Drivers section — it shipped in v0.4.0 with
+  the reference docs updated but never got a mention in the README.
+- Added a line pointing at `RunInto` from the quick start, since the launcher
+  pair is new and the README only showed one half of it.
+- `## Trust boundaries` is now `## Shit that can bite you`. Anchor changed to
+  `#shit-that-can-bite-you`; any external link to the old anchor lands on the
+  page rather than the section.
+
 ## v0.4.0 — 2026-08-05
 
 One way to launch a request, and streaming becomes a choice.
