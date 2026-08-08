@@ -204,7 +204,7 @@ Full detail in [docs/tools.md](docs/tools.md).
 ## Logging
 
 Structured `log/slog` through
-[`common-go/scope`](https://github.com/psyb0t/common-go), pulled from the
+[`ctxscope`](https://github.com/psyb0t/ctxscope), pulled from the
 context — the library never takes a logger parameter and never installs a
 global. Whatever you configured on `slog.Default()` at startup is where it
 writes, and any scope attributes you set (`request_id`, `user_id`) ride along

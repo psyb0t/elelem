@@ -4,6 +4,16 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.4.4 — 2026-08-08
+
+Documentation. No code change.
+
+- The Logging section still pointed at `common-go/scope`, which v0.4.3 stopped
+  importing and which common-go v0.4.0 removed entirely. It now names
+  [`ctxscope`](https://github.com/psyb0t/ctxscope). The code moved a release
+  ago; the README did not, so it was sending readers at a package that no longer
+  exists.
+
 ## v0.4.3 — 2026-08-08
 
 Dependency migration. No API change.
