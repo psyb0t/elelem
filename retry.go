@@ -11,8 +11,8 @@ import (
 	"time"
 
 	commonerrors "github.com/psyb0t/common-go/errors"
-	"github.com/psyb0t/common-go/scope"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxscope"
 )
 
 const (
@@ -448,7 +448,7 @@ func (d *retryDriver) logRetrySuccess(
 		return
 	}
 
-	scope.GetLogger(ctx).Info(
+	ctxscope.GetLogger(ctx).Info(
 		"stream succeeded after retry",
 		"attempt", attempt,
 		"max_attempts", d.config.MaxAttempts,
@@ -461,7 +461,7 @@ func (d *retryDriver) logRetryGaveUp(
 	attempt RetryAttempt,
 	retryable, streamed bool,
 ) {
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"giving up on stream",
 		"reason", stopReason(retryable, streamed),
 		"attempt", attempt.Attempt,
@@ -476,7 +476,7 @@ func (d *retryDriver) logRetryScheduled(
 	ctx context.Context,
 	attempt RetryAttempt,
 ) {
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"retrying stream",
 		"reason", attempt.Reason,
 		"attempt", attempt.Attempt,

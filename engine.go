@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/psyb0t/common-go/scope"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxscope"
 )
 
 const (
@@ -262,7 +262,7 @@ func (s *runState) warnIfNearContextCeiling(ctx context.Context, tools []Tool) {
 		return
 	}
 
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"estimated prompt near model context ceiling",
 		"reason", LogReasonContextCeilingNear,
 		"estimated_tokens", estimate,
@@ -283,7 +283,7 @@ func (s *runState) prepareRound(
 		// discarding history is exactly what the opt-in flag exists to make
 		// deliberate, so it must never happen without a record.
 		if dropped := before - len(s.messages); dropped > 0 {
-			scope.GetLogger(ctx).Warn(
+			ctxscope.GetLogger(ctx).Warn(
 				"transcript repair dropped messages",
 				"reason", LogReasonUnpairedToolCalls,
 				"dropped", dropped,
@@ -314,7 +314,7 @@ func (s *runState) prepareRound(
 	// Every round is an outbound provider call — the one external dependency
 	// this library has. Without this line a stalled or looping conversation
 	// leaves no trace of how far it got or what it was carrying.
-	scope.GetLogger(ctx).Debug(
+	ctxscope.GetLogger(ctx).Debug(
 		"round starting",
 		"round", s.round,
 		"max_rounds", s.request.maxRounds,
@@ -346,7 +346,7 @@ func (s *runState) recordAssistant(
 	// is the breadcrumb an operator needs when a chat mysteriously answers
 	// nothing.
 	if !hasAssistantOutput(assistant) {
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"provider returned an empty assistant turn",
 			"reason", LogReasonEmptyAssistantTurn,
 			"round", s.round,
@@ -443,7 +443,7 @@ func (s *runState) drainToolCalls(
 	ctx context.Context,
 	calls map[int]*ToolCall,
 ) []ToolCall {
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 	seen := make(map[string]struct{}, len(calls))
 	drained := make([]ToolCall, 0, len(calls))
 
@@ -575,7 +575,7 @@ func (s *runState) consumeToolCallDelta(
 		calls[unusedToolCallIndex(calls)] = call
 		call = nil
 
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"driver reused a tool call index for a different call",
 			"reason", LogReasonToolCallIndexReused,
 			"index", delta.Index,
@@ -655,7 +655,7 @@ func (s *runState) warnToolCallsCapped(ctx context.Context, index int) {
 
 	s.warnedToolCallCap = true
 
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"provider declared more tool calls than the per-round cap",
 		"reason", LogReasonToolCallsCapped,
 		"cap", maxToolCallsPerRound,
@@ -687,7 +687,7 @@ func (s *runState) warnToolArgumentsCapped(
 
 	s.cappedArgumentCalls[call.ID] = struct{}{}
 
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"tool call arguments exceeded the size cap",
 		"reason", LogReasonToolArgumentsCapped,
 		"id", call.ID,
@@ -823,7 +823,7 @@ func (s *runState) dropUnansweredToolCalls(ctx context.Context) {
 		return
 	}
 
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"dropping tool calls no result will answer",
 		"reason", LogReasonUnpairedToolCalls,
 		"calls", len(s.messages[last].ToolCalls),
@@ -845,7 +845,7 @@ func toolDecisionsByCallID(
 	decisionByID := make(map[string]ToolCallDecision, len(decisions))
 	for _, decision := range decisions {
 		if _, pending := pendingCallIDs[decision.CallID]; !pending {
-			scope.GetLogger(ctx).Warn(
+			ctxscope.GetLogger(ctx).Warn(
 				"ignoring tool call decision",
 				"call_id", decision.CallID,
 				"reason", LogReasonToolCallNotPending,
@@ -958,7 +958,7 @@ func (s *runState) runToolCall(
 
 		// A gate that swallowed a call silently would be indistinguishable
 		// from the model never asking for it.
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"tool call denied by caller decision",
 			"reason", LogReasonToolCallDenied,
 			"tool", call.Name,
@@ -979,7 +979,7 @@ func (s *runState) runToolCall(
 			validToolNames(tools),
 		)
 
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"model requested an unknown tool",
 			"reason", LogReasonToolNotInToolSet,
 			"tool", call.Name,
@@ -1074,7 +1074,7 @@ func (s *runState) fireToolResult(
 	// vanish. Logged for the same reason fireError logs its swallowed hook
 	// error: the log is then the only record that the caller's code failed at
 	// all, and a hook silently failing every round is invisible otherwise.
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"on tool result hook failed after an earlier failure",
 		"reason", LogReasonOnToolResultFailed,
 		"call_id", call.ID,
@@ -1101,7 +1101,7 @@ func (s *runState) recordInjections(
 		if injection.Type != RoleUser &&
 			injection.Type != RoleAssistant &&
 			injection.Type != RoleSystem {
-			scope.GetLogger(ctx).Error(
+			ctxscope.GetLogger(ctx).Error(
 				"dropping message injection with an unusable role",
 				"reason", LogReasonInjectionRoleInvalid,
 				"role", injection.Type,
@@ -1146,7 +1146,7 @@ func (s *runState) runToolSafely(
 	func() {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				scope.GetLogger(ctx).Error(
+				ctxscope.GetLogger(ctx).Error(
 					"tool execution panic",
 					"tool", tool.Name,
 					"reason", LogReasonToolExecutionPanic,
@@ -1175,7 +1175,7 @@ func (s *runState) runTool(
 		// Fed back to the model as an error result so it can self-correct, but
 		// a model repeatedly emitting unparseable arguments is a prompt or
 		// schema problem the operator needs to see.
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"tool arguments are not valid JSON",
 			"reason", LogReasonToolArgumentsInvalid,
 			"tool", tool.Name,
@@ -1256,7 +1256,7 @@ func (s *runState) runToolLifecycle(
 		// A ToolSet entry with no handler is a caller wiring bug, not a data
 		// condition — the model was told the tool exists and can never get a
 		// real answer from it.
-		scope.GetLogger(ctx).Error(
+		ctxscope.GetLogger(ctx).Error(
 			"tool has no handler",
 			"reason", LogReasonToolHasNoHandler,
 			"tool", tool.Name,
@@ -1291,7 +1291,7 @@ func (s *runState) runToolLifecycle(
 		// ev.Result is authoritative and MUST survive the hook chain — a nil
 		// here means a hook cleared it, which would otherwise orphan the
 		// tool_call_id and make the whole transcript illegal.
-		scope.GetLogger(ctx).Error(
+		ctxscope.GetLogger(ctx).Error(
 			"tool hook cleared the result, substituting an error",
 			"reason", LogReasonToolResultRemoved,
 			"tool", tool.Name,
@@ -1355,7 +1355,7 @@ func executeToolHandler(
 
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				scope.GetLogger(ctx).Error(
+				ctxscope.GetLogger(ctx).Error(
 					"tool handler panic",
 					"tool", tool.Name,
 					"reason", LogReasonToolHandlerPanic,
@@ -1588,7 +1588,7 @@ func (s *runState) logCompactionOutcome(
 	budget, messagesBefore int,
 	over bool,
 ) {
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 
 	if over {
 		// The budget is a target, not a gate — the provider is the authority
@@ -1627,7 +1627,7 @@ func (s *runState) compactToBudget(
 	count, budget int,
 	counter TokenCounter,
 ) error {
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 
 	handler := s.request.preTokenLimit
 
@@ -1779,7 +1779,7 @@ func (s *runState) fireError(ctx context.Context, err error) {
 			// The hook's own failure is swallowed on purpose — the run's
 			// error is what the caller gets — so this line is the ONLY
 			// record that it happened. It must carry the error itself.
-			scope.GetLogger(ctx).Warn(
+			ctxscope.GetLogger(ctx).Warn(
 				"on error hook failed",
 				"reason", LogReasonOnErrorHookFailed,
 				"err", hookErr,

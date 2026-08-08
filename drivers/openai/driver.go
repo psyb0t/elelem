@@ -11,8 +11,8 @@ import (
 	openaisdk "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/ssestream"
-	"github.com/psyb0t/common-go/scope"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxscope"
 	"github.com/psyb0t/elelem"
 )
 
@@ -106,7 +106,7 @@ func (d *Driver) Stream(
 		return usage, err
 	}
 
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 
 	// The provider call is this package's only external dependency; without a
 	// line on each side of it a hung or failed upstream leaves no trace.
@@ -178,7 +178,7 @@ func (d *Driver) Complete(
 		return usage, err
 	}
 
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 
 	logger.Debug(
 		"openai request starting",
@@ -301,7 +301,7 @@ func warnUnmappedFinishReason(
 		return
 	}
 
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"unmapped provider stop reason",
 		"reason", elelem.LogReasonFinishReasonUnmapped,
 		"model", modelID,

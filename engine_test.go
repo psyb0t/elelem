@@ -10,7 +10,7 @@ import (
 	"time"
 
 	commonerrors "github.com/psyb0t/common-go/errors"
-	"github.com/psyb0t/common-go/scope"
+	"github.com/psyb0t/ctxscope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1462,7 +1462,7 @@ func (d *identityLoggingDriver) Stream(
 	request DriverRequest,
 	onDelta func(Delta) error,
 ) (Usage, error) {
-	scope.GetLogger(ctx).Debug(
+	ctxscope.GetLogger(ctx).Debug(
 		"driver reached",
 		"reason", "ctx_propagation_probe",
 		"model", request.Model.ID,
@@ -1485,8 +1485,8 @@ func TestEngine_CtxLoggerCarriesIdentityThroughTheWholeStack(t *testing.T) {
 	// process-wide.
 	ctx, records := captureLogsWith(
 		t,
-		scope.Attr("request_id", "req-123"),
-		scope.Attr("user_id", "user-456"),
+		ctxscope.Attr("request_id", "req-123"),
+		ctxscope.Attr("user_id", "user-456"),
 	)
 
 	driver := WithRetry(

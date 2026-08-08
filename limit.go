@@ -3,8 +3,8 @@ package elelem
 import (
 	"context"
 
-	"github.com/psyb0t/common-go/scope"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxscope"
 )
 
 type (
@@ -120,7 +120,7 @@ func dropUntilEstimatedToFit(
 	ctx context.Context,
 	event *TokenLimitEvent,
 ) (int, error) {
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 	estimate := event.EstimatedTokens
 	dropped := 0
 
@@ -184,7 +184,7 @@ func logDropSummary(ctx context.Context, before, after, dropped int) {
 		return
 	}
 
-	scope.GetLogger(ctx).Warn(
+	ctxscope.GetLogger(ctx).Warn(
 		"dropped transcript history to fit the token budget",
 		"reason", LogReasonTokenBudgetExceeded,
 		"messages_before", before,

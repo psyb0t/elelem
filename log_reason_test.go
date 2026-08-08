@@ -9,7 +9,7 @@ import (
 	"time"
 
 	commonerrors "github.com/psyb0t/common-go/errors"
-	"github.com/psyb0t/common-go/scope"
+	"github.com/psyb0t/ctxscope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +33,7 @@ func captureLogs(t *testing.T) (context.Context, func() []map[string]any) {
 // any elelem code runs. Use it to assert those survive the whole call chain.
 func captureLogsWith(
 	t *testing.T,
-	attrs ...scope.Attribute,
+	attrs ...ctxscope.Attribute,
 ) (context.Context, func() []map[string]any) {
 	t.Helper()
 
@@ -46,7 +46,7 @@ func captureLogsWith(
 	})))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 
-	ctx := scope.Set(context.Background(), attrs...)
+	ctx := ctxscope.Set(context.Background(), attrs...)
 
 	return ctx, func() []map[string]any {
 		var records []map[string]any

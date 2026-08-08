@@ -208,10 +208,9 @@ github.com/charmbracelet/x/term
 # github.com/ckaznocha/intrange v0.3.1
 ## explicit; go 1.23.0
 github.com/ckaznocha/intrange
-# github.com/clipperhouse/uax29/v2 v2.2.0
+# github.com/clipperhouse/uax29/v2 v2.7.0
 ## explicit; go 1.18
 github.com/clipperhouse/uax29/v2/graphemes
-github.com/clipperhouse/uax29/v2/internal/iterators
 # github.com/curioswitch/go-reassign v0.3.0
 ## explicit; go 1.21
 github.com/curioswitch/go-reassign
@@ -843,10 +842,12 @@ github.com/psyb0t/aichteeteapee
 # github.com/psyb0t/common-go v0.3.1
 ## explicit; go 1.26
 github.com/psyb0t/common-go/errors
-github.com/psyb0t/common-go/scope
-# github.com/psyb0t/ctxerrors v0.4.2
+# github.com/psyb0t/ctxerrors v0.4.4
 ## explicit; go 1.26
 github.com/psyb0t/ctxerrors
+# github.com/psyb0t/ctxscope v1.0.2
+## explicit; go 1.26
+github.com/psyb0t/ctxscope
 # github.com/quasilyte/go-ruleguard v0.4.5
 ## explicit; go 1.22.0
 github.com/quasilyte/go-ruleguard/internal/goenv

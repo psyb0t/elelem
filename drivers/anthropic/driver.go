@@ -8,8 +8,8 @@ import (
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
-	"github.com/psyb0t/common-go/scope"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxscope"
 	"github.com/psyb0t/elelem"
 )
 
@@ -100,7 +100,7 @@ func (d *Driver) Stream(
 		)
 	}
 
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 
 	// The provider call is this package's only external dependency; without a
 	// line on each side of it a hung or failed upstream leaves no trace.
@@ -193,7 +193,7 @@ func (d *Driver) Complete(
 		)
 	}
 
-	logger := scope.GetLogger(ctx)
+	logger := ctxscope.GetLogger(ctx)
 
 	logger.Debug(
 		"anthropic request starting",

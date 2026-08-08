@@ -8,8 +8,8 @@ import (
 	"slices"
 
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
-	"github.com/psyb0t/common-go/scope"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxscope"
 	"github.com/psyb0t/elelem"
 )
 
@@ -357,7 +357,7 @@ func insertProviderReasoning(
 	// signal, so these two drops are the ONLY warning anyone gets.
 	envelope, ok := decodeProviderReasoningEnvelope(raw)
 	if !ok {
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"dropping unreadable provider reasoning",
 			"reason", elelem.LogReasonProviderReasoningUndecodable,
 			"model", modelID,
@@ -369,7 +369,7 @@ func insertProviderReasoning(
 	if envelope.Provider != providerName ||
 		envelope.Version != providerReasoningVersion ||
 		envelope.Model != modelID {
-		scope.GetLogger(ctx).Warn(
+		ctxscope.GetLogger(ctx).Warn(
 			"dropping foreign provider reasoning",
 			"reason", elelem.LogReasonProviderReasoningMismatch,
 			"model", modelID,

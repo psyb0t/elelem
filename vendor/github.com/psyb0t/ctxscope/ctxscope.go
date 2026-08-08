@@ -1,6 +1,6 @@
-// Package scope carries attributes on a context.Context and stamps them onto
-// the logger GetLogger returns, so every line logged under that context is
-// tagged without anyone passing the values around.
+// Package ctxscope carries attributes on a context.Context and stamps them onto
+// every line logged under that context, so the values travel without anyone
+// passing them around.
 //
 // Two tiers, split by whether an attribute describes the PROCESS or the WORK:
 //
@@ -10,7 +10,12 @@
 // Putting a process fact in Set's tier is a bug rather than a style slip: it
 // would cross a hop and overwrite the receiving service's own value, whose logs
 // would then name the wrong deploy.
-package scope
+//
+// There are two ways to get the attributes onto a line. Install NewHandler once
+// at startup and plain slog.InfoContext(ctx, ...) carries them everywhere,
+// including inside libraries that never heard of this package; or call
+// GetLogger(ctx) at the log site. The handler is the one nobody can forget.
+package ctxscope
 
 import (
 	"context"
