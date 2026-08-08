@@ -5,6 +5,7 @@
 [![coverage](https://raw.githubusercontent.com/psyb0t/elelem/badges/coverage.svg)](https://github.com/psyb0t/elelem/actions/workflows/pipeline.yml)
 [![version](https://raw.githubusercontent.com/psyb0t/elelem/badges/version.svg)](https://github.com/psyb0t/elelem/tags)
 [![license](https://raw.githubusercontent.com/psyb0t/elelem/badges/license.svg)](LICENSE)
+[![imported by](https://raw.githubusercontent.com/psyb0t/elelem/badges/importers.svg)](https://github.com/psyb0t/elelem/blob/badges/importers.md)
 
 elelem is LLM, spelled out loud. Say it fast, you get it.
 
