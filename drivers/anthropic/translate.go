@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	providerName             = "anthropic"
 	providerReasoningVersion = 1
 	maxCacheBreakpoints      = 4
 )
@@ -366,7 +365,7 @@ func insertProviderReasoning(
 		return blocks, nil
 	}
 
-	if envelope.Provider != providerName ||
+	if envelope.Provider != Name ||
 		envelope.Version != providerReasoningVersion ||
 		envelope.Model != modelID {
 		ctxscope.GetLogger(ctx).Warn(
@@ -1090,7 +1089,7 @@ func marshalProviderReasoning(
 	}
 
 	encoded, err := json.Marshal(providerReasoningEnvelope{
-		Provider: providerName,
+		Provider: Name,
 		Version:  providerReasoningVersion,
 		Model:    modelID,
 		Blocks:   blocks,

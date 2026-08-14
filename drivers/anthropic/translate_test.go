@@ -19,7 +19,7 @@ func TestToMessageParams(t *testing.T) {
 	parallel := false
 
 	reasoning, err := json.Marshal(providerReasoningEnvelope{
-		Provider: providerName,
+		Provider: Name,
 		Version:  providerReasoningVersion,
 		Model:    "claude-opus-4-6",
 		Blocks: []providerReasoningBlock{{
@@ -236,7 +236,7 @@ func TestInsertProviderReasoning_SurvivesRebuiltContentLayout(t *testing.T) {
 	// Two thinking blocks recorded at HIGH original indices, out of order, to
 	// prove both the bounds safety and the stable ordering.
 	reasoning, err := json.Marshal(providerReasoningEnvelope{
-		Provider: providerName,
+		Provider: Name,
 		Version:  providerReasoningVersion,
 		Model:    "claude-opus-4-6",
 		Blocks: []providerReasoningBlock{
@@ -549,7 +549,7 @@ func TestProviderReasoningRejectsNonReasoningBlocks(t *testing.T) {
 			t.Parallel()
 
 			envelope, err := json.Marshal(providerReasoningEnvelope{
-				Provider: providerName,
+				Provider: Name,
 				Version:  providerReasoningVersion,
 				Model:    "claude-opus-4-6",
 				Blocks: []providerReasoningBlock{{

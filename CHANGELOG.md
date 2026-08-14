@@ -4,6 +4,15 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.5.0 — 2026-08-14
+
+- **New:** each provider driver now exports a `Name` constant — `openai.Name`
+  (`"openai"`) and `anthropic.Name` (`"anthropic"`) — a stable identifier
+  callers can use to select a driver by name. The Anthropic driver's
+  previously-unexported `providerName` is now this exported const; behavior is
+  unchanged.
+- Added GitHub Sponsors funding metadata.
+
 ## v0.4.4 — 2026-08-08
 
 Documentation. No code change.

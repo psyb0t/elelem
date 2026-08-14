@@ -13,6 +13,10 @@ import (
 	"github.com/psyb0t/elelem"
 )
 
+// Name is the provider identifier for this driver — reported on reasoning
+// envelopes and usable by callers selecting a driver by name.
+const Name = "anthropic"
+
 // defaultMaxOutputTokens is used when the caller sets no output limit. The
 // Messages API REQUIRES max_tokens, so unlike OpenAI — which omits the field
 // and lets the model decide — this driver must pick something.

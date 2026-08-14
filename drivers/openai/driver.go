@@ -18,6 +18,10 @@ import (
 
 const sdkRetryAttempts = 0
 
+// Name is the provider identifier for this driver — usable by callers
+// selecting a driver by name. OpenAI-compatible endpoints reuse it.
+const Name = "openai"
+
 // Driver implements elelem.Driver over the official OpenAI Go SDK.
 type Driver struct {
 	api openaisdk.Client
