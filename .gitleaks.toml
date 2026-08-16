@@ -7,7 +7,7 @@ useDefault = true
 # so anything ignored there has to be named again here or a local scratch dir
 # fails the release for a file that was never going to be committed.
 [[allowlists]]
-description = "Local scratch and vendored deps — never committed"
+description = "Local scratch directories — never committed"
 paths = [
   '''(^|/)\.research_files(?:/|$)''',
   '''(^|/)\.agent_notes(?:/|$)''',
@@ -15,5 +15,4 @@ paths = [
   '''(^|/)\.brutal_reviews(?:/|$)''',
   '''(^|/)\.plan-and-delegate(?:/|$)''',
   '''(^|/)\.telemetry(?:/|$)''',
-  '''(^|/)vendor(?:/|$)''',
 ]

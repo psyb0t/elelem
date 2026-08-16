@@ -133,6 +133,14 @@ openai.NewDriver(
 )
 ```
 
+`NewDriver` is convenient for a one-provider program: the official SDK can
+read its usual environment variables. A multi-provider application that owns
+credential resolution should start every configured driver with
+`WithoutEnvironmentDefaults()`, then pass only that upstream's own key and
+HTTP client plus a URL when it is not the driver's official default. That
+stops one provider's environment credential from quietly reaching a keyless
+local endpoint.
+
 | | `drivers/openai` | `drivers/anthropic` |
 |---|---|---|
 | Talks to | OpenAI and anything OpenAI-shaped — vLLM, Ollama, OpenRouter, LM Studio, whatever proxy you cobbled together | The Anthropic Messages API |

@@ -61,6 +61,19 @@ func WithAPIKey(key string) DriverOption {
 	}
 }
 
+// WithoutEnvironmentDefaults prevents the SDK from borrowing credentials or
+// endpoint settings from ANTHROPIC_* variables. Use it when the embedding app
+// resolves each upstream's configuration itself, especially with a mix of
+// authenticated and keyless endpoints in one process.
+func WithoutEnvironmentDefaults() DriverOption {
+	return func(cfg *driverConfig) {
+		cfg.sdkOptions = append(
+			cfg.sdkOptions,
+			option.WithoutEnvironmentDefaults(),
+		)
+	}
+}
+
 // WithBaseURL overrides the Anthropic API endpoint.
 func WithBaseURL(baseURL string) DriverOption {
 	return func(cfg *driverConfig) {

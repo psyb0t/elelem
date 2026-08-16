@@ -78,6 +78,116 @@ func TestDriverStream(t *testing.T) {
 	assert.Equal(t, elelem.FinishReasonToolCalls, usage.FinishReason)
 }
 
+func TestWithoutEnvironmentDefaults_LeavesKeylessUpstreamUnauthenticated(
+	t *testing.T,
+) {
+	t.Setenv("OPENAI_API_KEY", "must-not-reach-keyless-upstream")
+	t.Setenv("OPENAI_ADMIN_KEY", "must-not-reach-keyless-upstream")
+	t.Setenv("OPENAI_ORG_ID", "must-not-reach-keyless-upstream")
+	t.Setenv("OPENAI_PROJECT_ID", "must-not-reach-keyless-upstream")
+	t.Setenv("OPENAI_CUSTOM_HEADERS", "X-Environment-Secret: must-not-leak")
+
+	server := httptest.NewServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		assert.Empty(t, request.Header.Get("Authorization"))
+		assert.Empty(t, request.Header.Get("OpenAI-Organization"))
+		assert.Empty(t, request.Header.Get("OpenAI-Project"))
+		assert.Empty(t, request.Header.Get("X-Environment-Secret"))
+		assert.Equal(t, "/models", request.URL.Path)
+
+		writer.Header().Set(
+			aichteeteapee.HeaderNameContentType,
+			aichteeteapee.ContentTypeJSON,
+		)
+		_, err := writer.Write([]byte(`{"data":[]}`))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+
+	driver := NewDriver(
+		WithoutEnvironmentDefaults(),
+		WithBaseURL(server.URL),
+		WithHTTPClient(server.Client()),
+	)
+	_, err := driver.ListModels(t.Context())
+	require.NoError(t, err)
+}
+
+func TestWithoutEnvironmentDefaults_UsesOfficialBaseURLWithoutOverride(
+	t *testing.T,
+) {
+	t.Setenv("OPENAI_BASE_URL", "https://environment.example/v1")
+	t.Setenv("OPENAI_CUSTOM_HEADERS", "")
+
+	driver := NewDriver(
+		WithoutEnvironmentDefaults(),
+		WithHTTPClient(&http.Client{Transport: roundTripFunc(func(
+			request *http.Request,
+		) (*http.Response, error) {
+			assert.Equal(t, "api.openai.com", request.URL.Host)
+			assert.Equal(t, "/v1/models", request.URL.Path)
+			assert.Empty(t, request.Header.Get("Authorization"))
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					aichteeteapee.HeaderNameContentType: {
+						aichteeteapee.ContentTypeJSON,
+					},
+				},
+				Body: io.NopCloser(strings.NewReader(`{"data":[]}`)),
+			}, nil
+		})}),
+	)
+
+	_, err := driver.ListModels(t.Context())
+	require.NoError(t, err)
+}
+
+func TestWithoutEnvironmentDefaults_UsesExplicitAPIKey(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "must-not-override-configured-upstream")
+
+	expectedAuthorization := "Bearer configured-upstream-key"
+
+	server := httptest.NewServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		assert.Equal(
+			t,
+			expectedAuthorization,
+			request.Header.Get("Authorization"),
+		)
+		writer.Header().Set(
+			aichteeteapee.HeaderNameContentType,
+			aichteeteapee.ContentTypeJSON,
+		)
+		_, err := writer.Write([]byte(`{"data":[]}`))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+
+	driver := NewDriver(
+		WithoutEnvironmentDefaults(),
+		WithAPIKey("configured-upstream-key"),
+		WithBaseURL(server.URL),
+		WithHTTPClient(server.Client()),
+	)
+	_, err := driver.ListModels(t.Context())
+	require.NoError(t, err)
+}
+
+func TestEnvironmentHeaderNames(t *testing.T) {
+	t.Setenv(
+		"OPENAI_CUSTOM_HEADERS",
+		"X-First: one\nnot-a-header\n  : blank-name\n X-Second : two",
+	)
+
+	assert.Equal(t, []string{"X-First", "X-Second"}, environmentHeaderNames())
+}
+
 func TestDriverConformance(t *testing.T) {
 	t.Parallel()
 

@@ -4,6 +4,17 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.6.0 — 2026-08-16
+
+- **New:** `openai.WithoutEnvironmentDefaults()` and
+  `anthropic.WithoutEnvironmentDefaults()` make a driver use only the options
+  its caller supplied. Applications that derive separate clients for several
+  upstreams can now keep a keyless local endpoint genuinely keyless even when
+  a different upstream's SDK credential exists in the same process.
+- **Fixed:** the coverage target now forces fresh test binaries, so a
+  dependency package cannot contribute stale instrumentation data to the
+  combined coverage profile.
+
 ## v0.5.0 — 2026-08-14
 
 - **New:** each provider driver now exports a `Name` constant — `openai.Name`

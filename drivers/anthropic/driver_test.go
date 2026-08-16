@@ -124,6 +124,38 @@ func TestDriverConformance(t *testing.T) {
 	)
 }
 
+func TestWithoutEnvironmentDefaults_LeavesKeylessUpstreamUnauthenticated(
+	t *testing.T,
+) {
+	t.Setenv("ANTHROPIC_API_KEY", "must-not-reach-keyless-upstream")
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "must-not-reach-keyless-upstream")
+
+	server := httptest.NewServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		assert.Empty(t, request.Header.Get("x-api-key"))
+		assert.Empty(t, request.Header.Get("Authorization"))
+		assert.Equal(t, "/v1/models", request.URL.Path)
+
+		writer.Header().Set(
+			aichteeteapee.HeaderNameContentType,
+			aichteeteapee.ContentTypeJSON,
+		)
+		_, err := writer.Write([]byte(`{"data":[],"has_more":false}`))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+
+	driver := NewDriver(
+		WithoutEnvironmentDefaults(),
+		WithBaseURL(server.URL),
+		WithHTTPClient(server.Client()),
+	)
+	_, err := driver.ListModels(t.Context())
+	require.NoError(t, err)
+}
+
 func TestDriverStreamAndListModels(t *testing.T) {
 	t.Parallel()
 

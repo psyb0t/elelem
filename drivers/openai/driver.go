@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"sort"
+	"strings"
 
 	openaisdk "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -16,7 +18,10 @@ import (
 	"github.com/psyb0t/elelem"
 )
 
-const sdkRetryAttempts = 0
+const (
+	sdkRetryAttempts                = 0
+	environmentIsolationOptionCount = 5
+)
 
 // Name is the provider identifier for this driver — usable by callers
 // selecting a driver by name. OpenAI-compatible endpoints reuse it.
@@ -59,6 +64,55 @@ func WithAPIKey(key string) DriverOption {
 
 		cfg.options = append(cfg.options, option.WithAPIKey(key))
 	}
+}
+
+// WithoutEnvironmentDefaults prevents the SDK from borrowing credentials or
+// endpoint settings from OPENAI_* variables. Use it when the embedding app
+// resolves each upstream's configuration itself, especially when one process
+// holds clients for both authenticated and keyless OpenAI-compatible endpoints.
+func WithoutEnvironmentDefaults() DriverOption {
+	return func(cfg *driverConfig) {
+		headerNames := environmentHeaderNames()
+		options := make(
+			[]option.RequestOption,
+			0,
+			environmentIsolationOptionCount+len(headerNames),
+		)
+		options = append(options,
+			option.WithBaseURL("https://api.openai.com/v1/"),
+			option.WithAPIKey(""),
+			option.WithAdminAPIKey(""),
+			option.WithOrganization(""),
+			option.WithProject(""),
+		)
+
+		for _, headerName := range headerNames {
+			options = append(options, option.WithHeaderDel(headerName))
+		}
+
+		cfg.options = append(cfg.options, options...)
+	}
+}
+
+func environmentHeaderNames() []string {
+	lines := strings.Split(os.Getenv("OPENAI_CUSTOM_HEADERS"), "\n")
+	headerNames := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		name, _, found := strings.Cut(line, ":")
+		if !found {
+			continue
+		}
+
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		headerNames = append(headerNames, name)
+	}
+
+	return headerNames
 }
 
 // WithBaseURL points the driver at an OpenAI-compatible endpoint.
