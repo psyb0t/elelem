@@ -4,6 +4,11 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.6.1 — 2026-08-16
+
+- **Fixed:** CI now runs on Go 1.26.6, which includes the standard-library
+  security fixes reported by `govulncheck` for the previous Go patch release.
+
 ## v0.6.0 — 2026-08-16
 
 - **New:** `openai.WithoutEnvironmentDefaults()` and
