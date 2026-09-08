@@ -539,7 +539,8 @@ func (s *runState) driverParams(tools []Tool) GenerationParams {
 	// extension point and a third-party driver may answer
 	// non-deterministically — stripping an unsupported param beats shipping it.
 	capabilities := s.request.client.Capabilities(s.model)
-	if !capabilities.SupportsReasoningEffort {
+	if !capabilities.SupportsReasoningEffort &&
+		!capabilities.SupportsDisablingReasoning {
 		params.ReasoningEffort = ReasoningEffortUnset
 	}
 

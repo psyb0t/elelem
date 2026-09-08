@@ -137,6 +137,30 @@ func TestRequest_CancelReturnsPartialAssistant(t *testing.T) {
 	assert.Equal(t, MessageOriginTurn, response.Messages[1].Origin)
 }
 
+func TestRequest_KeepsDisablingReasoningForBinaryThinkingDriver(t *testing.T) {
+	t.Parallel()
+
+	driver := &scriptedDriver{
+		turns: []scriptedTurn{{
+			deltas: []Delta{{Text: "done"}},
+			usage:  Usage{FinishReason: FinishReasonStop},
+		}},
+		capabilities: Capabilities{SupportsDisablingReasoning: true},
+	}
+	client := New(driver, WithDefaultModel(Model{ID: "binary-thinking"}))
+
+	response, err := NewRequest(client).
+		WithPrompt(NewPrompt().UserText("question")).
+		WithReasoningEffort(ReasoningEffortNone).
+		Run(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "done", response.Text)
+
+	requests := driver.Requests()
+	require.Len(t, requests, 1)
+	assert.Equal(t, ReasoningEffortNone, requests[0].Params.ReasoningEffort)
+}
+
 // Run infers the tool loop from configuration, so tool-only settings reach the
 // wire whenever a tool is configured and stay off it otherwise.
 //

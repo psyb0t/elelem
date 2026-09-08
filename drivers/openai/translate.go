@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"strings"
@@ -32,7 +33,35 @@ type (
 )
 
 func toOpenAIParams(req elelem.DriverRequest) (chatCompletionParams, error) {
-	messages, err := toOpenAIMessages(req.Messages)
+	return toOpenAIParamsWithAssistantMessageExtra(
+		context.Background(),
+		req,
+		nil,
+	)
+}
+
+func (d *Driver) toOpenAIParams(
+	ctx context.Context,
+	req elelem.DriverRequest,
+) (chatCompletionParams, error) {
+	return toOpenAIParamsWithAssistantMessageExtra(
+		ctx,
+		req,
+		d.assistantMessageExtra,
+	)
+}
+
+func toOpenAIParamsWithAssistantMessageExtra(
+	ctx context.Context,
+	req elelem.DriverRequest,
+	assistantMessageExtra AssistantMessageExtra,
+) (chatCompletionParams, error) {
+	messages, err := toOpenAIMessagesWithAssistantMessageExtra(
+		ctx,
+		req.Model,
+		req.Messages,
+		assistantMessageExtra,
+	)
 	if err != nil {
 		return chatCompletionParams{}, err
 	}
@@ -450,9 +479,28 @@ func toFunctionParameters(raw json.RawMessage) (functionParameters, error) {
 }
 
 func toOpenAIMessages(messages []elelem.Message) ([]messageParam, error) {
+	return toOpenAIMessagesWithAssistantMessageExtra(
+		context.Background(),
+		elelem.Model{},
+		messages,
+		nil,
+	)
+}
+
+func toOpenAIMessagesWithAssistantMessageExtra(
+	ctx context.Context,
+	model elelem.Model,
+	messages []elelem.Message,
+	assistantMessageExtra AssistantMessageExtra,
+) ([]messageParam, error) {
 	out := make([]messageParam, 0, len(messages))
 	for _, message := range messages {
-		translated, err := toOpenAIMessage(message)
+		translated, err := toOpenAIMessageWithAssistantMessageExtra(
+			ctx,
+			model,
+			message,
+			assistantMessageExtra,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -463,7 +511,12 @@ func toOpenAIMessages(messages []elelem.Message) ([]messageParam, error) {
 	return out, nil
 }
 
-func toOpenAIMessage(message elelem.Message) (messageParam, error) {
+func toOpenAIMessageWithAssistantMessageExtra(
+	ctx context.Context,
+	model elelem.Model,
+	message elelem.Message,
+	assistantMessageExtra AssistantMessageExtra,
+) (messageParam, error) {
 	switch message.Role {
 	case elelem.RoleSystem:
 		// OpenAI's system message takes text only — the spec's
@@ -477,7 +530,12 @@ func toOpenAIMessage(message elelem.Message) (messageParam, error) {
 			message.ToolCallID,
 		), nil
 	case elelem.RoleAssistant:
-		return assistantMessage(message), nil
+		return assistantMessage(
+			ctx,
+			model,
+			message,
+			assistantMessageExtra,
+		)
 	default:
 		return messageParam{}, ctxerrors.Wrap(
 			elelem.ErrInvalidTranscript,
@@ -514,13 +572,14 @@ func toolResultContent(message elelem.Message) string {
 	return toolErrorPrefix + text
 }
 
-func assistantMessage(message elelem.Message) messageParam {
-	if len(message.ToolCalls) == 0 {
-		return openaisdk.AssistantMessage(message.Text())
-	}
-
+func assistantMessage(
+	ctx context.Context,
+	model elelem.Model,
+	message elelem.Message,
+	assistantMessageExtra AssistantMessageExtra,
+) (messageParam, error) {
 	assistant := openaisdk.ChatCompletionAssistantMessageParam{}
-	if text := message.Text(); text != "" {
+	if text := message.Text(); text != "" || len(message.ToolCalls) == 0 {
 		assistant.Content.OfString = openaisdk.String(text)
 	}
 
@@ -531,7 +590,23 @@ func assistantMessage(message elelem.Message) messageParam {
 		)
 	}
 
-	return openaisdk.ChatCompletionMessageParamUnion{OfAssistant: &assistant}
+	if assistantMessageExtra != nil {
+		extra, err := assistantMessageExtra(ctx, model, message)
+		if err != nil {
+			return messageParam{}, ctxerrors.Wrap(
+				err,
+				"encode assistant message extras",
+			)
+		}
+
+		if len(extra) > 0 {
+			assistant.SetExtraFields(extra)
+		}
+	}
+
+	return openaisdk.ChatCompletionMessageParamUnion{
+		OfAssistant: &assistant,
+	}, nil
 }
 
 func functionToolCallParam(call elelem.ToolCall) messageToolCallParam {

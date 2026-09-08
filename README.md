@@ -32,7 +32,7 @@ and several regrets away, and this is the layer they'd be sitting on.
 
 Built on the official `openai-go` and `anthropic-sdk-go`, plus an embedded
 `o200k_base` tokenizer so budgeting doesn't need the network. Test coverage is
-kept above 90%, and both shipped drivers run the same conformance suite a
+kept above 90%, and all shipped drivers run the same conformance suite a
 third-party driver would. The `Driver` contract is executable, not aspirational
 bullshit in a markdown file.
 
@@ -117,12 +117,12 @@ Every knob these examples don't show is in
 | **[History](docs/history.md)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
 | **[Retries](docs/retries.md)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and keeps a ledger of what the failed attempts cost you. |
 | **[Structured output](docs/structured-output.md)** | `RunInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request when the model shits out malformed JSON. |
-| **[Drivers](docs/drivers.md)** | OpenAI-compatible and Anthropic transports. `KnownModels()` / `LookupModel(id)` for pre-filled models; unknown ids stay usable, so this morning's release works today. |
+| **[Drivers](docs/drivers.md)** | OpenAI-compatible, Anthropic, and Z.ai Coding transports. `KnownModels()` / `LookupModel(id)` provide known metadata; unknown ids stay usable. |
 | **[Test doubles](docs/testing.md)** | A scripted `Driver` that imports no test framework, a generated mock, and the conformance suite for when you write a third driver. |
 
 ## Drivers
 
-Both drivers take the same four options and expose the same surface:
+The OpenAI-compatible driver takes these options:
 
 ```go
 openai.NewDriver(
@@ -141,11 +141,20 @@ HTTP client plus a URL when it is not the driver's official default. That
 stops one provider's environment credential from quietly reaching a keyless
 local endpoint.
 
-| | `drivers/openai` | `drivers/anthropic` |
-|---|---|---|
-| Talks to | OpenAI and anything OpenAI-shaped — vLLM, Ollama, OpenRouter, LM Studio, whatever proxy you cobbled together | The Anthropic Messages API |
-| Model discovery | `ListModels(ctx)` live, plus `KnownModels()` / `LookupModel(id)` | same |
-| Unknown model ids | accepted — the provider decides | accepted |
+| | `drivers/openai` | `drivers/anthropic` | `drivers/zaicoding` |
+|---|---|---|---|
+| Talks to | OpenAI and anything OpenAI-shaped, including vLLM, Ollama, OpenRouter, LM Studio, and compatible proxies | The Anthropic Messages API | Z.ai Coding's OpenAI-shaped endpoint |
+| Model discovery | `ListModels(ctx)` live, plus `KnownModels()` / `LookupModel(id)` | same | same |
+| Unknown model ids | accepted, the provider decides | accepted | accepted when no reasoning control is set |
+
+`zaicoding.NewDriver` sends Z.ai's `thinking` object and preserves
+`reasoning_content` through tool rounds. Use it instead of the generic OpenAI
+driver when calling Z.ai Coding models:
+
+```go
+driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
+model := zaicoding.LookupModel("glm-4.7")
+```
 
 **Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)`
 reports what one model supports — seed, tool choice, parallel tool calls,
@@ -164,7 +173,7 @@ Your renderer never has to know. See
 [docs/requests.md](docs/requests.md#streaming).
 
 Writing a third driver is [docs/drivers.md](docs/drivers.md), and
-`elelemtest/conformance.Run` is the contract suite both shipped drivers run
+`elelemtest/conformance.Run` is the contract suite all shipped drivers run
 against — so it's alive, not a document that quietly drifted out of date two
 years ago.
 
@@ -258,6 +267,7 @@ elelemtest/conformance/            driver contract suite
 elelemtest/mocks/                  generated Driver mock
 drivers/openai/                    OpenAI-compatible transport
 drivers/anthropic/                 Anthropic transport
+drivers/zaicoding/                 Z.ai Coding transport
 ```
 
 Three placements the filename alone won't give you: the round/tool loop lives

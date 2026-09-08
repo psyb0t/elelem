@@ -4,6 +4,21 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.8.0 (2026-09-08)
+
+- **New:** `drivers/zaicoding` calls Z.ai Coding's OpenAI-shaped endpoint and
+  applies its per-model thinking controls. `LookupModel` supplies metadata for
+  GLM 4.5 Air, GLM 4.7, and GLM 5.1 through GLM 5.3.
+- Tool loops now retain Z.ai `reasoning_content` and replay it with the
+  assistant tool-call message on the next provider request. The generic OpenAI
+  transport exposes a trusted assistant-message extension for provider drivers
+  that need this behavior.
+- `ReasoningEffortNone` now reaches drivers that can disable thinking but do
+  not accept numeric effort grades.
+- Existing OpenAI and Anthropic callers need no changes. Applications using
+  Z.ai Coding should construct `zaicoding.NewDriver` and select models with
+  `zaicoding.LookupModel`.
+
 ## v0.7.0 (2026-09-08)
 
 - **New:** `UserMessageQueue` accepts bounded, concurrent user input while an

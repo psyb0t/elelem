@@ -29,15 +29,26 @@ const Name = "openai"
 
 // Driver implements elelem.Driver over the official OpenAI Go SDK.
 type Driver struct {
-	api openaisdk.Client
+	api                   openaisdk.Client
+	assistantMessageExtra AssistantMessageExtra
 }
 
 type driverConfig struct {
-	options []option.RequestOption
+	options               []option.RequestOption
+	assistantMessageExtra AssistantMessageExtra
 }
 
 // DriverOption configures an OpenAI driver.
 type DriverOption func(*driverConfig)
+
+// AssistantMessageExtra adds trusted provider-specific fields to translated
+// assistant messages. It is intended for specialized drivers built over this
+// transport, not for caller-provided request fields.
+type AssistantMessageExtra func(
+	context.Context,
+	elelem.Model,
+	elelem.Message,
+) (map[string]any, error)
 
 // NewDriver builds an OpenAI-compatible driver.
 func NewDriver(opts ...DriverOption) *Driver {
@@ -51,7 +62,10 @@ func NewDriver(opts ...DriverOption) *Driver {
 		}
 	}
 
-	return &Driver{api: openaisdk.NewClient(cfg.options...)}
+	return &Driver{
+		api:                   openaisdk.NewClient(cfg.options...),
+		assistantMessageExtra: cfg.assistantMessageExtra,
+	}
 }
 
 // WithAPIKey supplies the bearer token used by the upstream. When omitted, the
@@ -147,6 +161,15 @@ func WithSDKOptions(opts ...option.RequestOption) DriverOption {
 	}
 }
 
+// WithAssistantMessageExtra appends trusted fields to assistant messages.
+// Specialized drivers use it to replay provider-owned response state on a
+// later request, such as reasoning content that accompanies a tool call.
+func WithAssistantMessageExtra(extra AssistantMessageExtra) DriverOption {
+	return func(cfg *driverConfig) {
+		cfg.assistantMessageExtra = extra
+	}
+}
+
 // Stream issues one streaming chat completion.
 func (d *Driver) Stream(
 	ctx context.Context,
@@ -159,7 +182,7 @@ func (d *Driver) Stream(
 		return usage, err
 	}
 
-	params, err := toOpenAIParams(req)
+	params, err := d.toOpenAIParams(ctx, req)
 	if err != nil {
 		return usage, err
 	}
@@ -231,7 +254,7 @@ func (d *Driver) Complete(
 		return usage, err
 	}
 
-	params, err := toOpenAIParams(req)
+	params, err := d.toOpenAIParams(ctx, req)
 	if err != nil {
 		return usage, err
 	}

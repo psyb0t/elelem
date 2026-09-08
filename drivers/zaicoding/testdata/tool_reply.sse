@@ -1,0 +1,3 @@
+data: {"model":"glm-4.7","choices":[{"delta":{"content":"done"},"finish_reason":"stop"}]}
+
+data: [DONE]

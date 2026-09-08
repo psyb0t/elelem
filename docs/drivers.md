@@ -67,6 +67,25 @@ The shipped drivers keep their SDK types entirely inside their own packages.
 Nothing from `openai-go` or `anthropic-sdk-go` appears in a signature the
 caller touches.
 
+## Z.ai Coding
+
+`drivers/zaicoding` is the provider-specific choice for Z.ai Coding's
+OpenAI-shaped endpoint. It uses the Coding endpoint by default, sends Z.ai's
+`thinking` object, and preserves `reasoning_content` on the next request after
+a tool call.
+
+```go
+driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
+model := zaicoding.LookupModel("glm-4.7")
+```
+
+The generic OpenAI driver remains appropriate for ordinary OpenAI-compatible
+endpoints. Use `zaicoding` when the selected model needs Z.ai's thinking
+controls. GLM 4.5 Air, GLM 4.7, and GLM 5.1 use enabled or disabled thinking.
+GLM 5.2 and GLM 5.3 also accept the reasoning effort values documented by
+Z.ai. Unsupported values fail locally with
+`zaicoding.ErrUnsupportedParameter`.
+
 ## Capabilities are a promise
 
 Report conservatively. A capability you claim and don't enforce is worse than
@@ -121,7 +140,7 @@ case. See [retries.md](retries.md#how-failures-are-classified).
 
 ## The conformance suite
 
-`elelemtest/conformance.Run` is aimed at you, and both shipped drivers run it —
+`elelemtest/conformance.Run` is aimed at you, and all shipped drivers run it —
 so it's a live contract, not a document that drifted.
 
 ```go
