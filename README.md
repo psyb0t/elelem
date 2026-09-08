@@ -31,10 +31,10 @@ environment. You wire it, it runs requests. Agent frameworks are one `go get`
 and several regrets away, and this is the layer they'd be sitting on.
 
 Built on the official `openai-go` and `anthropic-sdk-go`, plus an embedded
-`o200k_base` tokenizer so budgeting doesn't need the network. 247 tests at 90%+
-coverage, and both shipped drivers run the same conformance suite a third-party
-driver would — the `Driver` contract is executable, not aspirational bullshit
-in a markdown file.
+`o200k_base` tokenizer so budgeting doesn't need the network. Test coverage is
+kept above 90%, and both shipped drivers run the same conformance suite a
+third-party driver would. The `Driver` contract is executable, not aspirational
+bullshit in a markdown file.
 
 ```go
 driver := openai.NewDriver(openai.WithAPIKey(apiKey))
@@ -110,7 +110,7 @@ Every knob these examples don't show is in
 
 | Area | What you get |
 |---|---|
-| **[Requests](docs/requests.md)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
+| **[Requests](docs/requests.md)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, queued user turns, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
 | **[Prompts](docs/prompts.md)** | An immutable `Prompt` carrying the system message, the history and this turn — build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read gets refused locally instead of by the provider a round trip later. |
 | **[Tools](docs/tools.md)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of taking your process down with it, per-call denial, and tools that inject messages. |
 | **[Callbacks](docs/callbacks.md)** | Sixteen observation points — run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
@@ -245,6 +245,7 @@ locked inside their driver package and never leak out.
 
 ```text
 client.go, request.go, engine.go   request construction and execution
+user_message_queue.go              bounded user input between provider rounds
 driver.go, errors.go               provider boundary and sentinels
 message.go, transcript.go          transcript primitives and repair
 usage.go                           token and retry accounting

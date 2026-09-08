@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	commonerrors "github.com/psyb0t/common-go/errors"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +64,7 @@ type retryAfterError struct {
 
 func (e retryAfterError) Error() string { return "rate limited" }
 
-func (e retryAfterError) Unwrap() error { return commonerrors.ErrRateLimited }
+func (e retryAfterError) Unwrap() error { return commerr.ErrRateLimited }
 
 func (e retryAfterError) HTTPStatus() int { return 429 }
 
@@ -371,7 +371,7 @@ func TestParseRetryAfter(t *testing.T) {
 // The portable sentinel is what lets a caller ask about a condition without
 // knowing which provider answered. It used to live inside ONE driver: the
 // OpenAI driver joined sentinels onto its errors and the Anthropic driver did
-// not, so errors.Is(err, commonerrors.ErrRateLimited) was true for one and
+// not, so errors.Is(err, commerr.ErrRateLimited) was true for one and
 // false for the other on the identical condition. The retry layer re-derives
 // everything from status, which hid it — until a caller holds a driver
 // directly, which is exactly what an extracted public package invites.
@@ -388,13 +388,13 @@ func TestProviderSentinel(t *testing.T) {
 		{
 			name:   "rate limited by status",
 			status: http.StatusTooManyRequests,
-			want:   commonerrors.ErrRateLimited,
+			want:   commerr.ErrRateLimited,
 		},
 		{
 			name:   "rate limited in band on a 200",
 			status: http.StatusOK,
 			code:   ProviderErrorCodeRateLimit,
-			want:   commonerrors.ErrRateLimited,
+			want:   commerr.ErrRateLimited,
 			because: "an in-band failure carries a meaningless status, so " +
 				"the code has to outrank it here too",
 		},
@@ -407,17 +407,17 @@ func TestProviderSentinel(t *testing.T) {
 		{
 			name:   "unauthorized",
 			status: http.StatusUnauthorized,
-			want:   commonerrors.ErrNotAuthenticated,
+			want:   commerr.ErrNotAuthenticated,
 		},
 		{
 			name:   "forbidden is also an authentication failure",
 			status: http.StatusForbidden,
-			want:   commonerrors.ErrNotAuthenticated,
+			want:   commerr.ErrNotAuthenticated,
 		},
 		{
 			name:   "not found",
 			status: http.StatusNotFound,
-			want:   commonerrors.ErrNotFound,
+			want:   commerr.ErrNotFound,
 		},
 		{
 			name:    "an ordinary bad request has no portable meaning",
@@ -468,7 +468,7 @@ func TestProviderErrorAccessors(t *testing.T) {
 		t.Parallel()
 
 		providerErr := &ProviderError{
-			Cause:           commonerrors.ErrRateLimited,
+			Cause:           commerr.ErrRateLimited,
 			StatusCode:      http.StatusTooManyRequests,
 			RetryAfterDelay: retryAfter,
 			Code:            errorCode,
@@ -479,13 +479,13 @@ func TestProviderErrorAccessors(t *testing.T) {
 		assert.Equal(t, errorCode, providerErr.ErrorCode())
 		assert.Equal(
 			t,
-			commonerrors.ErrRateLimited.Error(),
+			commerr.ErrRateLimited.Error(),
 			providerErr.Error(),
 		)
 
 		// The whole point of wrapping a sentinel: a caller decides what to do
 		// about a rate limit without knowing which provider produced it.
-		require.ErrorIs(t, providerErr, commonerrors.ErrRateLimited)
+		require.ErrorIs(t, providerErr, commerr.ErrRateLimited)
 	})
 
 	// A failed errors.As leaves the target nil, and calling through it is the
@@ -534,7 +534,7 @@ func TestMapProviderError(t *testing.T) {
 		{
 			name: "the context-length code wins over its 400 status",
 			err: &ProviderError{
-				Cause:      commonerrors.ErrInvalidArgument,
+				Cause:      commerr.ErrInvalidArgument,
 				StatusCode: http.StatusBadRequest,
 				Code:       ProviderErrorCodeContextLengthExceeded,
 			},
@@ -547,25 +547,25 @@ func TestMapProviderError(t *testing.T) {
 			name:   "401 is an authentication failure",
 			err:    assert.AnError,
 			status: http.StatusUnauthorized,
-			want:   commonerrors.ErrNotAuthenticated,
+			want:   commerr.ErrNotAuthenticated,
 		},
 		{
 			name:   "403 is also an authentication failure",
 			err:    assert.AnError,
 			status: http.StatusForbidden,
-			want:   commonerrors.ErrNotAuthenticated,
+			want:   commerr.ErrNotAuthenticated,
 		},
 		{
 			name:   "404 is a not-found",
 			err:    assert.AnError,
 			status: http.StatusNotFound,
-			want:   commonerrors.ErrNotFound,
+			want:   commerr.ErrNotFound,
 		},
 		{
 			name:   "429 is a rate limit",
 			err:    assert.AnError,
 			status: http.StatusTooManyRequests,
-			want:   commonerrors.ErrRateLimited,
+			want:   commerr.ErrRateLimited,
 		},
 		{
 			name:    "an unmapped status keeps the original error",
@@ -688,11 +688,11 @@ func TestWithRetry_PassesNonStreamCallsThrough(t *testing.T) {
 	t.Run("ListModels error is wrapped, not swallowed", func(t *testing.T) {
 		t.Parallel()
 
-		driver := &relayDriver{modelsErr: commonerrors.ErrNotFound}
+		driver := &relayDriver{modelsErr: commerr.ErrNotFound}
 
 		got, err := WithRetry(driver, RetryConfig{}).
 			ListModels(context.Background())
-		require.ErrorIs(t, err, commonerrors.ErrNotFound)
+		require.ErrorIs(t, err, commerr.ErrNotFound)
 		assert.Nil(t, got)
 	})
 
@@ -778,8 +778,8 @@ func TestWithRetry_DoesNotRetryPermanentFailures(t *testing.T) {
 	t.Parallel()
 
 	base := &scriptedDriver{turns: []scriptedTurn{
-		{err: commonerrors.ErrInvalidArgument},
-		{err: commonerrors.ErrInvalidArgument},
+		{err: commerr.ErrInvalidArgument},
+		{err: commerr.ErrInvalidArgument},
 	}}
 
 	jitter := false
@@ -799,7 +799,7 @@ func TestWithRetry_DoesNotRetryPermanentFailures(t *testing.T) {
 		DriverRequest{Model: Model{ID: "test-model"}},
 		nil,
 	)
-	require.ErrorIs(t, err, commonerrors.ErrInvalidArgument)
+	require.ErrorIs(t, err, commerr.ErrInvalidArgument)
 	assert.Len(t, base.Requests(), 1,
 		"a permanent failure must not be retried")
 }
@@ -824,7 +824,7 @@ func TestRetryAccounting_AccumulatesAcrossToolLoopRounds(t *testing.T) {
 
 	driver := &scriptedDriver{turns: []scriptedTurn{
 		{
-			err:   commonerrors.ErrRateLimited,
+			err:   commerr.ErrRateLimited,
 			usage: Usage{TokenCounts: TokenCounts{Total: firstWasted}},
 		},
 		{
@@ -841,7 +841,7 @@ func TestRetryAccounting_AccumulatesAcrossToolLoopRounds(t *testing.T) {
 			},
 		},
 		{
-			err:   commonerrors.ErrRateLimited,
+			err:   commerr.ErrRateLimited,
 			usage: Usage{TokenCounts: TokenCounts{Total: secondWasted}},
 		},
 		{
@@ -933,11 +933,11 @@ func TestRetryAccounting_ExhaustedRetriesStillReportTheirCost(t *testing.T) {
 
 	driver := &scriptedDriver{turns: []scriptedTurn{
 		{
-			err:   commonerrors.ErrRateLimited,
+			err:   commerr.ErrRateLimited,
 			usage: Usage{TokenCounts: TokenCounts{Total: firstWasted}},
 		},
 		{
-			err:   commonerrors.ErrRateLimited,
+			err:   commerr.ErrRateLimited,
 			usage: Usage{TokenCounts: TokenCounts{Total: secondWasted}},
 		},
 	}}
@@ -959,7 +959,7 @@ func TestRetryAccounting_ExhaustedRetriesStillReportTheirCost(t *testing.T) {
 		WithPrompt(NewPrompt().UserText("go")).
 		Run(context.Background())
 
-	require.ErrorIs(t, err, commonerrors.ErrRateLimited)
+	require.ErrorIs(t, err, commerr.ErrRateLimited)
 	require.NotNil(t, response, "a failed run still reports what it spent")
 
 	assert.Equal(t, attempts, response.Usage.Retry.TotalAttempts)

@@ -13,15 +13,15 @@ import (
 
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/psyb0t/aichteeteapee"
-	commonerrors "github.com/psyb0t/common-go/errors"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/psyb0t/elelem"
 	"github.com/psyb0t/elelem/elelemtest/conformance"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// A rate limit must satisfy errors.Is(err, commonerrors.ErrRateLimited) here
+// A rate limit must satisfy errors.Is(err, commerr.ErrRateLimited) here
 // exactly as it does for every other driver. This one joined no sentinel at
 // all, so the same condition answered differently depending on which provider
 // served the request — invisible behind the retry layer, which re-derives from
@@ -36,7 +36,7 @@ func TestNormalizeProviderErrorJoinsPortableSentinel(t *testing.T) {
 
 	err := normalizeProviderError(apiError)
 
-	require.ErrorIs(t, err, commonerrors.ErrRateLimited,
+	require.ErrorIs(t, err, commerr.ErrRateLimited,
 		"a caller must be able to ask about the condition without knowing "+
 			"which provider answered")
 

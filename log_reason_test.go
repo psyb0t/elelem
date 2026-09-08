@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	commonerrors "github.com/psyb0t/common-go/errors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/psyb0t/ctxscope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -282,7 +282,7 @@ func TestRun_LogsRetryAttemptAndRecovery(t *testing.T) {
 	ctx, records := captureLogs(t)
 
 	base := &scriptedDriver{turns: []scriptedTurn{
-		{err: commonerrors.ErrRateLimited},
+		{err: commerr.ErrRateLimited},
 		{
 			deltas: []Delta{{Text: "done"}},
 			usage:  Usage{FinishReason: FinishReasonStop},

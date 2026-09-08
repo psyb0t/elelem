@@ -68,7 +68,7 @@ func normalizeProviderError(err error) error {
 	code := normalizeErrorCode(anthropicErrorCode(apiError))
 
 	// Joined so errors.Is answers the same for this provider as for any other.
-	// Without it, errors.Is(err, commonerrors.ErrRateLimited) was true for the
+	// Without it, errors.Is(err, commerr.ErrRateLimited) was true for the
 	// OpenAI driver and false here on the identical condition — masked while
 	// the retry layer re-derives from status, and wrong for anyone holding a
 	// driver directly.

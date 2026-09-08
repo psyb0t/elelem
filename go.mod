@@ -12,8 +12,7 @@ require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/openai/openai-go/v3 v3.44.0
 	github.com/psyb0t/aichteeteapee v1.10.0
-	github.com/psyb0t/common-go v0.3.1
-	github.com/psyb0t/ctxerrors v0.4.4
+	github.com/psyb0t/ctxerrors v0.7.1
 	github.com/psyb0t/ctxscope v1.0.2
 	github.com/stretchr/testify v1.11.1
 	github.com/tiktoken-go/tokenizer v0.8.1

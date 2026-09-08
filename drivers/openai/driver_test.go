@@ -16,7 +16,7 @@ import (
 
 	"github.com/openai/openai-go/v3/packages/ssestream"
 	"github.com/psyb0t/aichteeteapee"
-	commonerrors "github.com/psyb0t/common-go/errors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/psyb0t/elelem"
 	"github.com/psyb0t/elelem/elelemtest/conformance"
 	"github.com/stretchr/testify/assert"
@@ -562,7 +562,7 @@ func TestDriverNormalizesProviderErrors(t *testing.T) {
 	}{
 		{
 			name: "rate limited", status: http.StatusTooManyRequests,
-			code: "rate_limit", sentinel: commonerrors.ErrRateLimited,
+			code: "rate_limit", sentinel: commerr.ErrRateLimited,
 			retryAfter: time.Second,
 		},
 		{
@@ -571,15 +571,15 @@ func TestDriverNormalizesProviderErrors(t *testing.T) {
 		},
 		{
 			name: "unauthorized", status: http.StatusUnauthorized,
-			code: "invalid_api_key", sentinel: commonerrors.ErrNotAuthenticated,
+			code: "invalid_api_key", sentinel: commerr.ErrNotAuthenticated,
 		},
 		{
 			name: "forbidden", status: http.StatusForbidden,
-			code: "forbidden", sentinel: commonerrors.ErrNotAuthenticated,
+			code: "forbidden", sentinel: commerr.ErrNotAuthenticated,
 		},
 		{
 			name: "model missing", status: http.StatusNotFound,
-			code: "model_not_found", sentinel: commonerrors.ErrNotFound,
+			code: "model_not_found", sentinel: commerr.ErrNotFound,
 		},
 		{
 			name: "context exceeded", status: http.StatusBadRequest,

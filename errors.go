@@ -4,12 +4,12 @@ import (
 	"errors"
 	"net/http"
 
-	commonerrors "github.com/psyb0t/common-go/errors"
+	"github.com/psyb0t/ctxerrors/commerr"
 )
 
 // ProviderSentinel returns the portable sentinel for a provider failure, or nil
 // when the condition has none. Drivers join it onto the error they build so a
-// caller can ask errors.Is(err, commonerrors.ErrRateLimited) without knowing
+// caller can ask errors.Is(err, commerr.ErrRateLimited) without knowing
 // which provider answered.
 //
 // Shared rather than per-driver because it once lived in only one: OpenAI
@@ -23,16 +23,16 @@ func ProviderSentinel(status int, code string) error {
 	case ProviderErrorCodeContextLengthExceeded:
 		return ErrContextExceeded
 	case ProviderErrorCodeRateLimit:
-		return commonerrors.ErrRateLimited
+		return commerr.ErrRateLimited
 	}
 
 	switch status {
 	case http.StatusTooManyRequests:
-		return commonerrors.ErrRateLimited
+		return commerr.ErrRateLimited
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return commonerrors.ErrNotAuthenticated
+		return commerr.ErrNotAuthenticated
 	case http.StatusNotFound:
-		return commonerrors.ErrNotFound
+		return commerr.ErrNotFound
 	default:
 		return nil
 	}
@@ -44,13 +44,20 @@ var (
 		"maximum conversation rounds exceeded",
 	)
 	ErrToolCallsAlreadyExecuted = errors.New("tool calls already executed")
-	ErrResponseTruncated        = errors.New(
+	ErrUserMessageQueueCapacity = errors.New(
+		"user message queue capacity must be positive",
+	)
+	ErrUserMessageQueueFull     = errors.New("user message queue is full")
+	ErrQueuedUserMessageInvalid = errors.New(
+		"queued message must be a valid user message",
+	)
+	ErrResponseTruncated = errors.New(
 		"structured response was truncated",
 	)
 	ErrResponseSchemaMismatch = errors.New(
 		"structured response does not match target",
 	)
-	ErrInvalidRequest          = commonerrors.ErrInvalidArgument
+	ErrInvalidRequest          = commerr.ErrInvalidArgument
 	ErrMaxOutputExceedsContext = errors.New(
 		"maximum output tokens exceed model context",
 	)

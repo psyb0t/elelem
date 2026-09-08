@@ -4,6 +4,20 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.7.0 (2026-09-08)
+
+- **New:** `UserMessageQueue` accepts bounded, concurrent user input while an
+  agent loop is running. `WithUserMessageQueue` drains queued messages in FIFO
+  order at provider round boundaries. Automatic loops can continue after a
+  terminal answer when new input is pending. Manual loops carry queued input
+  into the round after tool execution.
+- Queued messages must use the user role and cannot carry assistant, tool, or
+  injection protocol fields. The engine validates queued content against the
+  selected model before calling the driver. Messages left at the round limit
+  stay queued for a later run.
+- Replaced the deprecated `common-go/errors` dependency with
+  `ctxerrors/commerr`. Provider-neutral sentinel matching remains unchanged.
+
 ## v0.6.1 — 2026-08-16
 
 - **Fixed:** CI now runs on Go 1.26.6, which includes the standard-library

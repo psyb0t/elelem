@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	commonerrors "github.com/psyb0t/common-go/errors"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +78,7 @@ func TestNewToolDeniedResult(t *testing.T) {
 func TestErrInvalidRequest(t *testing.T) {
 	t.Parallel()
 
-	assert.ErrorIs(t, ErrInvalidRequest, commonerrors.ErrInvalidArgument)
+	assert.ErrorIs(t, ErrInvalidRequest, commerr.ErrInvalidArgument)
 }
 
 func newToolRequest(tool Tool, turns []scriptedTurn) *Request {

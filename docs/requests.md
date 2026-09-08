@@ -14,6 +14,7 @@ all chains.
 - [Generation parameters](#generation-parameters)
 - [Provider-specific parameters](#provider-specific-parameters)
 - [The tool loop](#the-tool-loop)
+- [Queued user messages](#queued-user-messages)
 - [Bounds](#bounds)
 - [The Response](#the-response)
 
@@ -225,6 +226,41 @@ every round — for catalogs, or authorization, that can change mid-conversation
 
 `WithForceFinalAnswer` is the difference between "hit max rounds and returned a
 tool call nobody will execute" and "hit max rounds and answered."
+
+## Queued user messages
+
+`UserMessageQueue` accepts user input while an automatic agent loop is active.
+The queue is bounded, mutex-protected, and accepts only user-role messages. It
+rejects assistant, tool, system, and injection fields, so incoming input cannot
+forge transcript protocol state.
+
+```go
+queue, err := elelem.NewUserMessageQueue(16)
+if err != nil {
+	return err
+}
+
+request := elelem.NewRequest(client).
+	WithPrompt(prompt).
+	WithTools(tools).
+	WithUserMessageQueue(queue).
+	WithAutoToolCalls()
+
+// This is safe from a request or websocket goroutine while Run is active.
+if err := queue.EnqueueText("Stop and explain the last action."); err != nil {
+	return err
+}
+```
+
+The engine drains queued input before its first provider request, after every
+set of tool results and injections, and after a terminal assistant answer. It
+never changes a provider request that is already in flight. Pending input is
+FIFO and becomes normal `MessageOriginTurn` transcript entries.
+
+`WithAutoToolCalls` is required to continue after a terminal answer. A manual
+loop still carries queued input into the provider request after you call
+`ExecuteToolCalls`, but it never starts a new terminal round by itself. A run
+at `WithMaxRounds` leaves pending input queued for a later `Run`.
 
 ## Bounds
 

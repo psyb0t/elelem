@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	commonerrors "github.com/psyb0t/common-go/errors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/psyb0t/ctxscope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -229,7 +229,7 @@ func TestRequest_OnRetryFiresBeforeSuccessfulRetry(t *testing.T) {
 	t.Parallel()
 
 	base := &scriptedDriver{turns: []scriptedTurn{
-		{err: commonerrors.ErrRateLimited},
+		{err: commerr.ErrRateLimited},
 		{
 			deltas: []Delta{{Text: "done"}},
 			usage:  Usage{FinishReason: FinishReasonStop},
@@ -799,11 +799,11 @@ func TestWithRetry_NilDeltaAndFinalFailureAreSafe(t *testing.T) {
 
 	base := &scriptedDriver{turns: []scriptedTurn{
 		{
-			err:   commonerrors.ErrRateLimited,
+			err:   commerr.ErrRateLimited,
 			usage: Usage{TokenCounts: TokenCounts{Total: 3}},
 		},
 		{
-			err:   commonerrors.ErrRateLimited,
+			err:   commerr.ErrRateLimited,
 			usage: Usage{TokenCounts: TokenCounts{Total: 5}},
 		},
 	}}
@@ -824,7 +824,7 @@ func TestWithRetry_NilDeltaAndFinalFailureAreSafe(t *testing.T) {
 		DriverRequest{Model: Model{ID: "test-model"}},
 		nil,
 	)
-	require.ErrorIs(t, err, commonerrors.ErrRateLimited)
+	require.ErrorIs(t, err, commerr.ErrRateLimited)
 	assert.Equal(t, 2, usage.Retry.TotalAttempts)
 	require.Len(t, usage.Retry.FailedAttempts, 2)
 	assert.Equal(t, int64(8), usage.Retry.WastedTotalTokens)
@@ -836,7 +836,7 @@ func TestWithRetry_DoesNotRetryAfterFirstDelta(t *testing.T) {
 
 	base := &scriptedDriver{turns: []scriptedTurn{{
 		deltas: []Delta{{Text: "partial"}},
-		err:    commonerrors.ErrRateLimited,
+		err:    commerr.ErrRateLimited,
 	}}}
 	retry := WithRetry(base, RetryConfig{MaxAttempts: 3})
 	seen := 0
@@ -849,7 +849,7 @@ func TestWithRetry_DoesNotRetryAfterFirstDelta(t *testing.T) {
 			return nil
 		},
 	)
-	require.ErrorIs(t, err, commonerrors.ErrRateLimited)
+	require.ErrorIs(t, err, commerr.ErrRateLimited)
 	assert.Equal(t, 1, seen)
 	assert.Equal(t, 1, len(base.Requests()))
 }

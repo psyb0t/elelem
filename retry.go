@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	commonerrors "github.com/psyb0t/common-go/errors"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/psyb0t/ctxscope"
 )
 
@@ -128,7 +128,7 @@ type HTTPStatusError interface {
 
 // ProviderError is a normalized upstream failure: the provider's own error
 // code plus the HTTP status and any Retry-After, wrapped over a
-// commonerrors sentinel so errors.Is works without knowing the provider.
+// commerr sentinel so errors.Is works without knowing the provider.
 type ProviderError struct {
 	Cause           error
 	StatusCode      int
@@ -145,7 +145,7 @@ func (e *ProviderError) Error() string {
 }
 
 // Unwrap exposes the underlying sentinel so errors.Is(err,
-// commonerrors.ErrRateLimited) holds across the wrap layers.
+// commerr.ErrRateLimited) holds across the wrap layers.
 func (e *ProviderError) Unwrap() error {
 	if e == nil {
 		return nil
@@ -619,11 +619,11 @@ func mapProviderError(err error, status int) error {
 
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return ctxerrors.Wrap(commonerrors.ErrNotAuthenticated, err.Error())
+		return ctxerrors.Wrap(commerr.ErrNotAuthenticated, err.Error())
 	case http.StatusNotFound:
-		return ctxerrors.Wrap(commonerrors.ErrNotFound, err.Error())
+		return ctxerrors.Wrap(commerr.ErrNotFound, err.Error())
 	case http.StatusTooManyRequests:
-		return ctxerrors.Wrap(commonerrors.ErrRateLimited, err.Error())
+		return ctxerrors.Wrap(commerr.ErrRateLimited, err.Error())
 	default:
 		return ctxerrors.Wrap(err, "provider request")
 	}
@@ -635,7 +635,7 @@ func classifyRetry(err error) (RetryReason, int, bool) {
 		return "", 0, false
 	}
 
-	if errors.Is(err, commonerrors.ErrRateLimited) {
+	if errors.Is(err, commerr.ErrRateLimited) {
 		return RetryReasonRateLimited, http.StatusTooManyRequests, true
 	}
 

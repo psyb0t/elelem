@@ -42,6 +42,7 @@ type Request struct {
 	tokenCounter             TokenCounter
 	forceFinalAnswer         bool
 	autoToolCalls            bool
+	userMessageQueue         *UserMessageQueue
 	transcriptRepair         bool
 	strictResponseValidation bool
 	responseRepair           bool
@@ -295,6 +296,20 @@ func (r *Request) WithForceFinalAnswer(value bool) *Request {
 
 func (r *Request) WithAutoToolCalls() *Request {
 	r.autoToolCalls = true
+
+	return r
+}
+
+// WithUserMessageQueue attaches incoming user messages to this request's
+// agent loop. The queue is safe to enqueue from another goroutine while Run is
+// active. Its messages are delivered only at a round boundary, never into a
+// provider request already in flight.
+//
+// Only an automatic loop drains after a terminal answer. A manual caller still
+// controls terminal continuation, but executing pending tools carries queued
+// messages into the following provider request.
+func (r *Request) WithUserMessageQueue(queue *UserMessageQueue) *Request {
+	r.userMessageQueue = queue
 
 	return r
 }
@@ -695,7 +710,12 @@ func (r *Request) run(ctx context.Context) (*Response, error) {
 	}
 
 	ctx = withRetryCallback(ctx, r.onRetry)
+
 	state := newRunState(r, withTools)
+	if r.autoToolCalls {
+		state.acceptQueuedUserMessages()
+	}
+
 	// The first round is round 1; withholding is decided by the one predicate
 	// on runState rather than a hardcoded specialization of it here.
 	withholdTools := withTools && state.shouldWithholdTools(1)
@@ -1021,6 +1041,13 @@ func cloneParams(params GenerationParams) GenerationParams {
 // Anthropic accepts only four. The driver makes the final per-value call — the
 // same split MaxReasoningEffort already uses.
 func (r *Request) validateContentCapabilities(caps Capabilities) error {
+	return r.validateMessageContentCapabilities(r.prompt.Messages(), caps)
+}
+
+func (r *Request) validateMessageContentCapabilities(
+	messages []Message,
+	caps Capabilities,
+) error {
 	supported := map[PartType]bool{
 		PartTypeText:  true,
 		PartTypeImage: caps.SupportsImageInput,
@@ -1028,7 +1055,7 @@ func (r *Request) validateContentCapabilities(caps Capabilities) error {
 		PartTypeFile:  caps.SupportsFileInput,
 	}
 
-	for i, message := range r.prompt.Messages() {
+	for i, message := range messages {
 		if err := message.Content.Validate(); err != nil {
 			return ctxerrors.Wrapf(err, "message %d", i)
 		}
