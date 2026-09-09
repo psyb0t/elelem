@@ -4,6 +4,16 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.9.0 (2026-09-09)
+
+- **Breaking:** the maintained Z.ai Coding catalog now contains only GLM 5.3
+  and GLM 5.3 Flash. `KnownModels` no longer advertises legacy Coding Plan
+  models, and `LookupModel` no longer supplies their context or reasoning
+  metadata. Move Coding Plan configuration to `glm-5.3` or `glm-5.3-flash`.
+- GLM 5.3 retains validated low, high, and max reasoning effort controls. GLM
+  5.3 Flash preserves tool-loop thinking but does not advertise numeric or
+  disabling controls.
+
 ## v0.8.0 (2026-09-08)
 
 - **New:** `drivers/zaicoding` calls Z.ai Coding's OpenAI-shaped endpoint and

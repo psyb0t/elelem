@@ -76,15 +76,14 @@ a tool call.
 
 ```go
 driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
-model := zaicoding.LookupModel("glm-4.7")
+model := zaicoding.LookupModel("glm-5.3")
 ```
 
 The generic OpenAI driver remains appropriate for ordinary OpenAI-compatible
-endpoints. Use `zaicoding` when the selected model needs Z.ai's thinking
-controls. GLM 4.5 Air, GLM 4.7, and GLM 5.1 use enabled or disabled thinking.
-GLM 5.2 and GLM 5.3 also accept the reasoning effort values documented by
-Z.ai. Unsupported values fail locally with
-`zaicoding.ErrUnsupportedParameter`.
+endpoints. The maintained Coding Plan catalog contains GLM 5.3 and GLM 5.3
+Flash. GLM 5.3 accepts its documented reasoning effort values. GLM 5.3 Flash
+uses preserved thinking but does not advertise numeric or disabling controls.
+Unsupported values fail locally with `zaicoding.ErrUnsupportedParameter`.
 
 ## Capabilities are a promise
 

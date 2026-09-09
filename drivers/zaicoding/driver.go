@@ -278,13 +278,7 @@ func disabledThinkingConfiguration(
 	modelID string,
 ) (*thinkingConfig, elelem.ReasoningEffort, error) {
 	switch kind {
-	case modelKindGLM45Air,
-		modelKindGLM47,
-		modelKindGLM51,
-		modelKindGLM52:
-		return &thinkingConfig{Type: thinkingTypeDisabled},
-			elelem.ReasoningEffortUnset, nil
-	case modelKindGLM53, modelKindUnknown:
+	case modelKindGLM53, modelKindGLM53Flash, modelKindUnknown:
 		return nil, elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
 			modelID,
 			elelem.ReasoningEffortNone,
@@ -303,14 +297,9 @@ func mappedReasoningEffort(
 	effort elelem.ReasoningEffort,
 ) (elelem.ReasoningEffort, error) {
 	switch kind {
-	case modelKindGLM52:
-		return glm52ReasoningEffort(modelID, effort)
 	case modelKindGLM53:
 		return glm53ReasoningEffort(modelID, effort)
-	case modelKindUnknown,
-		modelKindGLM45Air,
-		modelKindGLM47,
-		modelKindGLM51:
+	case modelKindUnknown, modelKindGLM53Flash:
 		return elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
 			modelID,
 			effort,
@@ -321,25 +310,6 @@ func mappedReasoningEffort(
 		modelID,
 		effort,
 	)
-}
-
-func glm52ReasoningEffort(
-	modelID string,
-	effort elelem.ReasoningEffort,
-) (elelem.ReasoningEffort, error) {
-	switch effort {
-	case elelem.ReasoningEffortLow,
-		elelem.ReasoningEffortMedium,
-		elelem.ReasoningEffortHigh:
-		return elelem.ReasoningEffortHigh, nil
-	case elelem.ReasoningEffortXHigh, elelem.ReasoningEffortMax:
-		return elelem.ReasoningEffortMax, nil
-	default:
-		return elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
-			modelID,
-			effort,
-		)
-	}
 }
 
 func glm53ReasoningEffort(

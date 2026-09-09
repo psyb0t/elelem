@@ -7,36 +7,24 @@ import (
 )
 
 const (
-	modelGLM45Air = "glm-4.5-air"
-	modelGLM47    = "glm-4.7"
-	modelGLM51    = "glm-5.1"
-	modelGLM52    = "glm-5.2"
-	modelGLM53    = "glm-5.3"
-
-	glm45AirContextSize = 128_000
-	glm47ContextSize    = 200_000
+	modelGLM53      = "glm-5.3"
+	modelGLM53Flash = "glm-5.3-flash"
 )
 
 type modelKind string
 
 const (
-	modelKindUnknown  modelKind = ""
-	modelKindGLM45Air modelKind = modelGLM45Air
-	modelKindGLM47    modelKind = modelGLM47
-	modelKindGLM51    modelKind = modelGLM51
-	modelKindGLM52    modelKind = modelGLM52
-	modelKindGLM53    modelKind = modelGLM53
+	modelKindUnknown    modelKind = ""
+	modelKindGLM53      modelKind = modelGLM53
+	modelKindGLM53Flash modelKind = modelGLM53Flash
 )
 
 // KnownModels returns the Z.ai Coding models whose reasoning behavior this
 // driver validates locally.
 func KnownModels() []elelem.Model {
 	return []elelem.Model{
-		LookupModel(modelGLM45Air),
-		LookupModel(modelGLM47),
-		LookupModel(modelGLM51),
-		LookupModel(modelGLM52),
 		LookupModel(modelGLM53),
+		LookupModel(modelGLM53Flash),
 	}
 }
 
@@ -47,15 +35,9 @@ func LookupModel(id string) elelem.Model {
 	switch classifyModel(id) {
 	case modelKindUnknown:
 		return model
-	case modelKindGLM45Air:
-		model.ContextSize = glm45AirContextSize
+	case modelKindGLM53Flash:
 		model.SupportsReasoning = true
-	case modelKindGLM47:
-		model.ContextSize = glm47ContextSize
-		model.SupportsReasoning = true
-	case modelKindGLM51:
-		model.SupportsReasoning = true
-	case modelKindGLM52, modelKindGLM53:
+	case modelKindGLM53:
 		model.SupportsReasoning = true
 		model.ReasoningLevels = reasoningLevels()
 	}
@@ -75,16 +57,10 @@ func reasoningLevels() elelem.ReasoningLevels {
 
 func classifyModel(id string) modelKind {
 	switch strings.ToLower(strings.TrimSpace(id)) {
-	case modelGLM45Air:
-		return modelKindGLM45Air
-	case modelGLM47:
-		return modelKindGLM47
-	case modelGLM51:
-		return modelKindGLM51
-	case modelGLM52:
-		return modelKindGLM52
 	case modelGLM53:
 		return modelKindGLM53
+	case modelGLM53Flash:
+		return modelKindGLM53Flash
 	default:
 		return modelKindUnknown
 	}
@@ -101,18 +77,14 @@ func capabilities(
 		capabilities.SupportsReasoningEffort = false
 		capabilities.SupportsDisablingReasoning = false
 		capabilities.MaxReasoningEffort = elelem.ReasoningEffortUnset
-	case modelKindGLM45Air, modelKindGLM47, modelKindGLM51:
-		capabilities.SupportsReasoningEffort = false
-		capabilities.SupportsDisablingReasoning = true
-		capabilities.MaxReasoningEffort = elelem.ReasoningEffortUnset
-	case modelKindGLM52:
-		capabilities.SupportsReasoningEffort = true
-		capabilities.SupportsDisablingReasoning = true
-		capabilities.MaxReasoningEffort = elelem.ReasoningEffortMax
 	case modelKindGLM53:
 		capabilities.SupportsReasoningEffort = true
 		capabilities.SupportsDisablingReasoning = false
 		capabilities.MaxReasoningEffort = elelem.ReasoningEffortMax
+	case modelKindGLM53Flash:
+		capabilities.SupportsReasoningEffort = false
+		capabilities.SupportsDisablingReasoning = false
+		capabilities.MaxReasoningEffort = elelem.ReasoningEffortUnset
 	}
 
 	return capabilities

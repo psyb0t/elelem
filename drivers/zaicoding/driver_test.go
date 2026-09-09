@@ -64,7 +64,7 @@ func TestDriverConformance(t *testing.T) {
 		},
 		conformance.Options{
 			Request: elelem.DriverRequest{
-				Model: LookupModel(modelGLM47),
+				Model: LookupModel(modelGLM53),
 				Messages: []elelem.Message{{
 					Role:    elelem.RoleUser,
 					Content: elelem.Text("conformance request"),
@@ -72,11 +72,8 @@ func TestDriverConformance(t *testing.T) {
 			},
 			NetworkCalls: networkCalls.Load,
 			Models: []elelem.Model{
-				LookupModel(modelGLM45Air),
-				LookupModel(modelGLM47),
-				LookupModel(modelGLM51),
-				LookupModel(modelGLM52),
 				LookupModel(modelGLM53),
+				LookupModel(modelGLM53Flash),
 				LookupModel("unknown-zai-model"),
 			},
 		},
@@ -125,7 +122,7 @@ func TestDriverReplaysReasoningContentAfterToolCall(t *testing.T) {
 		WithBaseURL(server.URL),
 		WithHTTPClient(server.Client()),
 	)
-	model := LookupModel(modelGLM47)
+	model := LookupModel(modelGLM53)
 
 	var (
 		reasoning         string
@@ -209,37 +206,6 @@ func TestReasoningConfiguration(t *testing.T) {
 		wantErr        error
 	}{
 		{
-			name:     "GLM 4.7 defaults to enabled thinking",
-			modelID:  modelGLM47,
-			wantType: thinkingTypeEnabled,
-		},
-		{
-			name:     "GLM 4.7 disables thinking",
-			modelID:  modelGLM47,
-			effort:   elelem.ReasoningEffortNone,
-			wantType: thinkingTypeDisabled,
-		},
-		{
-			name:    "GLM 4.7 rejects numeric effort",
-			modelID: modelGLM47,
-			effort:  elelem.ReasoningEffortHigh,
-			wantErr: ErrUnsupportedParameter,
-		},
-		{
-			name:           "GLM 5.2 maps medium to high",
-			modelID:        modelGLM52,
-			effort:         elelem.ReasoningEffortMedium,
-			wantType:       thinkingTypeEnabled,
-			wantWireEffort: elelem.ReasoningEffortHigh,
-		},
-		{
-			name:           "GLM 5.2 maps xhigh to max",
-			modelID:        modelGLM52,
-			effort:         elelem.ReasoningEffortXHigh,
-			wantType:       thinkingTypeEnabled,
-			wantWireEffort: elelem.ReasoningEffortMax,
-		},
-		{
 			name:           "GLM 5.3 sends low unchanged",
 			modelID:        modelGLM53,
 			effort:         elelem.ReasoningEffortLow,
@@ -250,6 +216,17 @@ func TestReasoningConfiguration(t *testing.T) {
 			name:    "GLM 5.3 rejects medium",
 			modelID: modelGLM53,
 			effort:  elelem.ReasoningEffortMedium,
+			wantErr: ErrUnsupportedParameter,
+		},
+		{
+			name:     "GLM 5.3 Flash defaults to enabled thinking",
+			modelID:  modelGLM53Flash,
+			wantType: thinkingTypeEnabled,
+		},
+		{
+			name:    "GLM 5.3 Flash rejects numeric effort",
+			modelID: modelGLM53Flash,
+			effort:  elelem.ReasoningEffortLow,
 			wantErr: ErrUnsupportedParameter,
 		},
 		{
@@ -326,19 +303,19 @@ func TestProviderReasoningExtraRejectsForeignOrInvalidPayload(t *testing.T) {
 		{
 			name:      "foreign provider",
 			provider:  "other",
-			model:     modelGLM47,
+			model:     modelGLM53,
 			reasoning: "x",
 		},
 		{
 			name:      "different model",
 			provider:  Name,
-			model:     modelGLM52,
+			model:     modelGLM53Flash,
 			reasoning: "x",
 		},
 		{
 			name:     "empty reasoning",
 			provider: Name,
-			model:    modelGLM47,
+			model:    modelGLM53,
 		},
 	}
 
@@ -358,7 +335,7 @@ func TestProviderReasoningExtraRejectsForeignOrInvalidPayload(t *testing.T) {
 
 			extra, err := providerReasoningExtra(
 				t.Context(),
-				LookupModel(modelGLM47),
+				LookupModel(modelGLM53),
 				elelem.Message{ProviderReasoning: raw},
 			)
 			require.NoError(t, err)
@@ -420,20 +397,11 @@ func TestLookupModel(t *testing.T) {
 		wantReasoningMax elelem.ReasoningEffort
 	}{
 		{
-			id:              modelGLM45Air,
-			wantContextSize: glm45AirContextSize,
-			wantReasoning:   true,
-		},
-		{
-			id:              modelGLM47,
-			wantContextSize: glm47ContextSize,
-			wantReasoning:   true,
-		},
-		{
-			id:               modelGLM52,
+			id:               modelGLM53,
 			wantReasoning:    true,
 			wantReasoningMax: elelem.ReasoningEffortMax,
 		},
+		{id: modelGLM53Flash, wantReasoning: true},
 		{id: "unlisted-model"},
 	}
 

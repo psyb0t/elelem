@@ -153,7 +153,7 @@ driver when calling Z.ai Coding models:
 
 ```go
 driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
-model := zaicoding.LookupModel("glm-4.7")
+model := zaicoding.LookupModel("glm-5.3")
 ```
 
 **Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)`
