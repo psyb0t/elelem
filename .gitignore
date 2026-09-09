@@ -17,6 +17,7 @@ CLAUDE.md
 ANUSTIMES.md
 .telemetry/
 coverage-percent.txt
+sec.sarif
 git-update.sh
 PLAN.md
 implplan.md
@@ -33,8 +34,9 @@ htmlcov/
 .python-version
 .nvmrc
 pyrightconfig.json
-# Written by local tooling to exclude its own scratch dirs from a build
-# context. This module ships no Dockerfile, so the file has no meaning here.
+# Docker build context policy is tracked with the development image.
 .dockerignore
+!/.dockerignore
+!scripts/test-coverage.sh
 
 .testing/

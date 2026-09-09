@@ -19,18 +19,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  call-go-workflow:
-    uses: psyb0t/reusable-github-workflows/.github/workflows/go-workflow.yml@master
+  call-code-workflow:
+    permissions:
+      contents: read
+      security-events: write
+    uses: psyb0t/reusable-github-workflows/.github/workflows/code-workflow.yml@master
     with:
-      go_version: "1.26.6"
-      dep_command: "make dep"
       lint_command: "make lint"
       test_command: "make test-coverage"
-      is_vendored: true
+      sec_command: "make sec"
       coverage_file: "coverage-percent.txt"
+      sarif_file: "sec.sarif"
+      sarif_category: "go"
 
   badges:
-    needs: [call-go-workflow]
+    needs: [call-code-workflow]
     if: github.ref_name == github.event.repository.default_branch || startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
@@ -38,3 +41,10 @@ jobs:
     with:
       coverage: true
       importers: true
+
+  release:
+    needs: [call-code-workflow]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    uses: psyb0t/reusable-github-workflows/.github/workflows/release-workflow.yml@master

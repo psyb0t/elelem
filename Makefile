@@ -1,72 +1,70 @@
-MIN_TEST_COVERAGE := 90
+MIN_TEST_COVERAGE ?= 90
 
-# Generated code is not the library's coverage story: the mock exists to be
-# called BY tests, and mockery decides how much of any given suite touches it.
-COVERAGE_PACKAGES := $(shell go list ./... | grep -v '/elelemtest/mocks')
+# All Go tooling runs inside Dockerfile.dev. The workspace is mounted at run
+# time, so a host needs Docker and Make, not a Go toolchain.
+APP_NAME := elelem
+DEV_IMAGE ?= $(APP_NAME)-dev
+UID := $(shell id -u)
+GID := $(shell id -g)
 
-# -coverpkg is load-bearing, not a tuning knob. By default Go instruments only
-# the package under test, so code executed ACROSS a package boundary reads as
-# 0% -- elelemtest/conformance is run by both driver suites and still measured
-# as entirely dead. That understates the real figure by several points and, far
-# worse, points anyone reading the report at the wrong gaps.
-COVERPKG := $(shell go list ./... | grep -v '/elelemtest/mocks' | paste -sd,)
+DEV_RUN := docker run --rm --init \
+	--user $(UID):$(GID) \
+	-e HOME=/tmp \
+	-e GOPATH=/tmp/go \
+	-e GOCACHE=/tmp/go-cache \
+	-e GOMODCACHE=/tmp/go-mod-cache \
+	-e CGO_ENABLED=1 \
+	-e MIN_TEST_COVERAGE=$(MIN_TEST_COVERAGE) \
+	-v "$(CURDIR):/work" \
+	-w /work \
+	$(DEV_IMAGE)
 
-.PHONY: all dep generate lint lint-fix test test-coverage clean help
+.PHONY: all dev-image shell dep generate lint lint-fix test test-coverage sec clean help
 
 all: dep lint test ## Run dep, lint and test
 
-dep: ## Get project dependencies
+dev-image: ## Build the development and CI Docker image
+	@docker build -f Dockerfile.dev -t $(DEV_IMAGE) .
+
+shell: dev-image ## Open a shell in the development image
+	@$(DEV_RUN) bash
+
+dep: dev-image ## Get project dependencies
 	@echo "Getting project dependencies..."
-	@go mod tidy
-	@go mod vendor
+	@$(DEV_RUN) sh -ceu 'go mod tidy && go mod vendor'
 
-generate: ## Run all code generation
+generate: dev-image ## Run all code generation
 	@echo "Running code generation..."
-	@go generate ./...
+	@$(DEV_RUN) go generate ./...
 
-lint: ## Lint all Golang files
+lint: dev-image ## Lint all Golang files
 	@echo "Linting all Go files..."
-	@out=$$(go fix -diff ./... 2>&1); \
-	if [ -n "$$out" ]; then \
-		echo "$$out"; \
-		echo "go fix found issues. Run 'make lint-fix' to apply."; \
-		exit 1; \
-	fi
-	@go tool golangci-lint run --timeout=30m0s ./...
+	@$(DEV_RUN) sh -ceu 'out=$$(go fix -diff ./... 2>&1); \
+		if [ -n "$$out" ]; then \
+			echo "$$out"; \
+			echo "go fix found issues. Run make lint-fix to apply."; \
+			exit 1; \
+		fi; \
+		go tool golangci-lint run --timeout=30m0s ./...'
 
-lint-fix: ## Lint all Golang files and fix
+lint-fix: dev-image ## Lint all Golang files and fix
 	@echo "Linting all Go files..."
-	@go fix ./...
-	@go tool golangci-lint run --fix --timeout=30m0s ./...
+	@$(DEV_RUN) sh -ceu 'go fix ./...; go tool golangci-lint run --fix --timeout=30m0s ./...'
 
-test: ## Run all tests
+test: dev-image ## Run all tests
 	@echo "Running all tests..."
-	@go test -race ./...
+	@$(DEV_RUN) go test -race ./...
 
-test-coverage: ## Run tests with coverage check. Fails if coverage is below the threshold.
+test-coverage: dev-image ## Run tests with coverage check
 	@echo "Running tests with coverage check..."
-	@trap 'rm -f coverage.txt' EXIT; \
-	go test -count=1 -race -coverpkg=$(COVERPKG) \
-		-coverprofile=coverage.txt $(COVERAGE_PACKAGES); \
-	if [ $$? -ne 0 ]; then \
-		echo "Test failed. Exiting."; \
-		exit 1; \
-	fi; \
-	result=$$(go tool cover -func=coverage.txt | grep -oP 'total:\s+\(statements\)\s+\K\d+' || echo "0"); \
-	pct=$$(go tool cover -func=coverage.txt | grep -oP 'total:\s+\(statements\)\s+\K[0-9.]+' || echo "0"); \
-	echo "$$pct" > coverage-percent.txt; \
-	if [ $$result -eq 0 ]; then \
-		echo "No test coverage information available."; \
-		exit 0; \
-	elif [ $$result -lt $(MIN_TEST_COVERAGE) ]; then \
-		echo "FAIL: Coverage $$result% is less than the minimum $(MIN_TEST_COVERAGE)%"; \
-		exit 1; \
-	fi
+	@$(DEV_RUN) bash scripts/test-coverage.sh
+
+sec: dev-image ## Security scan with govulncheck and semgrep
+	@$(DEV_RUN) bash scripts/sec.sh
 
 clean: ## Remove coverage artifacts and the Go build/test caches
 	@echo "Cleaning..."
-	@rm -f coverage.txt coverage-percent.txt
-	@go clean -cache -testcache
+	@rm -f coverage.txt coverage-percent.txt sec.sarif
 
 help: ## Display this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

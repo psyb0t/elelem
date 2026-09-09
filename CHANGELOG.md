@@ -4,6 +4,14 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.9.1 (2026-09-09)
+
+- **Fixed:** retry jitter now draws from `crypto/rand` instead of a predictable
+  pseudo-random source.
+- Development and CI commands now run in a pinned Docker image. `make sec`
+  runs `govulncheck` and Semgrep, then writes the combined SARIF report used by
+  the CI security upload.
+
 ## v0.9.0 (2026-09-09)
 
 - **Breaking:** the maintained Z.ai Coding catalog now contains only GLM 5.3

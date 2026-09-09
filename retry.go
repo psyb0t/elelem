@@ -2,9 +2,10 @@ package elelem
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"errors"
 	"io"
-	"math/rand/v2"
 	"net"
 	"net/http"
 	"strconv"
@@ -20,6 +21,10 @@ const (
 	defaultRetryInitialDelay = 250 * time.Millisecond
 	defaultRetryMaxDelay     = 5 * time.Second
 	retryHalfDivisor         = 2
+	retryRandomByteCount     = 8
+	retryRandomMantissaShift = 11
+	retryRandomFloatDivisor  = 1 << 53
+	fallbackRetryRandomFloat = 0.5
 )
 
 // maxParsedRetryAfter caps what an upstream can ask us to wait. The header is
@@ -193,6 +198,18 @@ func (realRetryClock) After(delay time.Duration) <-chan time.Time {
 	return time.After(delay)
 }
 
+func defaultRetryRandomFloat() float64 {
+	var randomBytes [retryRandomByteCount]byte
+	if _, err := cryptorand.Read(randomBytes[:]); err != nil {
+		return fallbackRetryRandomFloat
+	}
+
+	randomBits := binary.BigEndian.Uint64(randomBytes[:])
+	randomValue := randomBits >> retryRandomMantissaShift
+
+	return float64(randomValue) / float64(retryRandomFloatDivisor)
+}
+
 type retryDriver struct {
 	driver      Driver
 	config      RetryConfig
@@ -248,7 +265,7 @@ func WithRetry(driver Driver, config RetryConfig) Driver {
 		config:      config,
 		configErr:   configErr,
 		clock:       realRetryClock{},
-		randomFloat: rand.Float64,
+		randomFloat: defaultRetryRandomFloat,
 	}
 }
 

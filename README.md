@@ -293,13 +293,19 @@ Generated API reference on
 
 ## Development
 
+Every development and CI target runs in `Dockerfile.dev`. The host needs
+Docker and Make only.
+
 ```bash
+make dev-image      # build the pinned development and CI image
 make dep            # go mod tidy + vendor
 make generate       # regenerate the Driver mock
 make lint           # go fix + golangci-lint, strict as hell
 make lint-fix       # lint + auto-fix
 make test           # go test -race ./...
 make test-coverage  # coverage with minimum threshold
+make sec            # govulncheck + semgrep, writes sec.sarif
+make shell          # shell in the development image
 make help           # every target
 ```
 
