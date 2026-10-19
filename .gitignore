@@ -19,6 +19,7 @@ ANUSTIMES.md
 coverage-percent.txt
 sec.sarif
 git-update.sh
+git-update.sh.debot
 PLAN.md
 implplan.md
 NOTES.md
