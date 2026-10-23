@@ -32,8 +32,8 @@ response, err := elelem.NewRequest(client).
 ## Immutability
 
 Every method returns a new `Prompt`. Nothing mutates the receiver, so a base
-prompt can be built once and branched from repeatedly — across models, across
-goroutines — with no chance of a later call rewriting an earlier run's
+prompt can be built once and branched from repeatedly (across models, across
+goroutines) with no chance of a later call rewriting an earlier run's
 transcript.
 
 ```go
@@ -66,7 +66,7 @@ positional convention by hand.
 | `SystemMessage()` | The assembled result: base then fragments, blank-line separated, empties dropped. |
 
 The append list exists so composed code can add its own instruction without
-knowing, or clobbering, what the base prompt said — a library that needs one
+knowing, or clobbering, what the base prompt said. A library that needs one
 rule appended cannot safely call `WithSystem`, because it would erase yours.
 
 ## Adding messages
@@ -74,7 +74,7 @@ rule appended cannot safely call `WithSystem`, because it would erase yours.
 | Method | Notes |
 |---|---|
 | `UserText(s)` | A text-only user message. The common case. |
-| `User(parts...)` | A user message from content parts — text, images, audio, files. |
+| `User(parts...)` | A user message from content parts: text, images, audio, files. |
 | `AssistantText(s)` / `Assistant(parts...)` | Replays an assistant turn you hold. |
 | `ToolResult(callID, result, isError)` | Answers one tool call. The id must match a call the preceding assistant message made, or the provider rejects the transcript. |
 | `Add(messages...)` | Appends `Message` values verbatim, for anything the typed helpers do not cover. |
@@ -83,7 +83,7 @@ rule appended cannot safely call `WithSystem`, because it would erase yours.
 
 ## History and origins
 
-History is not a separate concept from the rest of the prompt — it is the same
+History is not a separate concept from the rest of the prompt. It is the same
 messages differing only in lifecycle, which `Message.Origin` already records.
 `WithHistory` is therefore an append that stamps `MessageOriginSeed`:
 
@@ -123,7 +123,7 @@ handling, logging, and any provider field taking a bare string all use.
 | `FileRef(fileID)` | A file already uploaded to the provider. |
 
 Non-text parts belong on a **user** message. That is not this library being
-restrictive — it is what both provider APIs accept.
+restrictive. It is what both provider APIs accept.
 
 ## Images
 
@@ -144,19 +144,19 @@ OpenAI concept, and a driver with no equivalent ignores it.
 
 ## Audio and files
 
-Audio is OpenAI-only — Anthropic has no audio block at all, so audio against
+Audio is OpenAI-only. Anthropic has no audio block at all, so audio against
 that driver is refused rather than silently dropped. Files are documents:
 OpenAI takes any media type as a file part, Anthropic takes `application/pdf`
 and `text/plain` as a document block and refuses the rest. `FileRef` names a
 file already uploaded to the provider, so it needs a provider with an upload
-API — Anthropic's document block has no id field, and an id minted elsewhere
+API. Anthropic's document block has no id field, and an id minted elsewhere
 would not resolve there anyway.
 
 ## What each provider accepts
 
 `Capabilities` carries `SupportsImageInput`, `SupportsAudioInput` and
 `SupportsFileInput`, and the request refuses locally when the content does not
-fit — `ErrUnsupportedContent`, before anything is sent. A capability flag is
+fit, returning `ErrUnsupportedContent` before anything is sent. A capability flag is
 necessary but not sufficient: the driver still makes the final per-value call,
 so Anthropic's image media-type whitelist applies even with
 `SupportsImageInput` set.
@@ -169,15 +169,15 @@ so Anthropic's image media-type whitelist applies even with
 | File bytes | any media type | `application/pdf`, `text/plain` |
 | `FileRef` | yes | no |
 
-A structurally broken part — image bytes with no media type, both a URL and
-bytes on one source — is reported as invalid rather than unsupported, because it
+A structurally broken part (image bytes with no media type, both a URL and
+bytes on one source) is reported as invalid rather than unsupported, because it
 is wrong for every provider and switching models would not fix it.
 
 ## Overriding capabilities
 
 A driver's `Capabilities` describe the provider's API, because that is all a
-driver can know. Point one at a different backend — `WithBaseURL` aimed at a
-compatible gateway — and those answers stop being true: the wire format still
+driver can know. Point one at a different backend (`WithBaseURL` aimed at a
+compatible gateway) and those answers stop being true: the wire format still
 matches, the model behind it may not read images at all.
 
 ```go
@@ -195,7 +195,7 @@ It takes the model because capabilities are per-model: one gateway can front a
 vision model and a text-only one, and a fixed struct would flatten the two.
 
 **It can only be trusted to RESTRICT.** Turning a flag on does not teach the
-driver a translation it does not have — the driver's own per-value gates still
+driver a translation it does not have. The driver's own per-value gates still
 run and still refuse. Widening a capability moves the error later; it does not
 remove it.
 

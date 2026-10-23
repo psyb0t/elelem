@@ -22,8 +22,8 @@ all chains.
 
 A `Client` is reusable and safe to hold for the process lifetime.
 
-A `Request` is **not consumed by running it.** Building is single-goroutine —
-the `With*` setters write without synchronization — but execution never writes
+A `Request` is **not consumed by running it.** Building is single-goroutine
+(the `With*` setters write without synchronization), but execution never writes
 back, so a fully-built `Request` can be run repeatedly, and concurrently from
 several goroutines. Each call snapshots the assembled transcript into private
 run state.
@@ -39,7 +39,7 @@ request := elelem.NewRequest(client)
 ```
 
 `WithDefaultModel` is worth setting. Without it a request that names no model
-falls back to a bare `Model{}` — which has no `ContextSize`, which silently
+falls back to a bare `Model{}`, which has no `ContextSize`, which silently
 disables every context-size check. Nothing errors; the budget just stops
 existing.
 
@@ -52,10 +52,10 @@ panicking, so a nil check at every call site isn't needed.
 | Call | Does |
 |---|---|
 | `Run(ctx)` | Sends the request. Tools go out if any are configured. |
-| `RunInto(ctx, &dst)` | Structured output — see [structured-output.md](structured-output.md). |
+| `RunInto(ctx, &dst)` | Structured output. See [structured-output.md](structured-output.md). |
 
 Two launchers, and the only difference is whether you want a typed value back.
-**Whether tools are sent is not a choice made at the call site** — a request
+**Whether tools are sent is not a choice made at the call site**. A request
 that carries tools sends them, one that doesn't, doesn't:
 
 ```go
@@ -68,13 +68,13 @@ To send no tools, configure none. `RunInto` is the one exception, and it is
 not a toggle either: a structured turn always suppresses tools, because a
 typed object and a tool list are competing answers to the same turn.
 
-Watching the reply arrive piece by piece is a callback, not a launcher —
-`OnDelta` / `OnText` / `OnReasoning`, see [callbacks.md](callbacks.md).
+Watching the reply arrive piece by piece is a callback, not a launcher
+(`OnDelta` / `OnText` / `OnReasoning`, see [callbacks.md](callbacks.md)).
 Whether the HTTP call itself streams is `WithStreaming`, below.
 
 **Manual driving is the default.** A `Run` without `WithAutoToolCalls` returns
 as soon as the model asks for a tool, handing you `Response.ToolCalls` and
-`Response.ExecuteToolCalls` — call the latter exactly once to advance a round.
+`Response.ExecuteToolCalls`. Call the latter exactly once to advance a round.
 That is the right mode when a human has to approve a call, or when you want to
 decide per call; see [tools.md](tools.md#driving-the-loop-by-hand).
 
@@ -86,8 +86,8 @@ model stops asking for tools or `MaxRounds` is hit.
 elelem streams by default: the driver opens a streaming request and the engine
 assembles the reply from the deltas as they land.
 
-Some OpenAI-compatible and Anthropic-compatible backends cannot serve that —
-an async job queue in front of the model has nowhere to put a token stream, and
+Some OpenAI-compatible and Anthropic-compatible backends cannot serve that.
+An async job queue in front of the model has nowhere to put a token stream, and
 says so. `WithStreaming(false)` sends the same request with streaming off:
 
 ```go
@@ -100,7 +100,7 @@ The request-level setting wins over the client-level one, in both directions.
 **Turning streaming off changes the transport, not the API.** The driver feeds
 the finished response through the same delta callback the streaming path uses,
 so `OnDelta` / `OnText` / `OnReasoning` still fire, tool calls still assemble,
-and the `Response` is the same — it just arrives in one piece instead of many.
+and the `Response` is the same. It just arrives in one piece instead of many.
 
 A driver that cannot stream at all reports `Capabilities.StreamingUnsupported`,
 and then the non-streaming path is taken no matter what was asked for. Note the
@@ -116,7 +116,7 @@ apart from a transport failure.
 
 ## The prompt
 
-The whole conversation — system message, history, and this turn's question —
+The whole conversation (system message, history, and this turn's question)
 is one `Prompt`, handed over in one call:
 
 ```go
@@ -129,7 +129,7 @@ request.WithPrompt(elelem.NewPrompt().
 
 `Prompt` is immutable, so one can be built once and run repeatedly, against
 several models, from several goroutines. `WithPrompt` REPLACES whatever the
-request held — build the conversation on the prompt, not by calling it twice.
+request held. Build the conversation on the prompt, not by calling it twice.
 
 Images, audio and documents ride on a user message as content parts:
 
@@ -153,7 +153,7 @@ request.WithModel(elelem.Model{
 })
 ```
 
-`ContextSize` and `Pricing` are yours to supply — they are NOT capabilities and
+`ContextSize` and `Pricing` are yours to supply. They are NOT capabilities and
 are not discovered. `ContextSize` drives budgeting; `Pricing` drives
 `Response.Cost`, which is `0` when pricing is absent. **`0` means unknown, not
 free.**
@@ -175,7 +175,7 @@ Set them individually, or hand over a whole `GenerationParams` block with
 | `WithTemperature(v)` | `float64` |
 | `WithTopP(v)` | `float64` |
 | `WithSeed(v)` | `int64` |
-| `WithStop(vs...)` | `...string` — the slice is copied |
+| `WithStop(vs...)` | `...string` (the slice is copied) |
 | `WithFrequencyPenalty(v)` | `float64` |
 | `WithPresencePenalty(v)` | `float64` |
 | `WithMaxOutputTokens(v)` | `int64` |
@@ -185,7 +185,7 @@ Unsupported settings fail **locally, before any network call**, rather than
 being silently dropped or bounced back by the provider a round later.
 
 Reasoning effort is gated per model on both providers, and the levels a model
-accepts are not always contiguous — a model may take `max` while rejecting
+accepts are not always contiguous. A model may take `max` while rejecting
 `xhigh`. Build against the model's own levels rather than the constant list:
 
 ```go
@@ -210,7 +210,7 @@ silently overwriting what the engine set.
 
 ## The tool loop
 
-See [tools.md](tools.md) for the full picture. The request-side surface:
+See [tools.md](tools.md) for the full picture. The request-side methods:
 
 ```go
 request.
@@ -222,7 +222,7 @@ request.
 ```
 
 `WithToolProvider(func(ctx) (*ToolSet, error))` resolves a fresh set before
-every round — for catalogs, or authorization, that can change mid-conversation.
+every round, for catalogs or authorization that can change mid-conversation.
 
 `WithForceFinalAnswer` is the difference between "hit max rounds and returned a
 tool call nobody will execute" and "hit max rounds and answered."
@@ -265,28 +265,23 @@ at `WithMaxRounds` leaves pending input queued for a later `Run`.
 ## Bounds
 
 **Some of these ship with a default; the rest are genuinely unbounded until you
-set them.** The difference matters — assuming a bound exists when it does not
+set them.** The difference matters. Assuming a bound exists when it does not
 is how a stream runs forever, and assuming none exists when one does is how a
 tool loop stops at twelve rounds for no visible reason.
 
 | Method | Bounds | Default |
 |---|---|---|
-| `WithTimeout(d)` | The whole request. **The only thing stopping an endless stream.** | **none** — unbounded |
-| `WithToolTimeout(d)` | Each tool's entire run — hooks included, not just the handler. | **none** — unbounded |
-| `WithMaxToolResultTokens(n)` | Each tool result, measured on the finished string including the truncation marker. | **none** — unbounded |
-| `WithMaxContextTokens(n)` | The transcript. See [history.md](history.md). | **none** — see below |
+| `WithTimeout(d)` | The whole request. **The only thing stopping an endless stream.** | **none** (unbounded) |
+| `WithToolTimeout(d)` | Each tool's entire run, hooks included, not just the handler. | **none** (unbounded) |
+| `WithMaxToolResultTokens(n)` | Each tool result, measured on the finished string including the truncation marker. | **none** (unbounded) |
+| `WithMaxContextTokens(n)` | The whole context, prompt and reply. The prompt gets this minus the output reserve. See [history.md](history.md). | the model's `ContextSize` |
 | `WithMaxRounds(n)` | Tool-loop rounds. Exceeding it returns `ErrMaxRoundsExceeded`. | **12** |
 | `WithMaxConcurrentTools(n)` | Goroutines as well as running handlers. | **8** |
-| `WithOutputReserveTokens(n)` | Reserve subtracted from `Model.ContextSize`. | `MaxOutputTokens` if set, else **4096** |
+| `WithOutputReserveTokens(n)` | Room kept for the reply, taken off the context limit. An explicit 0 keeps none. | `MaxOutputTokens` if set, else **4096** |
 | `WithForceFinalAnswer(v)` | Withholds tools on the last allowed round. | **true** |
 | `WithTokenCounter(c)` | Overrides the counter for this request only. | request → client → driver → package default |
 
-`WithMaxContextTokens` unset is not "unbounded" either: the budget then comes
-from `Model.ContextSize` minus the output reserve. Limiting stops happening in
-**two** cases — when the model carries no `ContextSize`, and when the reserve
-is greater than or equal to it. The second is the one that bites: with the
-default 4096 reserve, a `Model{ContextSize: 4096}` resolves to no budget at
-all, silently.
+The prompt budget is the context limit, `WithMaxContextTokens` or else `Model.ContextSize`, minus the output reserve. `Run` refuses an explicit limit the reserve fills with `ErrInvalidRequest`. With no explicit limit, limiting stops in two cases: when the model carries no `ContextSize`, and when the reserve is greater than or equal to it. With the default 4096 reserve, a `Model{ContextSize: 4096}` resolves to no budget at all, silently.
 
 Note `WithForceFinalAnswer` is already **on**. The examples above pass `true`
 explicitly for clarity; pass `false` if you would rather hit `MaxRounds` with an
@@ -298,7 +293,7 @@ Check before you send:
 reached, err := request.IsTokenLimitReached()
 ```
 
-It returns `false` when no budget is resolvable — a model with no `ContextSize`
+It returns `false` when no budget is resolvable. A model with no `ContextSize`
 and no explicit cap can't report a limit it has no way to compute.
 
 ## The Response

@@ -33,9 +33,9 @@ transcript constraints, normalize finish reasons and usage, and report
 conservative model capabilities.
 
 **`Complete` is the same call with streaming off, and it takes the same delta
-callback deliberately.** Everything downstream of a driver is delta-shaped —
-the engine's tool-call assembler, every `On*` callback, the content-block
-protocol a consumer builds on top — and none of it has a second code path for
+callback deliberately.** Everything downstream of a driver is delta-shaped
+(the engine's tool-call assembler, every `On*` callback, the content-block
+protocol a consumer builds on top), and none of it has a second code path for
 a non-streaming turn. So `Complete` issues the finished request, then feeds the
 response through the callback as one delta per piece of content, and the caller
 cannot tell which path ran except by timing. Returning a whole `Message`
@@ -52,7 +52,7 @@ Two details a new driver gets wrong in the same way both shipped ones did:
 
 If the provider cannot stream at all, say so with
 `Capabilities.StreamingUnsupported` and the engine takes `Complete` regardless
-of what the caller asked for — see [requests.md](requests.md#streaming).
+of what the caller asked for. See [requests.md](requests.md#streaming).
 
 ## The one rule
 
@@ -69,7 +69,7 @@ caller touches.
 
 ## Reasoning on compatible endpoints
 
-The OpenAI-compatible driver preserves returned `reasoning`, `reasoning_content`, `reasoning_details`, and `thinking_blocks` extensions in `Message.ProviderReasoning`, in both streaming and non-streaming mode. Tool continuation replays those fields with the assistant message. Streamed text and signature fragments are assembled in block order; signed and encrypted state stays opaque to the engine. No endpoint name or model-name heuristic enables this behavior: only fields actually returned by the upstream are preserved. Ordinary responses add no reasoning fields to later requests.
+The OpenAI-compatible driver preserves returned `reasoning`, `reasoning_content`, `reasoning_details`, and `thinking_blocks` extensions in `Message.ProviderReasoning`, in both streaming and non-streaming mode. Tool continuation replays those fields with the assistant message. Streamed text and signature fragments are assembled in block order; signed and encrypted state stays opaque to the engine. No endpoint name or model-name heuristic enables this behavior. The driver preserves only fields the upstream actually returns. Ordinary responses add no reasoning fields to later requests.
 
 Persist `ProviderReasoning` unchanged alongside the message. Its envelope binds replay to the transport and requested model ID; foreign or mismatched state is omitted. Malformed matching state and unsupported replay fields fail locally with `ErrInvalidTranscript`. Plain `Message.Reasoning` is display text and is never promoted into a replay field by guessing a provider contract. Specialized transports may continue using `WithAssistantMessageExtra` to supply their own replay dialect.
 
@@ -87,7 +87,7 @@ driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
 model := zaicoding.LookupModel("glm-5.3")
 ```
 
-The generic OpenAI driver remains appropriate for ordinary OpenAI-compatible endpoints. The maintained Coding Plan catalog contains GLM 5.3 and GLM 5.3 Flash, both with Z.ai's documented 1,000,000-token context window. `LookupModel` also gives GLM 5.3 Flash X and the retired IDs the Coding Plan routes (`glm-5.2` and `glm-5.1` to GLM 5.3, `glm-4.7` to GLM 5.3 Flash) the metadata of the model that serves them.
+The generic OpenAI driver is still the one to use for ordinary OpenAI-compatible endpoints. The maintained Coding Plan catalog contains GLM 5.3 and GLM 5.3 Flash, both with Z.ai's documented 1,000,000-token context window. `LookupModel` also gives GLM 5.3 Flash X and the retired IDs the Coding Plan routes (`glm-5.2` and `glm-5.1` to GLM 5.3, `glm-4.7` to GLM 5.3 Flash) the metadata of the model that serves them.
 
 What the driver sends and checks:
 
@@ -105,22 +105,22 @@ Unsupported values fail locally with `zaicoding.ErrUnsupportedParameter`. Specia
 ## Capabilities are a promise
 
 Report conservatively. A capability you claim and don't enforce is worse than
-one you don't claim — the engine will let a request through on the strength of
+one you don't claim. The engine will let a request through on the strength of
 it and the provider will reject it.
 
 - **Context and output limits are NOT capabilities.** They live on `Model`
   (`ContextSize`, `Pricing`) because they're caller-supplied facts, not
   driver-discovered ones.
 - **`MaxReasoningEffort` is a CEILING, not a whitelist.** A model's supported
-  effort set can be non-contiguous — one may accept `max` while rejecting
-  `xhigh` — and a single ceiling can't express that. Passing the rank check is
+  effort set can be non-contiguous (one may accept `max` while rejecting
+  `xhigh`), and a single ceiling can't express that. Passing the rank check is
   necessary but not sufficient; the driver makes the final call and returns its
   own `ErrUnsupportedParameter` for a level inside the ceiling the model doesn't
-  actually take. That sentinel is **per-driver** — `openai.ErrUnsupportedParameter`
+  actually take. That sentinel is **per-driver**. `openai.ErrUnsupportedParameter`
   and `anthropic.ErrUnsupportedParameter` are distinct values, since each names
   its own provider in the message.
 - **Unknown model ids stay usable.** If the provider accepts an id you've never
-  heard of, let it through — just don't guess its optional capabilities.
+  heard of, let it through. Just don't guess its optional capabilities.
 
 ## Errors
 
@@ -131,7 +131,7 @@ Build failures as `ProviderError` carrying the provider's own code, and join
 return &elelem.ProviderError{ /* ... */ }
 ```
 
-The `&` is load-bearing: `Error()` is declared on the pointer receiver, so a
+The `&` is load-bearing. `Error()` is declared on the pointer receiver, so a
 bare `elelem.ProviderError{}` value does not satisfy `error` and will not
 compile.
 
@@ -156,7 +156,7 @@ case. See [retries.md](retries.md#how-failures-are-classified).
 
 ## The conformance suite
 
-`elelemtest/conformance.Run` is aimed at you, and all shipped drivers run it —
+`elelemtest/conformance.Run` is aimed at you, and all shipped drivers run it,
 so it's a live contract, not a document that drifted.
 
 ```go
@@ -185,19 +185,19 @@ func TestDriverConformance(t *testing.T) {
 
 What it checks:
 
-- **stream contract** — delta ordering, usage invariants, normalized finish
+- **stream contract**: delta ordering, usage invariants, normalized finish
   reasons, and that the deltas and the usage agree about how the run ended
-- **model listing** — skippable via `Options.SkipListModels`
-- **cancelled context** — a cancelled ctx stops work rather than completing
-- **invalid transcript is local** — a malformed transcript is rejected WITHOUT
+- **model listing**: skippable via `Options.SkipListModels`
+- **cancelled context**: a cancelled ctx stops work rather than completing
+- **invalid transcript is local**: a malformed transcript is rejected WITHOUT
   a network call, which is what `NetworkCalls` is for
-- **capabilities are honest** — every advertised capability is actually
+- **capabilities are honest**: every advertised capability is actually
   enforced, per model
 
 `Options.Models` re-runs the capability contract against each model in place of
 `Request.Model`. `Capabilities` is a per-model function, so a suite pinned to
 one model can't see a driver that gates correctly for the model it was handed
-and wrongly for its siblings — which is exactly where the real bugs are.
+and wrongly for its siblings. That is exactly where the real bugs are.
 
 The subtests deliberately do NOT call `t.Parallel()`. `NetworkCalls` is a
 single shared counter and the transcript and capability cases assert on its
@@ -210,5 +210,5 @@ here, not an oversight.
 Use in-process fake HTTP servers and **no live credentials**. The shipped
 drivers' tests replay recorded SSE against `httptest.NewServer`, which is fast,
 hermetic, and can reproduce the failure shapes a real provider only emits
-occasionally — mid-stream errors inside a 200, truncated streams, malformed
+occasionally: mid-stream errors inside a 200, truncated streams, malformed
 tool-call fragments.

@@ -17,15 +17,10 @@ import (
 // it wants to abort the run.
 var errHandlerRefused = errors.New("first handler refused")
 
-// resolvedBudget decides how many tokens the transcript may occupy, and every
-// branch of it was unpinned — including the one the package README states
-// outright ("these two do NOT combine"). A budget resolved wrong never fails
-// loudly: it silently drops history that should have been sent, or sends a
-// transcript the provider then rejects.
-//
-// Two of these branches are documented nowhere, which is precisely why they
-// are pinned here rather than left to the prose: MaxOutputTokens standing in
-// as the reserve, and the guard returning 0 rather than a negative budget.
+// resolvedBudget decides how many tokens the transcript may occupy. A budget
+// resolved wrong never fails loudly: it silently drops history that should
+// have been sent, or sends a transcript that leaves the reply no room.
+// The context limit, explicit or the model's, always loses the reserve.
 func TestRequest_ResolvedBudget(t *testing.T) {
 	t.Parallel()
 
@@ -44,16 +39,16 @@ func TestRequest_ResolvedBudget(t *testing.T) {
 		because string
 	}{
 		{
-			name: "explicit max wins and nothing is subtracted from it",
+			name: "explicit max wins and the reserve comes off it",
 			build: func(r *Request) *Request {
 				return r.
 					WithMaxContextTokens(explicitMax).
 					WithOutputReserveTokens(reserve)
 			},
 			model: Model{ContextSize: contextSize},
-			want:  explicitMax,
-			because: "asking for a number and silently getting less would be " +
-				"worse than either behaviour alone",
+			want:  explicitMax - reserve,
+			because: "the max is the whole context, and the reply has to " +
+				"fit inside it",
 		},
 		{
 			name: "explicit max applies with no model context size",
@@ -61,6 +56,27 @@ func TestRequest_ResolvedBudget(t *testing.T) {
 				return r.WithMaxContextTokens(explicitMax)
 			},
 			model: Model{},
+			want:  explicitMax - defaultOutputReserveTokens,
+		},
+		{
+			name: "MaxOutputTokens is the reserve under an explicit max",
+			build: func(r *Request) *Request {
+				return r.
+					WithMaxContextTokens(explicitMax).
+					WithMaxOutputTokens(maxOutput)
+			},
+			model: Model{ContextSize: contextSize},
+			want:  explicitMax - maxOutput,
+		},
+		{
+			name: "an explicit zero reserve keeps the whole max",
+			build: func(r *Request) *Request {
+				return r.
+					WithMaxContextTokens(explicitMax).
+					WithOutputReserveTokens(0).
+					WithMaxOutputTokens(maxOutput)
+			},
+			model: Model{ContextSize: contextSize},
 			want:  explicitMax,
 		},
 		{
@@ -135,6 +151,58 @@ func TestRequest_ResolvedBudget(t *testing.T) {
 				request.resolvedBudget(tc.model),
 				tc.because,
 			)
+		})
+	}
+}
+
+// A reserve that fills an explicit max would leave the prompt no room and
+// resolve to no budget at all, so the request is refused before any call.
+func TestRequest_ReserveFillingExplicitMaxIsRejected(t *testing.T) {
+	t.Parallel()
+
+	const explicitMax = 1_000
+
+	testCases := []struct {
+		name  string
+		build func(*Request) *Request
+	}{
+		{
+			name: "default reserve",
+			build: func(r *Request) *Request {
+				return r.WithMaxContextTokens(explicitMax)
+			},
+		},
+		{
+			name: "explicit reserve equal to the max",
+			build: func(r *Request) *Request {
+				return r.
+					WithMaxContextTokens(explicitMax).
+					WithOutputReserveTokens(explicitMax)
+			},
+		},
+		{
+			name: "MaxOutputTokens above the max",
+			build: func(r *Request) *Request {
+				return r.
+					WithMaxContextTokens(explicitMax).
+					WithMaxOutputTokens(explicitMax + 1)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			driver := &scriptedDriver{}
+			client := New(driver, WithDefaultModel(Model{ID: "test-model"}))
+			request := tc.build(NewRequest(client).
+				WithPrompt(NewPrompt().UserText("question")))
+
+			_, err := request.Run(t.Context())
+
+			require.ErrorIs(t, err, ErrInvalidRequest)
+			assert.Empty(t, driver.Requests())
 		})
 	}
 }
@@ -1098,7 +1166,8 @@ func TestRequest_IsTokenLimitReached(t *testing.T) {
 			WithPrompt(NewPrompt().
 				WithSystem("a reasonably long system prompt here").
 				UserText("and a prompt on top of it")).
-			WithMaxContextTokens(tinyBudget)
+			WithMaxContextTokens(tinyBudget).
+			WithOutputReserveTokens(0)
 
 		reached, err := request.IsTokenLimitReached()
 		require.NoError(t, err)

@@ -34,7 +34,8 @@ func (c reasoningTokenCounter) Count(messages []elelem.Message,
 		}
 
 		model := c.model
-		if model.ID == "" && len(message.ProviderReasoning) > 0 {
+		if model.ID == "" &&
+			elelem.HasProviderReasoning(message.ProviderReasoning) {
 			var saved struct {
 				Model string `json:"model"`
 			}

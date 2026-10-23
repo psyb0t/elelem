@@ -188,6 +188,7 @@ func TestOpenAIReasoningCounterModelBinding(t *testing.T) {
 			WithModel(elelem.Model{ID: model}).
 			WithPrompt(elelem.NewPrompt().WithHistory(history).
 				UserText("continue")).WithMaxContextTokens(200).
+			WithOutputReserveTokens(0).
 			IsTokenLimitReached()
 		require.NoError(t, err)
 		assert.Equal(t, model == "source", reached)

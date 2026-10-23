@@ -149,7 +149,7 @@ func assistantReasoningExtra(ctx context.Context, model elelem.Model,
 func savedReasoningFields(model elelem.Model,
 	raw json.RawMessage,
 ) (map[string]any, error) {
-	if len(raw) == 0 {
+	if !elelem.HasProviderReasoning(raw) {
 		return map[string]any{}, nil
 	}
 

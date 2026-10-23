@@ -4,13 +4,13 @@ Three tiers, from most typed to least.
 
 ## Contents
 
-- [RunInto — typed](#runinto--typed)
-- [WithJSONSchema — your own schema](#withjsonschema--your-own-schema)
-- [WithJSONMode — untyped](#withjsonmode--untyped)
+- [RunInto (typed)](#runinto-typed)
+- [WithJSONSchema (your own schema)](#withjsonschema-your-own-schema)
+- [WithJSONMode (untyped)](#withjsonmode-untyped)
 - [Validation and repair](#validation-and-repair)
 - [Failure modes](#failure-modes)
 
-## RunInto — typed
+## RunInto (typed)
 
 Derives a strict JSON Schema from the destination, asks for a structured
 response, validates it, and assigns **only after a successful decode**:
@@ -32,19 +32,19 @@ response, err := elelem.NewRequest(client).
 	RunInto(ctx, &result)
 ```
 
-On error, `result` is untouched — it never holds a half-decoded object.
+On error, `result` is untouched. It never holds a half-decoded object.
 
 The destination must be a **non-nil pointer**. An invalid target, or a model
 whose capabilities don't cover structured responses, fails **locally, before
 any network call**.
 
 **A structured turn never sends tools**, even when the request carries them.
-A typed object and a tool list are competing answers to the same turn: offered
+A typed object and a tool list are competing answers to the same turn. Offered
 both, the model can satisfy the request by calling the tool, and then there is
 nothing to decode. If a run needs both, run the tool loop first and pass its
 outcome into a second request that asks for the object.
 
-## WithJSONSchema — your own schema
+## WithJSONSchema (your own schema)
 
 When you already own the schema, or need one the reflector wouldn't produce:
 
@@ -55,7 +55,7 @@ request.WithJSONSchema("incident", schema, true)  // name, schema, strict
 `strict` asks the provider to guarantee conformance rather than merely
 requesting it. The schema slice is copied, so your buffer stays yours.
 
-## WithJSONMode — untyped
+## WithJSONMode (untyped)
 
 ```go
 request.WithJSONMode()
@@ -73,11 +73,11 @@ request.
 	WithResponseRepair()             // one bounded repair attempt on malformed JSON
 ```
 
-The two are **independent knobs**, not a prerequisite pair: repair fires on any
+The two are **independent knobs**, not a prerequisite pair. Repair fires on any
 decode failure whenever `WithResponseRepair()` is set, whether or not strict
 validation is on. Its other gate is the finish reason: neither a **truncated**
 response nor a **refusal** is repaired, because neither is a schema mistake a
-second attempt would fix — one was cut off, the other was declined. Truncation
+second attempt would fix. One was cut off, the other was declined. Truncation
 surfaces as `ErrResponseTruncated`; a refusal carries no distinguishing
 sentinel, so it arrives as the plain validation error.
 

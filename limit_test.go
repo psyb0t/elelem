@@ -3,6 +3,7 @@ package elelem
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -157,6 +158,72 @@ func TestDropOldestUnits_NeverStopsPartWayThroughAUnit(t *testing.T) {
 		{Role: RoleUser, Content: Text("current")},
 	}, event.Messages,
 		"the assistant call and its result must leave together")
+}
+
+// Dropping just enough to fit used to stop after a turn's question and tool
+// round, keeping its final answer: the transcript then opened with an
+// assistant message whose question was gone. The whole exchange leaves.
+func TestDropOldestUnits_NeverKeepsAnAnswerWithoutItsQuestion(t *testing.T) {
+	t.Parallel()
+
+	const perMessage = 10
+
+	counter := fixedCounter(perMessage)
+	event := &TokenLimitEvent{
+		Messages: []Message{
+			{Role: RoleSystem, Content: Text("system")},
+			{Role: RoleUser, Content: Text("first question")},
+			{
+				Role:      RoleAssistant,
+				ToolCalls: []ToolCall{{ID: "call-1", Name: "lookup"}},
+			},
+			{Role: RoleTool, ToolCallID: "call-1", Content: Text("done")},
+			{Role: RoleAssistant, Content: Text("first answer")},
+			{Role: RoleUser, Content: Text("current")},
+		},
+		// Six messages cost 60. Dropping the question and the tool pair
+		// reaches 30, which fits a budget of 30 with the first answer left.
+		BudgetTokens: 3 * perMessage,
+		counter:      counter,
+	}
+
+	require.NoError(
+		t,
+		DropOldestUnits(counter)(context.Background(), event),
+	)
+
+	assert.Equal(t, []Message{
+		{Role: RoleSystem, Content: Text("system")},
+		{Role: RoleUser, Content: Text("current")},
+	}, event.Messages,
+		"the first answer must leave with its question")
+}
+
+// A transcript under budget keeps a leading assistant message: the cleanup
+// only follows a drop.
+func TestDropOldestUnits_LeavesAFittingTranscriptAlone(t *testing.T) {
+	t.Parallel()
+
+	const perMessage = 10
+
+	counter := fixedCounter(perMessage)
+	messages := []Message{
+		{Role: RoleSystem, Content: Text("system")},
+		{Role: RoleAssistant, Content: Text("greeting")},
+		{Role: RoleUser, Content: Text("current")},
+	}
+	event := &TokenLimitEvent{
+		Messages:     slices.Clone(messages),
+		BudgetTokens: 3 * perMessage,
+		counter:      counter,
+	}
+
+	require.NoError(
+		t,
+		DropOldestUnits(counter)(context.Background(), event),
+	)
+
+	assert.Equal(t, messages, event.Messages)
 }
 
 // The in-flight tool exchange is pinned regardless of age — dropping it strands
@@ -534,6 +601,7 @@ func TestTokenLimit_HandlerCannotCorruptEngineTranscript(t *testing.T) {
 		)).
 		WithTokenCounter(fixedCounter(10)).
 		WithMaxContextTokens(20).
+		WithOutputReserveTokens(0).
 		PreMaxTokensReached(func(
 			_ context.Context,
 			event *TokenLimitEvent,

@@ -15,7 +15,7 @@ don't hand your user the same fucking paragraph twice, and typed structured
 responses. Swap OpenAI for Anthropic by changing one line; the rest of your
 code never finds out it happened.
 
-It's a library, not a framework — the difference being who owns the `for` loop.
+It's a library, not a framework. The difference is who owns the `for` loop.
 Here, you do. `Run` hands you the tool calls and stops; the engine only drives
 the loop if you explicitly ask for it with `WithAutoToolCalls()`. That order is
 deliberate, because the second a human has to approve a tool call, "just
@@ -26,7 +26,7 @@ So: no planner, no memory store, no chain-of-anything, no swarm, no crew, no
 graph of nodes that's secretly a `for` loop with extra steps. It also stores
 nothing, picks no driver, resolves no credentials, discovers no external tools,
 decides who may call which tool exactly fucking never, and renders nothing to a
-user — no config loader, no `init()` quietly rummaging through your
+user. No config loader, no `init()` quietly rummaging through your
 environment. You wire it, it runs requests. Agent frameworks are one `go get`
 and several regrets away, and this is the layer they'd be sitting on.
 
@@ -77,7 +77,7 @@ Wrap the driver and you get retries with backoff:
 client := elelem.New(elelem.WithRetry(driver, elelem.RetryConfig{MaxAttempts: 3}))
 ```
 
-Streaming, a tool loop and a budget — still one chain, no ceremony:
+Streaming, a tool loop and a budget. Still one chain, no ceremony:
 
 ```go
 response, err := elelem.NewRequest(client).
@@ -96,7 +96,7 @@ response, err := elelem.NewRequest(client).
 ```
 
 `Run` sends the tools; `WithAutoToolCalls` is what makes the engine execute
-them. Manual driving is the default — drop that one line and the tool calls
+them. Manual driving is the default. Drop that one line and the tool calls
 come back to you, to approve or tell to fuck off.
 
 Want the model to fill in a struct instead? `RunInto(ctx, &dst)`. Same builder,
@@ -111,9 +111,9 @@ Every knob these examples don't show is in
 | Area | What you get |
 |---|---|
 | **[Requests](docs/requests.md)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, queued user turns, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
-| **[Prompts](docs/prompts.md)** | An immutable `Prompt` carrying the system message, the history and this turn — build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read gets refused locally instead of by the provider a round trip later. |
+| **[Prompts](docs/prompts.md)** | An immutable `Prompt` carrying the system message, the history and this turn. Build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read gets refused locally instead of by the provider a round trip later. |
 | **[Tools](docs/tools.md)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of taking your process down with it, per-call denial, and tools that inject messages. |
-| **[Callbacks](docs/callbacks.md)** | Sixteen observation points — run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
+| **[Callbacks](docs/callbacks.md)** | Sixteen observation points: run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
 | **[History](docs/history.md)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
 | **[Retries](docs/retries.md)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and keeps a ledger of what the failed attempts cost you. |
 | **[Structured output](docs/structured-output.md)** | `RunInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request when the model shits out malformed JSON. |
@@ -133,8 +133,8 @@ openai.NewDriver(
 )
 ```
 
-`NewDriver` is convenient for a one-provider program: the official SDK can
-read its usual environment variables. A multi-provider application that owns
+`NewDriver` is convenient for a one-provider program, because the official SDK
+can read its usual environment variables. A multi-provider application that owns
 credential resolution should start every configured driver with
 `WithoutEnvironmentDefaults()`, then pass only that upstream's own key and
 HTTP client plus a URL when it is not the driver's official default. That
@@ -159,7 +159,7 @@ model := zaicoding.LookupModel("glm-5.3")
 ```
 
 **Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)`
-reports what one model supports — seed, tool choice, parallel tool calls,
+reports what one model supports: seed, tool choice, parallel tool calls,
 strict tool arguments, JSON schema, sampling parameters, reasoning effort and
 its ceiling. Anthropic rejects a non-default temperature on newer models while
 happily eating it on older ones, so a single per-provider table would just be a
@@ -168,43 +168,43 @@ parameter **locally**, before any network call, instead of firing it off and
 eating a cryptic 400.
 
 Streaming is on by default. Some OpenAI- and Anthropic-compatible backends
-can't do it — an async job queue sitting in front of a model has nowhere to put
-a token stream — so `WithStreaming(false)` sends the same request with
+can't do it (an async job queue sitting in front of a model has nowhere to put
+a token stream), so `WithStreaming(false)` sends the same request with
 streaming off and feeds the finished response through the exact same callbacks.
 Your renderer never has to know. See
 [docs/requests.md](docs/requests.md#streaming).
 
 Writing a third driver is [docs/drivers.md](docs/drivers.md), and
 `elelemtest/conformance.Run` is the contract suite all shipped drivers run
-against — so it's alive, not a document that quietly drifted out of date two
+against, so it's alive, not a document that quietly drifted out of date two
 years ago.
 
 ## Shit that can bite you
 
-Two inputs are untrusted, and nobody has to be malicious for it to matter — a
+Two inputs are untrusted, and nobody has to be malicious for it to matter. A
 model that hallucinates, an OpenAI-compatible endpoint, or a proxy is plenty.
 
 **Provider output.** Tool-call ids, names, arguments, indices and the finish
 reason are all model-chosen. The engine bounds distinct tool calls per round
 and accumulated argument bytes unconditionally. **Tool-result size is bounded
-only if you ask** — `WithMaxToolResultTokens` is unset by default, and until
+only if you ask**. `WithMaxToolResultTokens` is unset by default, and until
 you set it a result goes through at whatever length it showed up. A call with
 no id, a duplicate id, or an index reused for two different calls gets dropped
-or split at ingest with a logged `reason` — because otherwise the provider
+or split at ingest with a logged `reason`. Otherwise the provider
 rejects each of those on the NEXT request instead of the one that produced it,
 and good luck with that afternoon.
 
 **Tool results.** A tool reads web pages, files and databases, so its output is
 attacker-influenced content going straight into the model's context. The engine
 **does not sanitize it, and does not bound it unless you set
-`WithMaxToolResultTokens`**: a result saying "ignore your instructions" is
+`WithMaxToolResultTokens`**. A result saying "ignore your instructions" is
 delivered exactly as written, at whatever length it arrived. Defending against
 that is your fucking job, not the library's.
 
 Three specifics worth knowing before you ship:
 
 - **A tool can inject a system message.** That's the feature, and it means a
-  tool is exactly as privileged as your system prompt — treat anything that can
+  tool is exactly as privileged as your system prompt, so treat anything that can
   register one the way you'd treat a line in `sudoers`.
 - **A handler's error text reaches the provider.** Handler errors become tool
   results the model reads, so a lazy `return err` from a failed database call
@@ -215,7 +215,7 @@ Three specifics worth knowing before you ship:
   your goroutine company for as long as it damn well pleases.
 
 API keys are never logged, and credentials embedded in a `WithBaseURL` endpoint
-get stripped before the SDK sees them — the SDKs stuff the request URL into the
+get stripped before the SDK sees them. The SDKs stuff the request URL into the
 text of every error they build, and those errors get logged.
 
 Full detail in [docs/tools.md](docs/tools.md).
@@ -224,15 +224,15 @@ Full detail in [docs/tools.md](docs/tools.md).
 
 Structured `log/slog` through
 [`ctxscope`](https://github.com/psyb0t/ctxscope), pulled from the
-context — the library never takes a logger parameter and never installs a
+context. The library never takes a logger parameter and never installs a
 global. Whatever you configured on `slog.Default()` at startup is where it
 writes, and any scope attributes you set (`request_id`, `user_id`) ride along
 on every line the engine emits.
 
 It shuts up on purpose. DEBUG carries the per-round and per-tool detail. INFO
-is spent on exactly two events — a transcript compacted to fit the budget, and
-a stream that only survived because a retry saved its ass — because both are
-things you want in a production log without flipping DEBUG on, and neither is
+is spent on exactly two events: a transcript compacted to fit the budget, and
+a stream that only survived because a retry saved its ass. Both get INFO because
+you want them in a production log without flipping DEBUG on, and neither is
 an error. WARN is the recoverable weirdness: a malformed tool call dropped at
 ingest, a decision matching no pending call, an unknown tool requested, the
 retry loop giving up. ERROR is shit that actually broke.
@@ -242,7 +242,7 @@ long conversation, and a WARN that fires on the normal path is exactly how a
 log turns into noise nobody reads.
 
 Every decision the engine makes quietly carries a `reason` field with a stable,
-greppable value — `token_budget_exceeded`, `tool_call_denied`,
+greppable value: `token_budget_exceeded`, `tool_call_denied`,
 `max_attempts_exhausted`, `finish_reason_unmapped`, and so on. They're exported
 as `elelem.LogReason*` constants, so your alerting matches the same symbol the
 engine emits instead of some string you copy-pasted out of a log line and

@@ -18,16 +18,16 @@ One question: **does the test need the model to say something?**
 | | `elelemtest.ScriptedDriver` | `elelemtest/mocks.MockDriver` |
 |---|---|---|
 | It is a fake… | **model** | **neighbour** |
-| Use when testing… | code that *consumes* model output — the turn loop, tool calls, streaming, history | code that *wraps or calls* a Driver — decorators, retry, metrics, registries |
+| Use when testing… | code that *consumes* model output: the turn loop, tool calls, streaming, history | code that *wraps or calls* a Driver: decorators, retry, metrics, registries |
 | You assert on… | what came **out** of your code | what went **into** the Driver, and that it was called |
-| Multi-turn conversation | yes — one `Turn` per driver call | no |
-| "called twice with X" | no | yes — matchers, `.Once()`, `AssertExpectations` |
+| Multi-turn conversation | yes, one `Turn` per driver call | no |
+| "called twice with X" | no | yes: matchers, `.Once()`, `AssertExpectations` |
 | Honors the `Driver` contract | **yes** | **no** |
 
 That last row is the one that matters. `ScriptedDriver` can't be made to emit a
 shape no real provider emits, so a test built on it can't pass against fiction.
-`MockDriver` will return whatever you tell it to, including impossible things —
-which is the point when you're testing the thing that *wraps* a driver, and a
+`MockDriver` will return whatever you tell it to, including impossible things.
+That is the point when you're testing the thing that *wraps* a driver, and a
 trap when you're not.
 
 ## ScriptedDriver
@@ -43,7 +43,7 @@ driver := elelemtest.NewScriptedDriver(
 client := elelem.New(driver)
 ```
 
-Turns are constructor arguments — one is consumed per driver call, so the
+Turns are constructor arguments. One is consumed per driver call, so the
 list above is a two-round conversation: the model asks for a tool, then
 answers.
 
@@ -70,7 +70,7 @@ driver.Streamed()     // one bool per call: true if it came in via Stream
 ```
 
 `Streamed()` is what a test asserts on when the thing under test is the
-transport choice itself — `WithStreaming(false)` should move a call from
+transport choice itself. `WithStreaming(false)` should move a call from
 `Stream` to `Complete` and change nothing else. Both paths replay the same
 turn through the same delta callback, so every other assertion in the test
 holds either way; that is the property, and a double that quietly reshaped
@@ -86,7 +86,7 @@ driver.
 	WithTokenCounter(myCounter)
 ```
 
-`WithCapabilities` replaces the whole struct — it doesn't merge over the
+`WithCapabilities` replaces the whole struct. It doesn't merge over the
 permissive defaults. That's deliberate: a partial override that silently kept
 defaults would make a gate test pass for the wrong reason.
 
@@ -120,7 +120,7 @@ driver.EXPECT().
 	Times(3)
 ```
 
-`MockDriver` lives in `elelemtest/mocks`, which imports `elelem` — so a test in
+`MockDriver` lives in `elelemtest/mocks`, which imports `elelem`, so a test in
 `package elelem` that imports it is an import cycle. Use the external test
 package (`package elelem_test`) for mock-based tests of this library itself.
 
@@ -141,7 +141,7 @@ func TestSomething(t *testing.T) {
 ```
 
 `GlobalScriptedDriver()` returns nil when none is set. **Always reset in a
-cleanup** — a leaked driver hands the next test someone else's script.
+cleanup**. A leaked driver hands the next test someone else's script.
 
 The alternative would be handing tests a constructor hook, which means the test
 exercises a wiring path production never takes. The registry is process-wide
@@ -149,12 +149,12 @@ state, so tests touching it must not be `t.Parallel`.
 
 ## Why elelemtest imports no test framework
 
-`elelemtest` imports nothing but `elelem` and `ctxerrors` — no `testing`, no
+`elelemtest` imports nothing but `elelem` and `ctxerrors`. No `testing`, no
 testify. That's a hard constraint, not an accident: **production code reaches
 this package.** An app can resolve every upstream to the scripted driver under
 `go test` so a suite can't dial a real provider by accident, and that import
 must not drag a test framework into the shipped binary.
 
-`elelemtest/conformance` is a separate package for exactly that reason — it
+`elelemtest/conformance` is a separate package for exactly that reason. It
 needs `testing` and testify, so it can't live alongside the doubles. See
 [drivers.md](drivers.md#the-conformance-suite).

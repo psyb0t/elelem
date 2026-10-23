@@ -43,11 +43,11 @@ every model supports it, and a request carrying it against one that doesn't is
 rejected outright with `ErrInvalidRequest` rather than degrading. Leaving it
 false is the portable choice.
 
-**`Timeout`** bounds the tool's WHOLE run — `PreRun`, `PostRun` and any
-injector, not just the handler. That's deliberate: hooks are caller code that
+**`Timeout`** bounds the tool's WHOLE run: `PreRun`, `PostRun` and any
+injector, not just the handler. That's deliberate. Hooks are caller code that
 can block on a network call exactly like a handler can, and a deadline starting
 after them would leave a hanging `PreRun` with nothing able to interrupt it.
-Budget accordingly — a slow hook spends the handler's share. Zero means no
+Budget accordingly, because a slow hook spends the handler's share. Zero means no
 per-tool bound, so the only limit is the caller's context.
 
 ## Attaching tools
@@ -62,7 +62,7 @@ request.WithToolProvider(resolveSet)  // fresh set before EVERY round
 ```
 
 `WithToolProvider(func(ctx) (*ToolSet, error))` is for catalogs whose contents
-or authorization can change mid-conversation — an MCP server that connects
+or authorization can change mid-conversation: an MCP server that connects
 late, a user whose permissions changed between rounds.
 
 `ToolSet` also has `Get(name)` and `Definitions()` if you need to inspect it.
@@ -89,9 +89,9 @@ tool := elelem.Tool{
 **An error from any HOOK aborts the run.** Hooks are your code, so their
 failure is a caller-code failure. `PreRun` additionally skips the handler.
 
-**An error from the HANDLER does the opposite** — it becomes a tool error the
+**An error from the HANDLER does the opposite**. It becomes a tool error the
 model can see and react to, and the loop continues. That asymmetry is the whole
-design: the model is allowed to recover from a tool that failed; it is not
+design. The model is allowed to recover from a tool that failed; it is not
 allowed to paper over your code breaking.
 
 ## Errors, panics and denial
@@ -103,7 +103,7 @@ elelem.NewToolDeniedResult()                                    // what the engi
 
 Return `NewToolErrorResult` with a message written **for the model**, not for
 you. A bare `return err` from a failed database call sends your connection
-string upstream — handler errors become tool results, and tool results go to
+string upstream, because handler errors become tool results, and tool results go to
 the provider.
 
 **A panic never aborts the run.** In a handler or in any hook, it is recovered
@@ -131,7 +131,7 @@ A nil return injects nothing. An error from an injector aborts the run, like
 any other hook.
 
 `Type` admits `RoleUser`, `RoleAssistant` and `RoleSystem`. **`RoleSystem` is
-deliberate** — tool-driven system injection is the feature, which also means a
+deliberate**. Tool-driven system injection is the feature, which also means a
 tool is exactly as privileged as your system prompt. `RoleTool` is not usable:
 an injection is a NEW message and can carry no `tool_call_id`, so it would be
 an orphan the provider rejects. Anything else, including the zero value, is
@@ -144,10 +144,10 @@ trusting you to:
 - An injection is **pinned** against history limiting until the model has
   answered it, so a budget reached mid-loop can't discard instruction the next
   round was meant to act on.
-- Once an assistant message follows it, it's ordinary history and droppable —
-  pinning every injection for a whole run would grow the pinned set with the
+- Once an assistant message follows it, it's ordinary history and droppable.
+  Pinning every injection for a whole run would grow the pinned set with the
   tool loop until the budget became unreachable.
-- Every `Prompt` entry point — `WithHistory`, `WithHistoryFrom`, `Add` —
+- Every `Prompt` entry point (`WithHistory`, `WithHistoryFrom`, `Add`)
   **drops** messages marked `MessageOriginInjection`, so feeding
   `Response.Messages` back in is safe.
 
@@ -159,7 +159,7 @@ own record.
 
 **Manual driving is the DEFAULT.** `Run` sends the tools; it does not execute
 them unless you also called `WithAutoToolCalls()`. Without it you get the calls
-back and decide yourself — which is what you want when a human approves them:
+back and decide yourself. That is what you want when a human approves them:
 
 ```go
 response, err := request.WithTools(tools).Run(ctx)
@@ -182,14 +182,14 @@ returns `ErrToolCallsAlreadyExecuted`.
 ## Bounds and untrusted output
 
 Tool output is attacker-influenced content going straight into the model's
-context — a fetched page, a file, a database column. The engine bounds what
+context: a fetched page, a file, a database column. The engine bounds what
 that can cost but **does not sanitize it**: a tool result saying "ignore your
 instructions" is delivered as written, and defending against that is your job.
 
 | Bound | Method |
 |---|---|
-| Result size | `WithMaxToolResultTokens(n)` — unset means unbounded |
-| Concurrency | `WithMaxConcurrentTools(n)` — bounds goroutines, not just running handlers |
+| Result size | `WithMaxToolResultTokens(n)` (unset means unbounded) |
+| Concurrency | `WithMaxConcurrentTools(n)` (bounds goroutines, not just running handlers) |
 | Per-tool time | `WithToolTimeout(d)` or `Tool.Timeout` |
 | Rounds | `WithMaxRounds(n)` |
 

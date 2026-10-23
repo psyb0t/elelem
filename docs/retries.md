@@ -38,14 +38,14 @@ failure comes back to you with the partial response instead. That's the whole
 rule, and it's why the decorator sits at the driver seam rather than around the
 engine: it needs to know whether a single byte has been emitted yet.
 
-Cancellation is never retried. A 4xx config or prompt problem is never retried
-— it would just burn quota to arrive at the same answer.
+Cancellation is never retried. A 4xx config or prompt problem is never retried,
+because it would just burn quota to arrive at the same answer.
 
 ## How failures are classified
 
 In order:
 
-**1. Transport failures** — the connection broke before any provider verdict.
+**1. Transport failures.** The connection broke before any provider verdict.
 All retryable; only the reason differs.
 
 | Shape | `RetryReason` |
@@ -54,7 +54,7 @@ All retryable; only the reason differs.
 | any other `net.Error` | `RetryReasonTransport` |
 | `io.EOF`, `io.ErrUnexpectedEOF` | `RetryReasonTransport` |
 
-**2. The provider's own error code — consulted BEFORE the HTTP status.**
+**2. The provider's own error code, consulted BEFORE the HTTP status.**
 
 This ordering is load-bearing. **Both providers report a mid-stream failure in
 band inside an HTTP 200**: the transport succeeded and the generation didn't, so
@@ -66,7 +66,7 @@ the status is describing the wrong thing entirely.
   as not-retryable, so a provider inventing a new code tomorrow cannot silently
   disable retry.
 
-**3. The HTTP status** — 429 and 5xx retry, the rest don't.
+**3. The HTTP status.** 429 and 5xx retry, the rest don't.
 
 ## Retry-After and backoff
 
@@ -78,7 +78,7 @@ day while the engine logged its own schedule as `delay_ms=86400000`.
 `ParseRetryAfter` handles both header forms (delay-seconds and HTTP-date) and
 never returns a negative or unbounded delay.
 
-Cancellation interrupts backoff — a cancelled context doesn't wait out the
+Cancellation interrupts backoff. A cancelled context doesn't wait out the
 sleep first.
 
 ## Accounting
@@ -103,15 +103,15 @@ type RetryInfo struct {
 }
 ```
 
-`Usage.Total` counts only the attempt that succeeded — that's your context
-figure. `Usage.BilledTotalTokens()` adds the wasted tokens — that's your cost
+`Usage.Total` counts only the attempt that succeeded. That's your context
+figure. `Usage.BilledTotalTokens()` adds the wasted tokens. That's your cost
 figure. A run that retried twice bills for three attempts and contextualizes
 one.
 
 When NO attempt succeeded, `Total` is therefore **0** and the entire spend sits
 in the retry ledger, so `BilledTotalTokens()` still equals what the provider
 charged. Read `Retry.WastedTotalTokens` and `Retry.FailedAttempts` for a run
-that failed outright — `Total` is not where its tokens are.
+that failed outright. `Total` is not where its tokens are.
 
 ## Sentinels
 
@@ -130,7 +130,7 @@ wrapping.
 | `ErrQuotaExhausted` | A spent quota, balance, or plan entitlement, such as OpenAI's `insufficient_quota`. Often sent as HTTP 429, but never retried and never `ErrRateLimited`. |
 | `ErrMaxOutputExceedsContext` | `MaxOutputTokens` leaves no room for the prompt. |
 | `ErrRetryMaxAttempts`, `ErrRetryDelays`, `ErrRetryDelayOrder` | `RetryConfig` is invalid. |
-| `ErrRetryLoopExhausted` | Defensive only — you should never see it. When every attempt fails you get the **provider's** error, not this. `RetryConfig` validation rejects `MaxAttempts < 1`, so the loop always runs and always returns from inside it. |
+| `ErrRetryLoopExhausted` | Defensive only. You should never see it. When every attempt fails you get the **provider's** error, not this. `RetryConfig` validation rejects `MaxAttempts < 1`, so the loop always runs and always returns from inside it. |
 
 Provider failures also join a `ProviderSentinel(status, code)`, so
 cross-provider checks work without knowing which provider served the request:
@@ -141,6 +141,6 @@ if errors.Is(err, commonerrors.ErrRateLimited) {
 }
 ```
 
-Credentials embedded in a `WithBaseURL` endpoint are stripped by
-`SanitizeBaseURL` before the SDK sees them — the SDKs put the request URL into
+`SanitizeBaseURL` strips credentials embedded in a `WithBaseURL` endpoint
+before the SDK sees them. The SDKs put the request URL into
 the text of every error they build, and those errors get logged.

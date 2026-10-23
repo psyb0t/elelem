@@ -29,7 +29,7 @@ func (c reasoningTokenCounter) Count(messages []elelem.Message,
 
 		normalized[index].ProviderReasoning = nil
 		if message.Role != elelem.RoleAssistant ||
-			len(message.ProviderReasoning) == 0 {
+			!elelem.HasProviderReasoning(message.ProviderReasoning) {
 			continue
 		}
 

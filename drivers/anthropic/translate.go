@@ -347,7 +347,7 @@ func insertProviderReasoning(
 	blocks []anthropicsdk.ContentBlockParamUnion,
 	raw json.RawMessage,
 ) ([]anthropicsdk.ContentBlockParamUnion, error) {
-	if len(raw) == 0 {
+	if !elelem.HasProviderReasoning(raw) {
 		return blocks, nil
 	}
 

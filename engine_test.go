@@ -744,6 +744,7 @@ func TestRequest_TokenLimitHandlersObserveFreshCounts(t *testing.T) {
 	}).UserText("current")).
 		WithTokenCounter(counter).
 		WithMaxContextTokens(25).
+		WithOutputReserveTokens(0).
 		PreMaxTokensReached(func(
 			_ context.Context,
 			event *TokenLimitEvent,

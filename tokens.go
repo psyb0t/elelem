@@ -79,7 +79,7 @@ func (builtInTokenCounter) Count(
 
 		// Drivers project replayable reasoning before counting.
 		parts = append(parts, message.Reasoning)
-		if len(message.ProviderReasoning) > 0 {
+		if HasProviderReasoning(message.ProviderReasoning) {
 			parts = append(parts, string(message.ProviderReasoning))
 		}
 

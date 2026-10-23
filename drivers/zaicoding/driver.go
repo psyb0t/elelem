@@ -592,7 +592,7 @@ func providerReasoningExtra(
 	model elelem.Model,
 	message elelem.Message,
 ) (map[string]any, error) {
-	if len(message.ProviderReasoning) == 0 {
+	if !elelem.HasProviderReasoning(message.ProviderReasoning) {
 		return map[string]any{}, nil
 	}
 

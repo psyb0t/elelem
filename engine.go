@@ -1803,7 +1803,7 @@ func hasAssistantOutput(assistant Message) bool {
 	return assistant.Text() != "" ||
 		assistant.Reasoning != "" ||
 		len(assistant.ToolCalls) > 0 ||
-		len(assistant.ProviderReasoning) > 0
+		HasProviderReasoning(assistant.ProviderReasoning)
 }
 
 func (s *runState) fireError(ctx context.Context, err error) {

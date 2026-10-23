@@ -103,6 +103,6 @@ func messageHasProtocolFields(message Message) bool {
 		message.ToolCallID != "" ||
 		message.ToolResultIsError ||
 		message.Reasoning != "" ||
-		len(message.ProviderReasoning) > 0 ||
+		HasProviderReasoning(message.ProviderReasoning) ||
 		message.Injection != nil
 }

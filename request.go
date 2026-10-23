@@ -39,6 +39,7 @@ type Request struct {
 	maxToolResultTokens      int
 	maxContextTokens         int
 	outputReserveTokens      int
+	outputReserveSet         bool
 	tokenCounter             TokenCounter
 	forceFinalAnswer         bool
 	autoToolCalls            bool
@@ -276,8 +277,12 @@ func (r *Request) WithMaxContextTokens(value int) *Request {
 	return r
 }
 
+// WithOutputReserveTokens sets the room kept for the reply inside the context
+// limit. An explicit 0 keeps none. Unset, the reserve is MaxOutputTokens when
+// that is set, else 4096.
 func (r *Request) WithOutputReserveTokens(value int) *Request {
 	r.outputReserveTokens = value
+	r.outputReserveSet = true
 
 	return r
 }
@@ -802,6 +807,23 @@ func (r *Request) validateLimits() error {
 		)
 	}
 
+	return r.validateOutputReserve()
+}
+
+// validateOutputReserve refuses an explicit limit the reserve swallows, which
+// would otherwise resolve to no budget at all, the opposite of what the caller
+// asked for.
+func (r *Request) validateOutputReserve() error {
+	reserve := r.resolvedOutputReserve()
+	if r.maxContextTokens > 0 && reserve >= r.maxContextTokens {
+		return ctxerrors.Wrapf(
+			ErrInvalidRequest,
+			"output reserve %d leaves no room in max context %d",
+			reserve,
+			r.maxContextTokens,
+		)
+	}
+
 	return nil
 }
 
@@ -988,29 +1010,37 @@ func (r *Request) selectedCounter() TokenCounter {
 	return DefaultTokenCounter()
 }
 
+// resolvedBudget is the room the prompt may take: the context limit, explicit
+// or the model's own, minus the reply's reserve. Prompt and reply share one
+// window, so a prompt that filled the limit would leave the reply nothing.
 func (r *Request) resolvedBudget(model Model) int {
-	if r.maxContextTokens > 0 {
-		return r.maxContextTokens
+	limit := r.maxContextTokens
+	if limit <= 0 {
+		limit = model.ContextSize
 	}
 
-	if model.ContextSize <= 0 {
+	if limit <= 0 {
 		return 0
 	}
 
-	reserve := r.outputReserveTokens
-	if reserve == 0 && r.params.MaxOutputTokens != nil {
-		reserve = int(*r.params.MaxOutputTokens)
-	}
-
-	if reserve == 0 {
-		reserve = defaultOutputReserveTokens
-	}
-
-	if reserve >= model.ContextSize {
+	reserve := r.resolvedOutputReserve()
+	if reserve >= limit {
 		return 0
 	}
 
-	return model.ContextSize - reserve
+	return limit - reserve
+}
+
+func (r *Request) resolvedOutputReserve() int {
+	if r.outputReserveSet {
+		return r.outputReserveTokens
+	}
+
+	if r.params.MaxOutputTokens != nil && *r.params.MaxOutputTokens > 0 {
+		return int(*r.params.MaxOutputTokens)
+	}
+
+	return defaultOutputReserveTokens
 }
 
 func nonEmptyStrings(values []string) []string {

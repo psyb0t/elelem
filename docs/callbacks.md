@@ -3,7 +3,7 @@
 Sixteen observation points. All optional, all with the same signature shape:
 `func(context.Context, T) error`.
 
-Registering the same one twice **appends** rather than replaces — see
+Registering the same one twice **appends** rather than replaces. See
 [Registering more than one handler](#registering-more-than-one-handler).
 
 **Returning an error from any callback stops the request.** They are your code,
@@ -26,7 +26,7 @@ see a `OnToolResult` for a call whose `OnToolCallStart` hasn't fired.
 ## Registering more than one handler
 
 Calling the same `On*` method twice **appends**. Both handlers run, in the order
-they were registered, and the first one to return an error stops the chain — the
+they were registered, and the first one to return an error stops the chain. The
 later handlers never see that event.
 
 ```go
@@ -39,7 +39,7 @@ This matters when a library builds part of the request and your code adds to it.
 Under replace semantics, whichever side registered last would silently
 unregister the other: no error, no log, just a handler that stopped running.
 
-To go the other way — replace instead of add — clear the chain first:
+To replace instead of add, clear the chain first:
 
 | Method | Effect |
 |---|---|
@@ -53,7 +53,7 @@ base.
 ```
 
 The `CallbackKind` constants (`CallbackStart`, `CallbackText`,
-`CallbackRoundStart`, `CallbackToolResult`, ... — one per `On*` method) are the
+`CallbackRoundStart`, `CallbackToolResult` and the rest, one per `On*` method) are the
 whole valid set. An unrecognized kind is ignored rather than clearing something
 else by accident.
 
@@ -62,7 +62,7 @@ variants" is a real pattern; these two methods are how a variant gets back out
 of what the base registered.
 
 **The two token-limit handlers are the exception.** `PreMaxTokensReached` and
-`PostMaxTokensReached` still REPLACE — `PreMaxTokensReached` has a built-in
+`PostMaxTokensReached` still REPLACE. `PreMaxTokensReached` has a built-in
 default it is meant to displace, and chaining onto a handler that rewrites the
 transcript in place would run the second one against the first one's output.
 See [Token limits](#token-limits).
@@ -71,10 +71,10 @@ See [Token limits](#token-limits).
 
 | Method | Payload |
 |---|---|
-| `OnStart(fn)` | `*RunEvent` — the resolved `Model`, `Messages`, `Tools` as the run begins. |
+| `OnStart(fn)` | `*RunEvent`: the resolved `Model`, `Messages`, `Tools` as the run begins. |
 | `OnRoundStart(fn)` | `*RoundEvent` |
 | `OnRoundEnd(fn)` | `*RoundEvent` |
-| `OnFinish(fn)` | `*Response` — the completed run. |
+| `OnFinish(fn)` | `*Response`, the completed run. |
 
 ```go
 type RoundEvent struct {
@@ -97,18 +97,18 @@ rounds double-counts, because `TotalUsage` already did it.
 |---|---|---|
 | `OnText(fn)` | `TextDelta{Text}` | Answer text, in fragments. |
 | `OnReasoning(fn)` | `ReasoningDelta{Text}` | Visible reasoning, when the model has `SupportsReasoning` **and** the provider streams it in the clear. |
-| `OnDelta(fn)` | `Delta` | The raw provider delta — text, reasoning, provider reasoning, tool-call fragment, finish reason. |
+| `OnDelta(fn)` | `Delta` | The raw provider delta: text, reasoning, provider reasoning, tool-call fragment, finish reason. |
 | `OnAssistantMessage(fn)` | `Message` | A completed assistant message. |
 
 A `TextDelta` is a **fragment**, not a token and not a line. Concatenate in
 arrival order; don't assume word or line boundaries.
 
-`OnDelta` is the firehose — everything the driver emitted. `OnText` and
+`OnDelta` is the firehose, everything the driver emitted. `OnText` and
 `OnReasoning` are the filtered convenience views. Using all three is fine;
 you'll just see the same content more than once.
 
 These are the only way to watch a reply arrive, and they fire whether or not
-the transport streams — with `WithStreaming(false)` the driver feeds the
+the transport streams. With `WithStreaming(false)` the driver feeds the
 finished response through the same callbacks, so a renderer built on them
 still works, it just gets everything at once. See
 [requests.md](requests.md#streaming).
@@ -117,30 +117,30 @@ still works, it just gets everything at once. See
 
 | Method | Payload |
 |---|---|
-| `OnToolCallStart(fn)` | `ToolCallEvent` — `CallID`, `Name`, `Arguments`, `Index`, `Result` (nil here) |
-| `OnToolCallFragment(fn)` | `ToolCallDelta` — arguments arriving in pieces |
+| `OnToolCallStart(fn)` | `ToolCallEvent`: `CallID`, `Name`, `Arguments`, `Index`, `Result` (nil here) |
+| `OnToolCallFragment(fn)` | `ToolCallDelta`, arguments arriving in pieces |
 | `OnToolResult(fn)` | `ToolCallEvent` with `Result` populated |
-| `OnMessageInjection(fn)` | `MessageInjection` — a tool injected a message |
+| `OnMessageInjection(fn)` | `MessageInjection`, when a tool injected a message |
 
 **`OnToolCallStart` arguments are COMPLETE.** It fires once per call after the
-stream has ended and the calls have been assembled and normalized — not while
+stream has ended and the calls have been assembled and normalized, not while
 fragments are arriving. `OnToolCallFragment` is the one that sees partial
 arguments mid-stream.
 
-That distinction is what makes it useful for an approval gate's INSPECTION
-step: the arguments you read there are the ones the tool would run with.
+That distinction makes it useful for an approval gate's INSPECTION
+step. The arguments you read there are the ones the tool would run with.
 
 **It is not how you deny a call.** Returning an error here aborts the whole
 run, and `ToolCallEvent` is passed by value with `Arguments` copied, so a hook
-cannot rewrite what executes. `Tool.PreRun` is no better: its only refusal
+cannot rewrite what executes. `Tool.PreRun` is no better. Its only refusal
 channel is an error, and an error from any hook aborts the run too.
 
-Refusing ONE call while the run continues has exactly one mechanism — drive the
+Refusing ONE call while the run continues has exactly one mechanism. Drive the
 loop yourself and pass a decision to `ExecuteToolCalls`:
 
 ```go
 response.ExecuteToolCalls(ctx, elelem.ToolCallDecision{
-	CallID: call.ID,   // REQUIRED — a decision whose CallID matches no
+	CallID: call.ID,   // REQUIRED. A decision whose CallID matches no
 	Deny:   true,      // pending call is discarded with a WARN and the
 })                     // tool runs anyway. It fails OPEN.
 ```
@@ -153,7 +153,7 @@ See [tools.md](tools.md#driving-the-loop-by-hand).
 
 | Method | Payload |
 |---|---|
-| `OnRetry(fn)` | `RetryAttempt` — attempt number, classification, delay, status, wasted tokens |
+| `OnRetry(fn)` | `RetryAttempt`: attempt number, classification, delay, status, wasted tokens |
 | `OnError(fn)` | `error` |
 
 `OnRetry` only fires when the driver is wrapped in `WithRetry`. See
@@ -177,7 +177,7 @@ type TokenLimitHandler func(context.Context, *TokenLimitEvent) error
 
 The handler **rewrites `event.Messages` in place**; whatever is left there is
 what gets sent. `event.Messages` is a copy of the engine's transcript, not the
-live slice, so reslicing it can't corrupt the run — and the engine adopts the
+live slice, so reslicing it can't corrupt the run. The engine adopts the
 result only if the handler returns nil.
 
 `event.Tools`, by contrast, is **not** copied and is not read back. Treat it as

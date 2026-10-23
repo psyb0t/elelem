@@ -328,6 +328,7 @@ func TestRun_LogsBudgetCompaction(t *testing.T) {
 	// A counter that always reports over budget forces the compaction path.
 	_, err := NewRequest(client).WithPrompt(NewPrompt().UserText("question")).
 		WithMaxContextTokens(10).
+		WithOutputReserveTokens(0).
 		WithTokenCounter(fixedCounter(999)).
 		Run(ctx)
 	require.NoError(t, err)

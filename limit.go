@@ -116,6 +116,11 @@ func DropOldestUnits(counter TokenCounter) TokenLimitHandler {
 // It never ENDS the compaction: the caller re-counts authoritatively and calls
 // again if the transcript still does not fit. A counter whose cost is not the
 // sum of its parts therefore costs an extra pass, not a wrong answer.
+//
+// Once it has dropped anything, it keeps going until the transcript starts at
+// a user message again, so an exchange leaves whole: a kept answer without
+// its question misleads the model, and some providers refuse a conversation
+// that opens with an assistant message.
 func dropUntilEstimatedToFit(
 	ctx context.Context,
 	event *TokenLimitEvent,
@@ -124,7 +129,14 @@ func dropUntilEstimatedToFit(
 	estimate := event.EstimatedTokens
 	dropped := 0
 
-	for estimate > event.BudgetTokens && len(event.Messages) > 1 {
+	for len(event.Messages) > 1 {
+		isOverBudget := estimate > event.BudgetTokens
+		isMidExchange := dropped > 0 && startsMidExchange(event.Messages)
+
+		if !isOverBudget && !isMidExchange {
+			break
+		}
+
 		index := firstDroppableUnit(event.Messages)
 		if index < 0 {
 			logger.Warn(
@@ -257,6 +269,29 @@ func firstDroppableUnit(messages []Message) int {
 	}
 
 	return -1
+}
+
+// startsMidExchange reports whether the first message after the system prompt
+// is a droppable message other than a user turn: the remains of an exchange
+// whose question was already dropped.
+func startsMidExchange(messages []Message) bool {
+	front := 0
+	if len(messages) > 0 && messages[0].Role == RoleSystem &&
+		messages[0].Injection == nil {
+		front = 1
+	}
+
+	if front >= len(messages) {
+		return false
+	}
+
+	isUserTurn := messages[front].Role == RoleUser &&
+		messages[front].Origin != MessageOriginInjection
+	if isUserTurn {
+		return false
+	}
+
+	return firstDroppableUnit(messages) == front
 }
 
 func unitEnd(messages []Message, index int) int {
