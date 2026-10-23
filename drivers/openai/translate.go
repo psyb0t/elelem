@@ -907,6 +907,10 @@ func usageFromChunk(
 		usage.Model = chunk.Model
 	}
 
+	if chunk.ID != "" {
+		usage.ResponseID = chunk.ID
+	}
+
 	// Gate on ANY token field, not on TotalTokens. Total is the DERIVED one,
 	// so it is precisely the field an OpenAI-compatible endpoint omits —
 	// gating on it threw away a frame reporting prompt=120/completion=40 and

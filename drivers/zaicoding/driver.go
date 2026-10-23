@@ -4,12 +4,14 @@ package zaicoding
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 	"net/http"
 	"strings"
 
 	"github.com/openai/openai-go/v3/option"
 	"github.com/psyb0t/ctxerrors"
+	"github.com/psyb0t/ctxerrors/commerr"
 	"github.com/psyb0t/ctxscope"
 	"github.com/psyb0t/elelem"
 	"github.com/psyb0t/elelem/drivers/openai"
@@ -26,15 +28,48 @@ const (
 
 	extraThinkingKey        = "thinking"
 	extraReasoningEffortKey = "reasoning_effort"
+	extraMaxTokensKey       = "max_tokens"
+	extraToolStreamKey      = "tool_stream"
+	thinkingTypeKey         = "type"
+	clearThinkingKey        = "clear_thinking"
 	reasoningContentKey     = "reasoning_content"
+
+	// maxStopWords is the most stop words the endpoint accepts; a longer list
+	// fails with business code 1214.
+	maxStopWords = 4
 )
+
+// Z.ai business codes the driver translates into portable errors.
+const (
+	codePromptTooLong    = "1261"
+	codeSensitiveContent = "1301"
+)
+
+// Finish reasons Z.ai adds to the OpenAI set. A stream that ends abnormally
+// reports its cause only through one of these.
+const (
+	finishReasonSensitive             = "sensitive"
+	finishReasonContextWindowExceeded = "model_context_window_exceeded"
+	finishReasonNetworkError          = "network_error"
+)
+
+// isQuotaCode reports the 429 business codes that mean a spent balance, an
+// exhausted plan window, an expired plan, or a model outside the plan. None
+// clears within a retry backoff, unlike 1302 (request rate) and 1305
+// (overload).
+func isQuotaCode(code string) bool {
+	switch code {
+	case "1113", "1308", "1309", "1310", "1311", "1313", "1314", "1315",
+		"1316", "1317", "1318", "1319", "1320", "1321":
+		return true
+	default:
+		return false
+	}
+}
 
 type thinkingType string
 
-const (
-	thinkingTypeEnabled  thinkingType = "enabled"
-	thinkingTypeDisabled thinkingType = "disabled"
-)
+const thinkingTypeEnabled thinkingType = "enabled"
 
 //nolint:tagliatelle // Z.ai wire field names are snake_case.
 type thinkingConfig struct {
@@ -81,6 +116,7 @@ func NewDriver(opts ...DriverOption) *Driver {
 		openai.WithAPIKey(cfg.apiKey),
 		openai.WithBaseURL(cfg.baseURL),
 		openai.WithAssistantMessageExtra(providerReasoningExtra),
+		openai.WithFinishReasonMapper(finishReason),
 	}
 
 	if cfg.httpClient != nil {
@@ -124,13 +160,15 @@ func WithSDKOptions(opts ...option.RequestOption) DriverOption {
 	}
 }
 
-// Stream issues one streaming Z.ai Coding chat completion.
+// Stream issues one streaming Z.ai Coding chat completion. When the request
+// carries tools it asks for tool_stream, so tool-call arguments arrive in
+// fragments instead of in one piece at the end of the call.
 func (d *Driver) Stream(
 	ctx context.Context,
 	req elelem.DriverRequest,
 	onDelta func(elelem.Delta) error,
 ) (elelem.Usage, error) {
-	prepared, err := prepareRequest(req)
+	prepared, err := prepareRequest(req, true)
 	if err != nil {
 		return elelem.Usage{}, ctxerrors.Wrap(
 			err,
@@ -138,13 +176,18 @@ func (d *Driver) Stream(
 		)
 	}
 
-	usage, err := d.openai.Stream(
-		ctx,
-		prepared,
-		withProviderReasoning(prepared.Model.ID, onDelta),
-	)
+	capture := newReasoningCapture(prepared.Model.ID, onDelta)
+
+	usage, err := d.openai.Stream(ctx, prepared, capture.handler())
 	if err != nil {
-		return usage, ctxerrors.Wrap(err, "stream Z.ai Coding chat completion")
+		return usage, ctxerrors.Wrap(
+			providerError(err),
+			"stream Z.ai Coding chat completion",
+		)
+	}
+
+	if err := capture.flush(); err != nil {
+		return usage, err
 	}
 
 	return usage, nil
@@ -156,7 +199,7 @@ func (d *Driver) Complete(
 	req elelem.DriverRequest,
 	onDelta func(elelem.Delta) error,
 ) (elelem.Usage, error) {
-	prepared, err := prepareRequest(req)
+	prepared, err := prepareRequest(req, false)
 	if err != nil {
 		return elelem.Usage{}, ctxerrors.Wrap(
 			err,
@@ -164,16 +207,18 @@ func (d *Driver) Complete(
 		)
 	}
 
-	usage, err := d.openai.Complete(
-		ctx,
-		prepared,
-		withProviderReasoning(prepared.Model.ID, onDelta),
-	)
+	capture := newReasoningCapture(prepared.Model.ID, onDelta)
+
+	usage, err := d.openai.Complete(ctx, prepared, capture.handler())
 	if err != nil {
 		return usage, ctxerrors.Wrap(
-			err,
+			providerError(err),
 			"complete Z.ai Coding chat completion",
 		)
+	}
+
+	if err := capture.flush(); err != nil {
+		return usage, err
 	}
 
 	return usage, nil
@@ -199,32 +244,52 @@ func (d *Driver) TokenCounter() elelem.TokenCounter {
 	return d.openai.TokenCounter()
 }
 
-func prepareRequest(req elelem.DriverRequest) (elelem.DriverRequest, error) {
+func prepareRequest(
+	req elelem.DriverRequest,
+	streaming bool,
+) (elelem.DriverRequest, error) {
+	kind := classifyModel(req.Model.ID)
+
+	if err := validateParams(kind, req.Model.ID, req.Params); err != nil {
+		return elelem.DriverRequest{}, err
+	}
+
 	thinking, reasoningEffort, err := reasoningConfiguration(
+		kind,
 		req.Model.ID,
-		req.Params.ReasoningEffort,
+		req.Params,
 	)
 	if err != nil {
 		return elelem.DriverRequest{}, err
 	}
 
-	if thinking == nil {
-		return req, nil
-	}
-
 	params := req.Params
-	params.ReasoningEffort = elelem.ReasoningEffortUnset
 
 	params.Extra = maps.Clone(params.Extra)
 	if params.Extra == nil {
 		params.Extra = make(map[string]any)
 	}
 
-	params.Extra[extraThinkingKey] = *thinking
-	delete(params.Extra, extraReasoningEffortKey)
+	// The endpoint caps output only through max_tokens and ignores the
+	// max_completion_tokens field the OpenAI transport would send.
+	if params.MaxOutputTokens != nil {
+		params.Extra[extraMaxTokensKey] = *params.MaxOutputTokens
+		params.MaxOutputTokens = nil
+	}
 
-	if reasoningEffort != elelem.ReasoningEffortUnset {
-		params.Extra[extraReasoningEffortKey] = reasoningEffort
+	if _, set := params.Extra[extraToolStreamKey]; streaming && !set &&
+		len(req.Tools) > 0 {
+		params.Extra[extraToolStreamKey] = true
+	}
+
+	if thinking != nil {
+		params.ReasoningEffort = elelem.ReasoningEffortUnset
+		params.Extra[extraThinkingKey] = *thinking
+		delete(params.Extra, extraReasoningEffortKey)
+
+		if reasoningEffort != elelem.ReasoningEffortUnset {
+			params.Extra[extraReasoningEffortKey] = reasoningEffort
+		}
 	}
 
 	req.Params = params
@@ -232,25 +297,68 @@ func prepareRequest(req elelem.DriverRequest) (elelem.DriverRequest, error) {
 	return req, nil
 }
 
-func reasoningConfiguration(
+// validateParams rejects the controls the endpoint refuses or ignores, so the
+// caller gets a local error instead of a provider 400 or a silently dropped
+// setting.
+func validateParams(
+	kind modelKind,
 	modelID string,
-	effort elelem.ReasoningEffort,
+	params elelem.GenerationParams,
+) error {
+	if len(params.Stop) > maxStopWords {
+		return ctxerrors.Wrapf(
+			ErrUnsupportedParameter,
+			"%d stop words on Z.ai Coding, at most %d",
+			len(params.Stop),
+			maxStopWords,
+		)
+	}
+
+	switch params.ToolChoice.Mode {
+	case elelem.ToolChoiceModeRequired, elelem.ToolChoiceModeTool:
+		// The endpoint accepts these values and then behaves as auto, so a
+		// caller that forced a tool would wait for a call that never comes.
+		return ctxerrors.Wrapf(
+			ErrUnsupportedParameter,
+			"tool choice %q on Z.ai Coding, which only honors auto and none",
+			params.ToolChoice.Mode,
+		)
+	}
+
+	if kind != modelKindUnknown && params.MaxOutputTokens != nil &&
+		*params.MaxOutputTokens > glm53MaxOutputTokens {
+		return ctxerrors.Wrapf(
+			ErrUnsupportedParameter,
+			"max output tokens %d on Z.ai Coding model %q, at most %d",
+			*params.MaxOutputTokens,
+			modelID,
+			glm53MaxOutputTokens,
+		)
+	}
+
+	return nil
+}
+
+func reasoningConfiguration(
+	kind modelKind,
+	modelID string,
+	params elelem.GenerationParams,
 ) (*thinkingConfig, elelem.ReasoningEffort, error) {
-	kind := classifyModel(modelID)
+	effort := params.ReasoningEffort
 	if kind == modelKindUnknown {
 		return unknownModelReasoningConfiguration(modelID, effort)
 	}
 
-	if effort == elelem.ReasoningEffortNone {
-		return disabledThinkingConfiguration(kind, modelID)
+	thinking, err := requestedThinking(params.Extra)
+	if err != nil {
+		return nil, elelem.ReasoningEffortUnset, err
 	}
 
-	thinking := enabledThinking()
 	if effort == elelem.ReasoningEffortUnset {
 		return thinking, elelem.ReasoningEffortUnset, nil
 	}
 
-	wireEffort, err := mappedReasoningEffort(kind, modelID, effort)
+	wireEffort, err := codingPlanReasoningEffort(modelID, effort)
 	if err != nil {
 		return nil, elelem.ReasoningEffortUnset, err
 	}
@@ -273,68 +381,74 @@ func unknownModelReasoningConfiguration(
 	)
 }
 
-func disabledThinkingConfiguration(
-	kind modelKind,
-	modelID string,
-) (*thinkingConfig, elelem.ReasoningEffort, error) {
-	switch kind {
-	case modelKindGLM53, modelKindGLM53Flash, modelKindUnknown:
-		return nil, elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
-			modelID,
-			elelem.ReasoningEffortNone,
+// requestedThinking builds the thinking object. Thinking is always enabled on
+// GLM 5.3 and GLM 5.3 Flash. clear_thinking defaults to false, which keeps
+// earlier turns' reasoning in the conversation, and a caller may set it to
+// true through Extra["thinking"].
+func requestedThinking(extra map[string]any) (*thinkingConfig, error) {
+	clearThinking := false
+	thinking := &thinkingConfig{
+		Type:          thinkingTypeEnabled,
+		ClearThinking: &clearThinking,
+	}
+
+	raw, ok := extra[extraThinkingKey]
+	if !ok {
+		return thinking, nil
+	}
+
+	fields, ok := raw.(map[string]any)
+	if !ok {
+		return nil, ctxerrors.Wrap(
+			ErrUnsupportedParameter,
+			"Z.ai Coding thinking must be a map with type and clear_thinking",
 		)
 	}
 
-	return nil, elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
-		modelID,
-		elelem.ReasoningEffortNone,
-	)
-}
-
-func mappedReasoningEffort(
-	kind modelKind,
-	modelID string,
-	effort elelem.ReasoningEffort,
-) (elelem.ReasoningEffort, error) {
-	switch kind {
-	case modelKindGLM53:
-		return glm53ReasoningEffort(modelID, effort)
-	case modelKindUnknown, modelKindGLM53Flash:
-		return elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
-			modelID,
-			effort,
+	if value, set := fields[thinkingTypeKey]; set &&
+		value != string(thinkingTypeEnabled) {
+		return nil, ctxerrors.Wrapf(
+			ErrUnsupportedParameter,
+			"thinking type %v on Z.ai Coding, which only accepts enabled",
+			value,
 		)
 	}
 
-	return elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
-		modelID,
-		effort,
-	)
+	if value, set := fields[clearThinkingKey]; set {
+		requested, isBool := value.(bool)
+		if !isBool {
+			return nil, ctxerrors.Wrap(
+				ErrUnsupportedParameter,
+				"Z.ai Coding clear_thinking must be a boolean",
+			)
+		}
+
+		thinking.ClearThinking = &requested
+	}
+
+	return thinking, nil
 }
 
-func glm53ReasoningEffort(
+// codingPlanReasoningEffort applies the Coding Plan's documented effort
+// mapping for GLM 5.3 and GLM 5.3 Flash: minimal and low become low, medium
+// and high become high, xhigh and max become max. Thinking cannot be turned
+// off, so none is refused rather than silently sent as low.
+func codingPlanReasoningEffort(
 	modelID string,
 	effort elelem.ReasoningEffort,
 ) (elelem.ReasoningEffort, error) {
 	switch effort {
-	case elelem.ReasoningEffortLow,
-		elelem.ReasoningEffortHigh,
-		elelem.ReasoningEffortMax:
-		return effort, nil
+	case elelem.ReasoningEffortMinimal, elelem.ReasoningEffortLow:
+		return elelem.ReasoningEffortLow, nil
+	case elelem.ReasoningEffortMedium, elelem.ReasoningEffortHigh:
+		return elelem.ReasoningEffortHigh, nil
+	case elelem.ReasoningEffortXHigh, elelem.ReasoningEffortMax:
+		return elelem.ReasoningEffortMax, nil
 	default:
 		return elelem.ReasoningEffortUnset, unsupportedReasoningEffort(
 			modelID,
 			effort,
 		)
-	}
-}
-
-func enabledThinking() *thinkingConfig {
-	clearThinking := false
-
-	return &thinkingConfig{
-		Type:          thinkingTypeEnabled,
-		ClearThinking: &clearThinking,
 	}
 }
 
@@ -350,39 +464,127 @@ func unsupportedReasoningEffort(
 	)
 }
 
-func withProviderReasoning(
+// finishReason maps Z.ai's own finish reasons. network_error means the
+// generation died in transit, which Z.ai's error table reports as code 1234
+// with HTTP 500 when it arrives as an error instead, so it becomes the same
+// retryable server failure.
+func finishReason(raw string) (elelem.FinishReason, error) {
+	switch raw {
+	case finishReasonSensitive:
+		return elelem.FinishReasonContentFilter, nil
+	case finishReasonContextWindowExceeded:
+		return elelem.FinishReasonContextExceeded, nil
+	case finishReasonNetworkError:
+		return elelem.FinishReasonUnset, &elelem.ProviderError{
+			Cause: ctxerrors.Wrap(
+				commerr.ErrUnavailable,
+				"Z.ai Coding ended the response with network_error",
+			),
+			StatusCode: http.StatusInternalServerError,
+			Code:       finishReasonNetworkError,
+		}
+	default:
+		return elelem.FinishReasonUnset, nil
+	}
+}
+
+// providerError translates Z.ai business codes into portable errors. A quota,
+// plan, or balance failure is rebuilt without the rate-limit sentinel the
+// transport joined for its 429 status, so nothing reads it as retryable.
+func providerError(err error) error {
+	providerErr, ok := errors.AsType[*elelem.ProviderError](err)
+	if !ok {
+		return err
+	}
+
+	code := providerErr.ErrorCode()
+	if isQuotaCode(code) {
+		return &elelem.ProviderError{
+			Cause: ctxerrors.Wrapf(
+				elelem.ErrQuotaExhausted,
+				"Z.ai Coding code %s: %s",
+				code,
+				providerErr.Error(),
+			),
+			StatusCode:      providerErr.HTTPStatus(),
+			RetryAfterDelay: providerErr.RetryAfterDelay,
+			Code:            code,
+		}
+	}
+
+	switch code {
+	case codePromptTooLong:
+		return errors.Join(err, elelem.ErrContextExceeded)
+	case codeSensitiveContent:
+		return errors.Join(err, ErrSensitiveContent)
+	default:
+		return err
+	}
+}
+
+// reasoningCapture forwards deltas and accumulates the response's reasoning,
+// then publishes the replay envelope once: just before the finish delta, which
+// must stay the last payload, or after the response when no finish delta
+// arrived. Encoding it on every reasoning delta cost time quadratic in the
+// reasoning length on long max-effort turns.
+type reasoningCapture struct {
+	modelID   string
+	onDelta   func(elelem.Delta) error
+	reasoning strings.Builder
+	published bool
+}
+
+func newReasoningCapture(
 	modelID string,
 	onDelta func(elelem.Delta) error,
-) func(elelem.Delta) error {
-	if onDelta == nil {
+) *reasoningCapture {
+	return &reasoningCapture{modelID: modelID, onDelta: onDelta}
+}
+
+func (c *reasoningCapture) handler() func(elelem.Delta) error {
+	if c.onDelta == nil {
 		return nil
 	}
 
-	var reasoning strings.Builder
-
 	return func(delta elelem.Delta) error {
-		if delta.Reasoning != "" {
-			reasoning.WriteString(delta.Reasoning)
+		c.reasoning.WriteString(delta.Reasoning)
 
-			payload, err := json.Marshal(providerReasoningEnvelope{
-				Provider:  Name,
-				Version:   providerReasoningVersion,
-				Model:     modelID,
-				Reasoning: reasoning.String(),
-			})
-			if err != nil {
-				return ctxerrors.Wrap(err, "encode Z.ai Coding reasoning")
+		if delta.FinishReason != elelem.FinishReasonUnset {
+			if err := c.flush(); err != nil {
+				return err
 			}
-
-			delta.ProviderReasoning = payload
 		}
 
-		if err := onDelta(delta); err != nil {
+		if err := c.onDelta(delta); err != nil {
 			return ctxerrors.Wrap(err, "publish Z.ai Coding delta")
 		}
 
 		return nil
 	}
+}
+
+func (c *reasoningCapture) flush() error {
+	if c.onDelta == nil || c.published || c.reasoning.Len() == 0 {
+		return nil
+	}
+
+	c.published = true
+
+	payload, err := json.Marshal(providerReasoningEnvelope{
+		Provider:  Name,
+		Version:   providerReasoningVersion,
+		Model:     c.modelID,
+		Reasoning: c.reasoning.String(),
+	})
+	if err != nil {
+		return ctxerrors.Wrap(err, "encode Z.ai Coding reasoning")
+	}
+
+	if err := c.onDelta(elelem.Delta{ProviderReasoning: payload}); err != nil {
+		return ctxerrors.Wrap(err, "publish Z.ai Coding reasoning")
+	}
+
+	return nil
 }
 
 func providerReasoningExtra(

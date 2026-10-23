@@ -218,9 +218,30 @@ func TestReasoningConfiguration(t *testing.T) {
 			wantWireEffort: elelem.ReasoningEffortLow,
 		},
 		{
-			name:    "GLM 5.3 rejects medium",
+			name:           "GLM 5.3 maps minimal to low",
+			modelID:        modelGLM53,
+			effort:         elelem.ReasoningEffortMinimal,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortLow,
+		},
+		{
+			name:           "GLM 5.3 maps medium to high",
+			modelID:        modelGLM53,
+			effort:         elelem.ReasoningEffortMedium,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortHigh,
+		},
+		{
+			name:           "GLM 5.3 maps xhigh to max",
+			modelID:        modelGLM53,
+			effort:         elelem.ReasoningEffortXHigh,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortMax,
+		},
+		{
+			name:    "GLM 5.3 refuses none because thinking stays on",
 			modelID: modelGLM53,
-			effort:  elelem.ReasoningEffortMedium,
+			effort:  elelem.ReasoningEffortNone,
 			wantErr: ErrUnsupportedParameter,
 		},
 		{
@@ -229,10 +250,32 @@ func TestReasoningConfiguration(t *testing.T) {
 			wantType: thinkingTypeEnabled,
 		},
 		{
-			name:    "GLM 5.3 Flash rejects numeric effort",
-			modelID: modelGLM53Flash,
-			effort:  elelem.ReasoningEffortLow,
-			wantErr: ErrUnsupportedParameter,
+			name:           "GLM 5.3 Flash sends low",
+			modelID:        modelGLM53Flash,
+			effort:         elelem.ReasoningEffortLow,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortLow,
+		},
+		{
+			name:           "GLM 5.3 Flash sends max",
+			modelID:        modelGLM53Flash,
+			effort:         elelem.ReasoningEffortMax,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortMax,
+		},
+		{
+			name:           "GLM 5.3 Flash X takes Flash parameters",
+			modelID:        modelGLM53FlashX,
+			effort:         elelem.ReasoningEffortHigh,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortHigh,
+		},
+		{
+			name:           "routed GLM 5.2 takes GLM 5.3 parameters",
+			modelID:        modelGLM52Routed,
+			effort:         elelem.ReasoningEffortMax,
+			wantType:       thinkingTypeEnabled,
+			wantWireEffort: elelem.ReasoningEffortMax,
 		},
 		{
 			name:    "unknown model rejects reasoning controls",
@@ -254,7 +297,7 @@ func TestReasoningConfiguration(t *testing.T) {
 						extraReasoningEffortKey: "caller-value",
 					},
 				},
-			})
+			}, true)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 
@@ -403,10 +446,22 @@ func TestLookupModel(t *testing.T) {
 	}{
 		{
 			id:               modelGLM53,
+			wantContextSize:  glm53ContextSize,
 			wantReasoning:    true,
 			wantReasoningMax: elelem.ReasoningEffortMax,
 		},
-		{id: modelGLM53Flash, wantReasoning: true},
+		{
+			id:               "GLM-5.3",
+			wantContextSize:  glm53ContextSize,
+			wantReasoning:    true,
+			wantReasoningMax: elelem.ReasoningEffortMax,
+		},
+		{
+			id:               modelGLM53Flash,
+			wantContextSize:  glm53ContextSize,
+			wantReasoning:    true,
+			wantReasoningMax: elelem.ReasoningEffortMax,
+		},
 		{id: "unlisted-model"},
 	}
 

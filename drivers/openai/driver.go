@@ -31,11 +31,13 @@ const Name = "openai"
 type Driver struct {
 	api                   openaisdk.Client
 	assistantMessageExtra AssistantMessageExtra
+	finishReasonMapper    FinishReasonMapper
 }
 
 type driverConfig struct {
 	options               []option.RequestOption
 	assistantMessageExtra AssistantMessageExtra
+	finishReasonMapper    FinishReasonMapper
 }
 
 // DriverOption configures an OpenAI driver.
@@ -49,6 +51,14 @@ type AssistantMessageExtra func(
 	elelem.Model,
 	elelem.Message,
 ) (map[string]any, error)
+
+// FinishReasonMapper maps a provider finish reason this transport does not
+// recognize. It returns the normalized reason, or an error when the provider
+// reports a failure through the finish reason instead of an error event; the
+// error ends the call. Returning FinishReasonUnset leaves the value unmapped.
+// It is intended for specialized drivers over providers that extend the
+// OpenAI finish-reason set.
+type FinishReasonMapper func(raw string) (elelem.FinishReason, error)
 
 // NewDriver builds an OpenAI-compatible driver.
 func NewDriver(opts ...DriverOption) *Driver {
@@ -65,6 +75,7 @@ func NewDriver(opts ...DriverOption) *Driver {
 	return &Driver{
 		api:                   openaisdk.NewClient(cfg.options...),
 		assistantMessageExtra: cfg.assistantMessageExtra,
+		finishReasonMapper:    cfg.finishReasonMapper,
 	}
 }
 
@@ -170,6 +181,36 @@ func WithAssistantMessageExtra(extra AssistantMessageExtra) DriverOption {
 	}
 }
 
+// WithFinishReasonMapper consults mapper for any finish reason the transport
+// does not recognize, after the response completes. The mapped value becomes
+// Usage.FinishReason, the reason the engine records.
+func WithFinishReasonMapper(mapper FinishReasonMapper) DriverOption {
+	return func(cfg *driverConfig) {
+		cfg.finishReasonMapper = mapper
+	}
+}
+
+// mapFinishReason applies the specialized driver's mapper to a finish reason
+// the transport left Unset.
+func (d *Driver) mapFinishReason(
+	raw string,
+	usage elelem.Usage,
+) (elelem.Usage, error) {
+	if d.finishReasonMapper == nil || raw == "" ||
+		usage.FinishReason != elelem.FinishReasonUnset {
+		return usage, nil
+	}
+
+	reason, err := d.finishReasonMapper(raw)
+	if err != nil {
+		return usage, ctxerrors.Wrap(err, "provider finish reason")
+	}
+
+	usage.FinishReason = reason
+
+	return usage, nil
+}
+
 // Stream issues one streaming chat completion.
 func (d *Driver) Stream(
 	ctx context.Context,
@@ -220,17 +261,7 @@ func (d *Driver) Stream(
 		return usage, streamErr
 	}
 
-	warnUnmappedFinishReason(ctx, req.Model.ID, rawFinishReason, usage)
-
-	logger.Debug(
-		"openai request completed",
-		"model", usage.Model,
-		"finish_reason", usage.FinishReason,
-		"prompt_tokens", usage.Prompt,
-		"completion_tokens", usage.Completion,
-	)
-
-	return usage, streamErr
+	return d.finishResponse(ctx, req.Model.ID, rawFinishReason, usage)
 }
 
 // Complete issues the same chat completion with streaming off.
@@ -297,9 +328,26 @@ func (d *Driver) Complete(
 		return usage, err
 	}
 
-	warnUnmappedFinishReason(ctx, req.Model.ID, rawFinishReason, usage)
+	return d.finishResponse(ctx, req.Model.ID, rawFinishReason, usage)
+}
 
-	logger.Debug(
+// finishResponse applies the specialized driver's finish-reason mapper, warns
+// about a reason nothing mapped, and logs the completed call. Stream and
+// Complete share it so the two modes cannot report a finish differently.
+func (d *Driver) finishResponse(
+	ctx context.Context,
+	modelID string,
+	rawFinishReason string,
+	usage elelem.Usage,
+) (elelem.Usage, error) {
+	usage, err := d.mapFinishReason(rawFinishReason, usage)
+	if err != nil {
+		return usage, err
+	}
+
+	warnUnmappedFinishReason(ctx, modelID, rawFinishReason, usage)
+
+	ctxscope.GetLogger(ctx).Debug(
 		"openai request completed",
 		"model", usage.Model,
 		"finish_reason", usage.FinishReason,

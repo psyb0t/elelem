@@ -27,6 +27,11 @@ type Usage struct {
 	Model        string
 	FinishReason FinishReason
 	Retry        RetryInfo
+
+	// ResponseID is the provider's identifier for the call that produced this
+	// usage, when the provider reports one. Quote it in a support request to
+	// the provider. Empty when the provider sends none.
+	ResponseID string
 }
 
 // BilledTotalTokens is Total plus the tokens burned by failed retry attempts
@@ -53,6 +58,11 @@ func addUsage(total, round Usage) Usage {
 	// Model is last-NON-EMPTY: a failed round may not identify its provider.
 	if round.Model != "" {
 		total.Model = round.Model
+	}
+
+	// ResponseID is last-NON-EMPTY for the same reason as Model.
+	if round.ResponseID != "" {
+		total.ResponseID = round.ResponseID
 	}
 
 	// FinishReason is last, INCLUDING Unset: it describes how the run ended.

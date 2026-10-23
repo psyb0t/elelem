@@ -127,6 +127,7 @@ wrapping.
 | `ErrResponseTruncated` | Structured output was cut off. Never repaired automatically. |
 | `ErrResponseSchemaMismatch` | Structured output didn't validate. |
 | `ErrContextExceeded` | The provider rejected the transcript as too long. |
+| `ErrQuotaExhausted` | A spent quota, balance, or plan entitlement, such as OpenAI's `insufficient_quota`. Often sent as HTTP 429, but never retried and never `ErrRateLimited`. |
 | `ErrMaxOutputExceedsContext` | `MaxOutputTokens` leaves no room for the prompt. |
 | `ErrRetryMaxAttempts`, `ErrRetryDelays`, `ErrRetryDelayOrder` | `RetryConfig` is invalid. |
 | `ErrRetryLoopExhausted` | Defensive only — you should never see it. When every attempt fails you get the **provider's** error, not this. `RetryConfig` validation rejects `MaxAttempts < 1`, so the loop always runs and always returns from inside it. |

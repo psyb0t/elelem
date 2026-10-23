@@ -318,7 +318,4 @@ type Response struct {
 }
 ```
 
-`Usage` is the run total — don't sum it yourself across rounds, you'll
-double-count. `Usage.BilledTotalTokens()` adds the tokens burned by failed
-retry attempts; `Usage.Total` counts only the attempt that succeeded. Use the
-former for cost, the latter for context.
+`Usage` is the run total, so don't sum it yourself across rounds; you'll double-count. `Usage.BilledTotalTokens()` adds the tokens burned by failed retry attempts, and `Usage.Total` counts only the attempt that succeeded. Use the former for cost, the latter for context. `Usage.ResponseID` is the provider's identifier for the last call, when the provider reports one. Quote it in a support request to the provider.

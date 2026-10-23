@@ -4,6 +4,22 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.11.0 (2026-10-23)
+
+Z.ai Coding now follows what the endpoint documents and does, and spent quotas are no longer retried as rate limits. No migration is needed unless you set tool choice on a Z.ai model, which is now refused locally.
+
+- **Breaking:** changes Z.ai capabilities to match the endpoint. Tool choice is no longer claimed, because the endpoint treats `required` and a named tool as `auto`, and GLM 5.3 no longer claims image, audio, or file input. More than four stop words fail locally.
+- Fixes `zaicoding.LookupModel` and `zaicoding.KnownModels` returning no context window for GLM 5.3 and GLM 5.3 Flash. Both now carry Z.ai's documented 1,000,000-token window, so budgeting, `DropOldestUnits`, and the max-output check work for them without a caller-supplied `ContextSize`.
+- Fixes the Z.ai output cap being ignored. `MaxOutputTokens` is now sent as `max_tokens`, the field the endpoint honors, instead of `max_completion_tokens`, and is limited to the documented 131,072.
+- Fixes GLM 5.3 Flash refusing every reasoning effort. Both models now take the Coding Plan mapping: `minimal` and `low` send `low`, `medium` and `high` send `high`, `xhigh` and `max` send `max`. GLM 5.3 no longer advertises a `medium` level the driver refused.
+- Fixes Z.ai quota and plan failures being retried as rate limits. Business codes 1113, 1308 to 1311, and 1313 to 1321 now return `ErrQuotaExhausted` and stop the retry loop. Code 1261 returns `ErrContextExceeded` and code 1301 returns the new `zaicoding.ErrSensitiveContent`.
+- Fixes the Z.ai finish reasons `sensitive`, `model_context_window_exceeded`, and `network_error` reporting an unset finish reason. They now map to `FinishReasonContentFilter`, `FinishReasonContextExceeded`, and a retryable server error.
+- Fixes OpenAI's `insufficient_quota` 429 being retried as a rate limit. It now returns `ErrQuotaExhausted`.
+- Adds `tool_stream` to streaming Z.ai requests that carry tools, so tool-call arguments arrive as they are generated.
+- Adds `ErrQuotaExhausted`, `Usage.ResponseID` with the provider's response ID, and `openai.WithFinishReasonMapper` for drivers built on the OpenAI transport.
+- Adds Z.ai metadata for GLM 5.3 Flash X and the retired IDs the Coding Plan routes to GLM 5.3 or GLM 5.3 Flash, and lets a caller set `clear_thinking` through `WithParam("thinking", ...)`.
+- Changes the Z.ai reasoning replay envelope to be encoded once per response instead of on every reasoning delta, where the cost grew with the square of the reasoning length.
+
 ## v0.10.1 (2026-10-23)
 
 - Fixes the CI lint failure caused by an overlong token-counter comment.

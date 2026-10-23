@@ -2,6 +2,7 @@ package elelem
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -199,6 +200,14 @@ func TestClassifyRetry_UsesProviderCodeWhenStatusIsMeaningless(t *testing.T) {
 				"code must outrank a retryable-looking status",
 		},
 		{
+			name:      "insufficient quota is permanent on its 429",
+			code:      ProviderErrorCodeInsufficientQuota,
+			status:    http.StatusTooManyRequests,
+			wantRetry: false,
+			because: "a spent quota does not refill within the backoff " +
+				"window, whatever the status says",
+		},
+		{
 			name:       "an unknown code falls through to the status",
 			code:       "something_new_the_provider_invented",
 			status:     http.StatusInternalServerError,
@@ -228,6 +237,24 @@ func TestClassifyRetry_UsesProviderCodeWhenStatusIsMeaningless(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClassifyRetry_QuotaOutranksRateLimit(t *testing.T) {
+	t.Parallel()
+
+	err := ctxerrors.Wrap(&ProviderError{
+		Cause: errors.Join(
+			assert.AnError,
+			commerr.ErrRateLimited,
+			ErrQuotaExhausted,
+		),
+		StatusCode: http.StatusTooManyRequests,
+	}, "provider")
+
+	_, status, retryable := classifyRetry(err)
+
+	assert.False(t, retryable)
+	assert.Equal(t, http.StatusTooManyRequests, status)
 }
 
 // A base URL carrying userinfo credentials lands verbatim in the SDK's request
@@ -403,6 +430,12 @@ func TestProviderSentinel(t *testing.T) {
 			status: http.StatusBadRequest,
 			code:   ProviderErrorCodeContextLengthExceeded,
 			want:   ErrContextExceeded,
+		},
+		{
+			name:   "insufficient quota outranks its 429",
+			status: http.StatusTooManyRequests,
+			code:   ProviderErrorCodeInsufficientQuota,
+			want:   ErrQuotaExhausted,
 		},
 		{
 			name:   "unauthorized",

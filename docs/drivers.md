@@ -87,11 +87,20 @@ driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
 model := zaicoding.LookupModel("glm-5.3")
 ```
 
-The generic OpenAI driver remains appropriate for ordinary OpenAI-compatible
-endpoints. The maintained Coding Plan catalog contains GLM 5.3 and GLM 5.3
-Flash. GLM 5.3 accepts its documented reasoning effort values. GLM 5.3 Flash
-uses preserved thinking but does not advertise numeric or disabling controls.
-Unsupported values fail locally with `zaicoding.ErrUnsupportedParameter`.
+The generic OpenAI driver remains appropriate for ordinary OpenAI-compatible endpoints. The maintained Coding Plan catalog contains GLM 5.3 and GLM 5.3 Flash, both with Z.ai's documented 1,000,000-token context window. `LookupModel` also gives GLM 5.3 Flash X and the retired IDs the Coding Plan routes (`glm-5.2` and `glm-5.1` to GLM 5.3, `glm-4.7` to GLM 5.3 Flash) the metadata of the model that serves them.
+
+What the driver sends and checks:
+
+- Thinking is always enabled with `clear_thinking: false`, so earlier turns' reasoning stays in the conversation. Pass `WithParam("thinking", map[string]any{"clear_thinking": true})` to drop it. Disabling thinking is refused.
+- Both models take reasoning effort with the Coding Plan mapping: `minimal` and `low` send `low`, `medium` and `high` send `high`, `xhigh` and `max` send `max`. `none` is refused, because thinking cannot be turned off.
+- `MaxOutputTokens` is sent as `max_tokens`, the field the endpoint honors, and may not exceed 131,072 on a known model.
+- A streaming request with tools asks for `tool_stream`, so tool-call arguments arrive in fragments.
+- Tool choice is not claimed. The endpoint treats `required` and a named tool as `auto`, and the driver refuses them locally. More than four stop words are refused.
+- GLM 5.3 is text-only. GLM 5.3 Flash takes images, audio, and files.
+
+Z.ai's own finish reasons map onto the portable ones: `sensitive` is `FinishReasonContentFilter` and `model_context_window_exceeded` is `FinishReasonContextExceeded`. `network_error` ends the call with a retryable server error. Business codes become sentinels. The balance, plan-window, plan-expiry and plan-entitlement 429s (1113, 1308 to 1311, 1313 to 1321) are `elelem.ErrQuotaExhausted` and are never retried, 1261 is `elelem.ErrContextExceeded`, and 1301 is `zaicoding.ErrSensitiveContent`. Request rate limits (1302) and overload (1305) stay retryable.
+
+Unsupported values fail locally with `zaicoding.ErrUnsupportedParameter`. Specialized drivers over the OpenAI transport add provider finish reasons with `openai.WithFinishReasonMapper`, which the transport consults only for values it does not recognize.
 
 ## Capabilities are a promise
 

@@ -1,0 +1,7 @@
+data: {"id":"resp-reply","model":"glm-5.3","choices":[{"index":0,"delta":{"reasoning_content":"think "}}]}
+
+data: {"id":"resp-reply","model":"glm-5.3","choices":[{"index":0,"delta":{"reasoning_content":"briefly"}}]}
+
+data: {"id":"resp-reply","model":"glm-5.3","choices":[{"index":0,"delta":{"content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}
+
+data: [DONE]

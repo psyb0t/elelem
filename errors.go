@@ -24,6 +24,10 @@ func ProviderSentinel(status int, code string) error {
 		return ErrContextExceeded
 	case ProviderErrorCodeRateLimit:
 		return commerr.ErrRateLimited
+	case ProviderErrorCodeInsufficientQuota:
+		// Arrives as a 429, so it must outrank the status: a spent quota is
+		// not a rate limit and no retry within the backoff window clears it.
+		return ErrQuotaExhausted
 	}
 
 	switch status {
@@ -62,6 +66,11 @@ var (
 		"maximum output tokens exceed model context",
 	)
 	ErrContextExceeded = errors.New("provider context limit exceeded")
+
+	// ErrQuotaExhausted is a spent quota, balance, or plan entitlement. It is
+	// often reported with HTTP 429 but is never retried: it clears on a billing
+	// or plan change, or at a reset hours away, not within a backoff window.
+	ErrQuotaExhausted = errors.New("provider quota exhausted")
 
 	// ErrToolHandlerPanicked is what a recovered handler panic becomes. A
 	// sentinel rather than a bare error so a caller can tell a panic apart

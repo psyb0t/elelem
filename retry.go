@@ -78,6 +78,7 @@ const (
 	ProviderErrorCodeOverloaded            = "overloaded_error"
 	ProviderErrorCodeAPIError              = "api_error"
 	ProviderErrorCodeRateLimit             = "rate_limit_error"
+	ProviderErrorCodeInsufficientQuota     = "insufficient_quota"
 )
 
 type RetryReason = string
@@ -652,6 +653,12 @@ func classifyRetry(err error) (RetryReason, int, bool) {
 		return "", 0, false
 	}
 
+	// Checked before the rate limit: providers report a spent quota with 429,
+	// and a driver may have joined both sentinels onto the same error.
+	if errors.Is(err, ErrQuotaExhausted) {
+		return "", http.StatusTooManyRequests, false
+	}
+
 	if errors.Is(err, commerr.ErrRateLimited) {
 		return RetryReasonRateLimited, http.StatusTooManyRequests, true
 	}
@@ -711,8 +718,10 @@ func classifyProviderErrorCode(code string) (RetryReason, bool, bool) {
 		return RetryReasonServerError, true, true
 	case ProviderErrorCodeRateLimit:
 		return RetryReasonRateLimited, true, true
-	case ProviderErrorCodeContextLengthExceeded:
-		// Permanent: the same transcript will not fit on a second attempt.
+	case ProviderErrorCodeContextLengthExceeded,
+		ProviderErrorCodeInsufficientQuota:
+		// Permanent: the same transcript will not fit on a second attempt, and
+		// a spent quota does not refill within the backoff window.
 		return "", false, true
 	default:
 		return "", false, false
