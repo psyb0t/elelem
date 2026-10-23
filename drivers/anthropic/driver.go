@@ -373,9 +373,9 @@ func (d *Driver) ListModels(ctx context.Context) ([]string, error) {
 	return models, nil
 }
 
-// TokenCounter uses elelem's provider-neutral estimator.
+// TokenCounter counts the thinking blocks this transport replays.
 func (d *Driver) TokenCounter() elelem.TokenCounter {
-	return elelem.DefaultTokenCounter()
+	return reasoningTokenCounter{}
 }
 
 var _ elelem.Driver = (*Driver)(nil)

@@ -590,18 +590,14 @@ func assistantMessage(
 		)
 	}
 
-	if assistantMessageExtra != nil {
-		extra, err := assistantMessageExtra(ctx, model, message)
-		if err != nil {
-			return messageParam{}, ctxerrors.Wrap(
-				err,
-				"encode assistant message extras",
-			)
-		}
+	extra, err := assistantReasoningExtra(ctx, model, message,
+		assistantMessageExtra)
+	if err != nil {
+		return messageParam{}, err
+	}
 
-		if len(extra) > 0 {
-			assistant.SetExtraFields(extra)
-		}
+	if len(extra) > 0 {
+		assistant.SetExtraFields(extra)
 	}
 
 	return openaisdk.ChatCompletionMessageParamUnion{

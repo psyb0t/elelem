@@ -180,9 +180,9 @@ type TokenCounter interface {
 }
 ```
 
-Tools count too — schemas are part of the prompt the provider bills for. So is
-reasoning: drivers round-trip thinking blocks back to the provider, and
-omitting them made the budget undercount every reasoning transcript.
+Tools count too because schemas are part of the request. Shipped drivers project reasoning through their replay rules before counting: display-only reasoning and opaque envelope metadata do not consume the budget, while replayed plaintext and signed blocks do. A copied display string does not count a second time beside its opaque replay state.
+
+Counters may optionally implement `ModelTokenCounter`, whose `ForModel(Model) TokenCounter` method binds the projection to the request's resolved model. Existing counters and third-party drivers keep the same interfaces and resolution order. This binding also survives retry wrappers, so reasoning state rejected after a model switch is excluded from the estimate.
 
 Estimates gate elelem's own budgeting and compaction decisions. They do not
 claim to match provider billing.

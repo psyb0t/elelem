@@ -204,7 +204,11 @@ func (d *Driver) Stream(
 		extraOptions(req.Params.Extra)...,
 	)
 
-	rawFinishReason, streamErr := consumeStream(stream, onDelta, &usage)
+	reasoning := d.newReasoningState(req.Model.ID, onDelta)
+
+	rawFinishReason, streamErr := consumeStreamReasoning(
+		stream, onDelta, &usage, reasoning,
+	)
 	if streamErr != nil {
 		logger.Warn(
 			"openai stream failed",
@@ -266,7 +270,6 @@ func (d *Driver) Complete(
 		"model", req.Model.ID,
 		"messages", len(req.Messages),
 		"tools", len(req.Tools),
-		"streaming", false,
 	)
 
 	completion, err := d.api.Chat.Completions.New(
@@ -288,7 +291,8 @@ func (d *Driver) Complete(
 		)
 	}
 
-	rawFinishReason, err := publishCompletion(*completion, onDelta, &usage)
+	rawFinishReason, err := publishCompletion(*completion, onDelta,
+		&usage, d.newReasoningState(req.Model.ID, onDelta))
 	if err != nil {
 		return usage, err
 	}
@@ -318,9 +322,22 @@ func publishCompletion(
 	completion openaisdk.ChatCompletion,
 	onDelta func(elelem.Delta) error,
 	usage *elelem.Usage,
+	reasoning *reasoningState,
 ) (string, error) {
 	if err := publishCompletionReasoning(completion, onDelta); err != nil {
 		return "", err
+	}
+
+	if reasoning != nil && len(completion.Choices) > 0 {
+		if err := reasoning.consume(
+			completion.Choices[0].Message.RawJSON(), false,
+		); err != nil {
+			return "", err
+		}
+
+		if err := reasoning.emit(); err != nil {
+			return "", err
+		}
 	}
 
 	chunk := chunkFromCompletion(completion)
@@ -393,10 +410,11 @@ func warnUnmappedFinishReason(
 // consumeStream drains the SSE stream and always closes it. The Close error is
 // joined rather than discarded — a leaked response body only surfaces under
 // sustained load, long after the change that caused it.
-func consumeStream(
+func consumeStreamReasoning(
 	stream *ssestream.Stream[openaisdk.ChatCompletionChunk],
 	onDelta func(elelem.Delta) error,
 	usage *elelem.Usage,
+	reasoning *reasoningState,
 ) (string, error) {
 	var (
 		streamErr       error
@@ -412,6 +430,11 @@ func consumeStream(
 	for stream.Next() {
 		chunk := stream.Current()
 		scanChoiceSignals(chunk, &rawFinishReason, &refused)
+
+		streamErr = consumeChunkReasoning(reasoning, chunk)
+		if streamErr != nil {
+			break
+		}
 
 		streamErr = publishChunk(chunk, onDelta, usage, refused)
 		if streamErr != nil {
@@ -436,7 +459,30 @@ func consumeStream(
 		streamErr = errors.Join(streamErr, wrappedCloseErr)
 	}
 
+	if streamErr == nil && reasoning != nil {
+		streamErr = reasoning.emit()
+	}
+
 	return rawFinishReason, streamErr
+}
+
+func consumeChunkReasoning(reasoning *reasoningState,
+	chunk openaisdk.ChatCompletionChunk,
+) error {
+	if reasoning == nil || len(chunk.Choices) == 0 {
+		return nil
+	}
+
+	choice := chunk.Choices[0]
+	if err := reasoning.consume(choice.Delta.RawJSON(), true); err != nil {
+		return err
+	}
+
+	if choice.FinishReason != "" {
+		return reasoning.emit()
+	}
+
+	return nil
 }
 
 // scanChoiceSignals accumulates the stream-scoped signals that no single chunk
@@ -514,9 +560,9 @@ var reservedRequestFields = map[string]bool{
 	"tool_choice": true,
 }
 
-// TokenCounter uses elelem's provider-neutral estimator.
+// TokenCounter counts only reasoning fields this transport replays.
 func (d *Driver) TokenCounter() elelem.TokenCounter {
-	return elelem.DefaultTokenCounter()
+	return reasoningTokenCounter{extra: d.assistantMessageExtra}
 }
 
 func extraOptions(extra map[string]any) []option.RequestOption {

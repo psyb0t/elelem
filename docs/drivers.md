@@ -67,6 +67,14 @@ The shipped drivers keep their SDK types entirely inside their own packages.
 Nothing from `openai-go` or `anthropic-sdk-go` appears in a signature the
 caller touches.
 
+## Reasoning on compatible endpoints
+
+The OpenAI-compatible driver preserves returned `reasoning`, `reasoning_content`, `reasoning_details`, and `thinking_blocks` extensions in `Message.ProviderReasoning`, in both streaming and non-streaming mode. Tool continuation replays those fields with the assistant message. Streamed text and signature fragments are assembled in block order; signed and encrypted state stays opaque to the engine. No endpoint name or model-name heuristic enables this behavior: only fields actually returned by the upstream are preserved. Ordinary responses add no reasoning fields to later requests.
+
+Persist `ProviderReasoning` unchanged alongside the message. Its envelope binds replay to the transport and requested model ID; foreign or mismatched state is omitted. Malformed matching state and unsupported replay fields fail locally with `ErrInvalidTranscript`. Plain `Message.Reasoning` is display text and is never promoted into a replay field by guessing a provider contract. Specialized transports may continue using `WithAssistantMessageExtra` to supply their own replay dialect.
+
+Each driver's counter budgets only the reasoning its translator replays. These counts remain local estimates, not provider billing. See [history counting](history.md#counting).
+
 ## Z.ai Coding
 
 `drivers/zaicoding` is the provider-specific choice for Z.ai Coding's

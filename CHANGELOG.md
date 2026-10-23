@@ -4,6 +4,13 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.10.0 (2026-10-22)
+
+- Fixes premature history eviction by counting only reasoning state the selected driver replays, excluding display-only text and opaque envelope metadata.
+- Preserves plaintext reasoning, signed thinking blocks, and structured reasoning details from OpenAI-compatible endpoints through streaming, storage, and tool continuation without endpoint-specific configuration.
+- Adds optional model-bound token counters while preserving the existing counter and driver interfaces, including retry wrappers.
+- Spreads scheduled issue relay runs across the day to reduce workflow queues.
+
 ## v0.9.1 (2026-09-09)
 
 - **Fixed:** retry jitter now draws from `crypto/rand` instead of a predictable

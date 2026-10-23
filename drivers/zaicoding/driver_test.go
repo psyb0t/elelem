@@ -147,6 +147,11 @@ func TestDriverReplaysReasoningContentAfterToolCall(t *testing.T) {
 	assert.Equal(t, "inspect files", reasoning)
 	require.NotEmpty(t, providerReasoning)
 
+	var saved providerReasoningEnvelope
+	require.NoError(t, json.Unmarshal(providerReasoning, &saved))
+	assert.Equal(t, Name, saved.Provider)
+	assert.Equal(t, "inspect files", saved.Reasoning)
+
 	_, err = driver.Stream(t.Context(), elelem.DriverRequest{
 		Model: model,
 		Messages: []elelem.Message{

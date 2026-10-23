@@ -964,6 +964,15 @@ func (r *Request) staticTools() []Tool {
 }
 
 func (r *Request) resolvedCounter() TokenCounter {
+	counter := r.selectedCounter()
+	if modelCounter, ok := counter.(ModelTokenCounter); ok {
+		return modelCounter.ForModel(r.resolvedModel())
+	}
+
+	return counter
+}
+
+func (r *Request) selectedCounter() TokenCounter {
 	if r.tokenCounter != nil {
 		return r.tokenCounter
 	}

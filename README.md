@@ -147,6 +147,8 @@ local endpoint.
 | Model discovery | `ListModels(ctx)` live, plus `KnownModels()` / `LookupModel(id)` | same | same |
 | Unknown model ids | accepted, the provider decides | accepted | accepted when no reasoning control is set |
 
+The OpenAI-compatible driver also preserves supported reasoning extensions through tool rounds, including signed and encrypted state. Persist `Message.ProviderReasoning` unchanged with your history. See [reasoning replay](docs/drivers.md#reasoning-on-compatible-endpoints) for the supported fields and model matching rules.
+
 `zaicoding.NewDriver` sends Z.ai's `thinking` object and preserves
 `reasoning_content` through tool rounds. Use it instead of the generic OpenAI
 driver when calling Z.ai Coding models:
