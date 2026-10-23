@@ -53,7 +53,12 @@ semgrep scan \
 
 log INFO "merging SARIF reports"
 jq -s \
-	'{version: "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", runs: ((.[0].runs // []) + (.[1].runs // []))}' \
+	'{version: "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", runs: ((.[0].runs // []) + (.[1].runs // []))}
+	| .runs |= map(
+		if .results then .results |= map(
+			if .stacks then .stacks |= unique else . end
+		) else . end
+	)' \
 	"$tmp_dir/govulncheck.sarif" "$tmp_dir/semgrep.sarif" >"$sarif_out"
 
 if ((govulncheck_status != 0 || semgrep_status != 0)); then

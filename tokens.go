@@ -77,7 +77,7 @@ func (builtInTokenCounter) Count(
 
 		parts = append(parts, message.Role, message.Text(), message.ToolCallID)
 
-		// Drivers project replayable reasoning before using this generic counter.
+		// Drivers project replayable reasoning before counting.
 		parts = append(parts, message.Reasoning)
 		if len(message.ProviderReasoning) > 0 {
 			parts = append(parts, string(message.ProviderReasoning))

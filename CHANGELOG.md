@@ -4,6 +4,13 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.10.1 (2026-10-23)
+
+- Fixes the CI lint failure caused by an overlong token-counter comment.
+- Requires Go 1.26.10 or later to build the module.
+- Updates the development and CI toolchain to Go 1.26.10, fixing GO-2026-6809, GO-2026-6617, GO-2026-6613, GO-2026-6612, GO-2026-6611, GO-2026-6610, GO-2026-6608, GO-2026-6607, GO-2026-6605, and GO-2026-6603.
+- Fixes rejected security report uploads by removing duplicate SARIF stacks while preserving findings and scanner failures.
+
 ## v0.10.0 (2026-10-22)
 
 - Fixes premature history eviction by counting only reasoning state the selected driver replays, excluding display-only text and opaque envelope metadata.
