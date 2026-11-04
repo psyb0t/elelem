@@ -4,6 +4,15 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.13.0 (2026-11-04)
+
+Tools can return images, and an MCP server's tools can run as elelem tools. No migration is needed.
+
+- Adds `ToolResult.Images`. The engine puts a tool's images on its tool message after the text. The Anthropic driver sends them inside the `tool_result` block, and the OpenAI driver sends them in one user message after the round's tool results, because an OpenAI tool message takes text only. When the model has no image input or an image is malformed, the engine leaves the image out and says so in the result text.
+- Adds `Message.ToolImages`, which returns the images a tool message carries.
+- Adds the `mcp` package. `mcp.Connect` starts a stdio server or reaches a Streamable HTTP one, with an optional bearer token, and returns its tools as `elelem.Tool` values named `mcp__<server>__<tool>`. Text results become `Content`, images become `Images`, and parts elelem cannot carry become a note. Only tools are supported. See `docs/mcp.md`.
+- Adds `github.com/modelcontextprotocol/go-sdk` v1.8.0, which only the `mcp` package imports.
+
 ## v0.12.0 (2026-10-23)
 
 `WithMaxContextTokens` is now the whole context, prompt and reply, so the output reserve comes off it the same way it comes off a model's `ContextSize`. Before upgrading, check every call that sets `WithMaxContextTokens`. The prompt gets that value minus the reserve, which is `WithOutputReserveTokens`, else `MaxOutputTokens`, else 4096. Pass `WithOutputReserveTokens(0)` to keep the old behavior.

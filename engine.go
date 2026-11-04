@@ -1064,8 +1064,13 @@ func (s *runState) recordToolOutcomes(
 // handler — and a bound enforced on only some of them is not a bound.
 func (s *runState) recordToolResultMessage(call ToolCall, result ToolResult) {
 	s.messages = append(s.messages, Message{
-		Role:              RoleTool,
-		Content:           Text(s.truncateToolResult(result.Content)),
+		Role: RoleTool,
+		Content: toolResultMessageContent(
+			s.truncateToolResult(result.Content),
+			result.Images,
+			s.request.client.Capabilities(s.model).SupportsImageInput,
+			s.model.ID,
+		),
 		ToolCallID:        call.ID,
 		ToolResultIsError: result.IsError,
 		Origin:            MessageOriginTurn,

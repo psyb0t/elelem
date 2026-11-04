@@ -133,6 +133,15 @@ linters:
             - github.com/anthropics/anthropic-sdk-go
             - github.com/openai/openai-go
             - github.com/tiktoken-go/tokenizer
+            - github.com/modelcontextprotocol/go-sdk
+        # The MCP SDK is admissible only in the mcp package, the same way a
+        # provider SDK stays in its driver.
+        mcp:
+          files:
+            - "!**/mcp/**"
+          deny:
+            - pkg: github.com/modelcontextprotocol/go-sdk
+              desc: the MCP SDK stays inside the mcp package
 
   exclusions:
     generated: lax

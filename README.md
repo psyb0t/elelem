@@ -270,6 +270,7 @@ elelemtest/mocks/                  generated Driver mock
 drivers/openai/                    OpenAI-compatible transport
 drivers/anthropic/                 Anthropic transport
 drivers/zaicoding/                 Z.ai Coding transport
+mcp/                               MCP server tools as elelem tools
 ```
 
 Three placements the filename alone won't give you: the round/tool loop lives
@@ -283,7 +284,8 @@ the request-validation helpers it shares with `request.go`.
 |---|---|
 | [requests.md](docs/requests.md) | Every builder method, what it sets, and what happens when you don't set it. |
 | [callbacks.md](docs/callbacks.md) | The sixteen observation points, their ordering guarantees, and a worked example. |
-| [tools.md](docs/tools.md) | Tools, the hook lifecycle, message injection, denial, and the bounds that keep a tool loop honest. |
+| [tools.md](docs/tools.md) | Tools, images in tool results, the hook lifecycle, message injection, denial, and the bounds that keep a tool loop honest. |
+| [mcp.md](docs/mcp.md) | Turning an MCP server's tools into elelem tools, over stdio or Streamable HTTP. |
 | [history.md](docs/history.md) | Token budgets, transcript units, limiting handlers, counting, and what to persist. |
 | [retries.md](docs/retries.md) | The retry decorator, failure classification, and the sentinel taxonomy. |
 | [structured-output.md](docs/structured-output.md) | `RunInto`, JSON mode, JSON schema, validation and repair. |

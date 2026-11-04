@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 
@@ -494,7 +495,19 @@ func toOpenAIMessagesWithAssistantMessageExtra(
 	assistantMessageExtra AssistantMessageExtra,
 ) ([]messageParam, error) {
 	out := make([]messageParam, 0, len(messages))
+
+	// withImages holds the current run's tool results that carry images.
+	// A tool message takes text only, so their images follow the run in one
+	// user message: a user message between two tool results would split the
+	// answer to one assistant turn.
+	withImages := make([]elelem.Message, 0)
+
 	for _, message := range messages {
+		if message.Role != elelem.RoleTool && len(withImages) > 0 {
+			out = append(out, toolImagesMessage(withImages))
+			withImages = withImages[:0]
+		}
+
 		translated, err := toOpenAIMessageWithAssistantMessageExtra(
 			ctx,
 			model,
@@ -506,9 +519,40 @@ func toOpenAIMessagesWithAssistantMessageExtra(
 		}
 
 		out = append(out, translated)
+
+		if len(message.ToolImages()) > 0 {
+			withImages = append(withImages, message)
+		}
+	}
+
+	if len(withImages) > 0 {
+		out = append(out, toolImagesMessage(withImages))
 	}
 
 	return out, nil
+}
+
+// toolImagesIntroFormat introduces the images one tool call returned, so the
+// model can tell which result each image belongs to.
+const toolImagesIntroFormat = "Images returned by tool call %s:"
+
+// toolImagesMessage is the user message carrying the images of a run of tool
+// results, each group introduced by its tool call ID.
+func toolImagesMessage(results []elelem.Message) messageParam {
+	parts := make([]openaisdk.ChatCompletionContentPartUnionParam, 0,
+		len(results)*2) //nolint:mnd // An intro and usually one image each.
+
+	for _, result := range results {
+		parts = append(parts, openaisdk.TextContentPart(
+			fmt.Sprintf(toolImagesIntroFormat, result.ToolCallID),
+		))
+
+		for _, image := range result.ToolImages() {
+			parts = append(parts, toImagePart(image))
+		}
+	}
+
+	return openaisdk.UserMessage(parts)
 }
 
 func toOpenAIMessageWithAssistantMessageExtra(

@@ -7,7 +7,8 @@ The [root README](../README.md) is the tour. This is the reference.
 | [requests.md](requests.md) | Building and running a request. Every builder method, what it sets, and what happens if you don't set it. |
 | [prompts.md](prompts.md) | The `Prompt` builder (system message, history, origins), plus images, audio and documents, and which provider takes what. |
 | [callbacks.md](callbacks.md) | The sixteen observation points: text, reasoning, tool calls, rounds, retries, token limits. Ordering guarantees and what an error from one does. |
-| [tools.md](tools.md) | Tools, the hook lifecycle, message injection, denial, and the bounds that stop a tool loop eating your process. |
+| [tools.md](tools.md) | Tools, images in tool results, the hook lifecycle, message injection, denial, and the bounds that stop a tool loop eating your process. |
+| [mcp.md](mcp.md) | Turning an MCP server's tools into elelem tools, over stdio or Streamable HTTP. |
 | [history.md](history.md) | Token budgets, transcript units, the limiting handlers, and counting. |
 | [retries.md](retries.md) | The retry decorator, how failures get classified, and the sentinel taxonomy. |
 | [structured-output.md](structured-output.md) | `RunInto`, JSON mode, JSON schema, validation and repair. |

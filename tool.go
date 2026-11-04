@@ -20,8 +20,20 @@ type ToolInput struct {
 	Arguments json.RawMessage
 }
 type ToolResult struct {
-	Content  string
-	IsError  bool
+	Content string
+	IsError bool
+
+	// Images are images the tool returned, such as a screenshot or a chart.
+	// The engine puts them on the tool message after Content, and each driver
+	// carries them the way its provider can: Anthropic inside the
+	// tool_result block, OpenAI in a user message right after the round's
+	// tool results, because its tool message takes text only.
+	//
+	// An image the model cannot take is never dropped silently. When the
+	// model has no image input, or an image is malformed, the engine leaves
+	// it out and appends a note saying so to the tool message's text.
+	Images []ImageSource
+
 	Metadata map[string]any
 }
 

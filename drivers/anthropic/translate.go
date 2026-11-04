@@ -214,11 +214,11 @@ func toToolResultMessage(
 			}
 		}
 
-		block := anthropicsdk.NewToolResultBlock(
-			message.ToolCallID,
-			message.Text(),
-			message.ToolResultIsError,
-		)
+		block, err := toToolResultBlock(message)
+		if err != nil {
+			return anthropicsdk.MessageParam{}, 0, err
+		}
+
 		applyBlockCacheHint(&block, message.CacheHint)
 
 		blocks = append(blocks, block)
@@ -226,6 +226,50 @@ func toToolResultMessage(
 	}
 
 	return anthropicsdk.NewUserMessage(blocks...), consumed, nil
+}
+
+// toToolResultBlock renders one tool result. Images ride inside the
+// tool_result block after the text, which the Messages API accepts. An empty
+// text block is left out when images follow, because the API refuses empty
+// text blocks.
+func toToolResultBlock(
+	message elelem.Message,
+) (anthropicsdk.ContentBlockParamUnion, error) {
+	images := message.ToolImages()
+
+	block := anthropicsdk.NewToolResultBlock(
+		message.ToolCallID,
+		message.Text(),
+		message.ToolResultIsError,
+	)
+	if len(images) == 0 {
+		return block, nil
+	}
+
+	content := make([]anthropicsdk.ToolResultBlockParamContentUnion, 0,
+		len(images)+1)
+	if text := message.Text(); text != "" {
+		content = append(content, anthropicsdk.ToolResultBlockParamContentUnion{
+			OfText: &anthropicsdk.TextBlockParam{Text: text},
+		})
+	}
+
+	for index, image := range images {
+		converted, err := toImageBlock(image)
+		if err != nil {
+			return anthropicsdk.ContentBlockParamUnion{}, ctxerrors.Wrapf(
+				err, "tool result image %d", index,
+			)
+		}
+
+		content = append(content, anthropicsdk.ToolResultBlockParamContentUnion{
+			OfImage: converted.OfImage,
+		})
+	}
+
+	block.OfToolResult.Content = content
+
+	return block, nil
 }
 
 // toMidConvSystemMessage renders a mid-conversation system message.

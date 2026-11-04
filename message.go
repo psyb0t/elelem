@@ -70,8 +70,9 @@ type Message struct {
 
 	// Content is an ordered list of parts. Build the text-only case with
 	// Text("..."); read it back with Message.Text() when a string is what you
-	// need. Only user messages carry non-text parts on either provider — see
-	// Capabilities for what each one accepts.
+	// need. User messages carry non-text parts, and so do tool messages,
+	// which may carry images after their text (see ToolResult.Images). See
+	// Capabilities for what each provider accepts.
 	Content Content
 
 	ToolCalls         []ToolCall

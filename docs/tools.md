@@ -3,6 +3,7 @@
 ## Contents
 
 - [Defining a tool](#defining-a-tool)
+- [Returning images](#returning-images)
 - [Attaching tools](#attaching-tools)
 - [The hook lifecycle](#the-hook-lifecycle)
 - [Errors, panics and denial](#errors-panics-and-denial)
@@ -49,6 +50,28 @@ can block on a network call exactly like a handler can, and a deadline starting
 after them would leave a hanging `PreRun` with nothing able to interrupt it.
 Budget accordingly, because a slow hook spends the handler's share. Zero means no
 per-tool bound, so the only limit is the caller's context.
+
+## Returning images
+
+A tool can return images next to its text, such as a screenshot or a rendered chart:
+
+```go
+return elelem.ToolResult{
+	Content: "the login page",
+	Images:  []elelem.ImageSource{{Data: png, MediaType: elelem.MediaTypePNG}},
+}, nil
+```
+
+The engine puts the images on the tool message after the text, and `Message.ToolImages` reads them back. Each driver sends them the way its provider can:
+
+| Provider | Where the images go |
+|---|---|
+| Anthropic | Inside the `tool_result` block, after the text. An empty text block is left out, because the API refuses one. |
+| OpenAI and OpenAI-compatible | The tool message takes text only, so the images follow the round's tool results in one user message. Each call's images are introduced by its tool call ID. |
+
+An image the model cannot take is never dropped silently. The engine leaves it out and appends a note such as `[image 1 of 2 not shown: model "glm-5.3" does not accept image input]` to the result text when the model has no image input, when an image has both or neither of `Data` and `URL`, or when it has `Data` and no `MediaType`. The Anthropic driver still refuses a media type other than PNG, JPEG, GIF, or WebP before the request is sent.
+
+The token budget does not count image tokens, the same as for images in user messages.
 
 ## Attaching tools
 
