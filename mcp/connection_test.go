@@ -283,6 +283,52 @@ func TestConnectOverHTTPWithoutTheTokenFails(t *testing.T) {
 	assert.NotContains(t, err.Error(), "wrong", "the token stays out of errors")
 }
 
+func TestRefreshToolsSeesAServerThatChanged(t *testing.T) {
+	t.Parallel()
+
+	shared := newTestServer()
+	handler := sdk.NewStreamableHTTPHandler(
+		func(*http.Request) *sdk.Server { return shared }, nil,
+	)
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	connection := connectHTTP(t, Server{Name: testHTTPServer, URL: server.URL})
+	before := len(connection.Tools())
+
+	shared.AddTool(&sdk.Tool{
+		Name: "added", InputSchema: objectSchema(),
+	}, func(context.Context, *sdk.CallToolRequest) (toolResult, error) {
+		return textResult("new"), nil
+	})
+
+	require.NoError(t, connection.RefreshTools(t.Context()))
+	require.Len(t, connection.Tools(), before+1)
+
+	result, err := callTool(t, connection, testHTTPServer, "added", "")
+	require.NoError(t, err)
+	assert.Equal(t, "new", result.Content)
+}
+
+func TestRefreshToolsOnAStoppedServerFails(t *testing.T) {
+	t.Parallel()
+
+	connection, err := Connect(t.Context(), stdioServer(t))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, connection.Close()) })
+
+	_, err = callTool(t, connection, testServerName, testToolExit, "")
+	require.Error(t, err)
+
+	require.Eventually(t, func() bool {
+		return connection.Err() != nil
+	}, connectionWait, connectionPoll)
+
+	before := connection.Tools()
+	require.ErrorIs(t, connection.RefreshTools(t.Context()), ErrServerStopped)
+	assert.Len(t, connection.Tools(), len(before), "the old list stays")
+}
+
 func TestConnectOverStdio(t *testing.T) {
 	t.Parallel()
 

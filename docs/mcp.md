@@ -69,7 +69,7 @@ A stdio server runs in its own process group. `Close` closes its input, waits `S
 
 `Done` closes when the connection ends, by `Close` or because the server went away. After the server goes away, `Err` returns `ErrServerStopped` and every tool call fails with it. `Err` is nil after a plain `Close`.
 
-The package reads the tool list once, at `Connect`. It does not watch for changes, so connect again to see a server's new tools.
+The package reads the tool list at `Connect`. It does not watch for changes: call `RefreshTools` to list the tools again, for example before each request. On failure the previous list stays.
 
 ## What is not supported
 

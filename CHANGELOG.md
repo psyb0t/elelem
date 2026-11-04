@@ -4,6 +4,13 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.14.0 (2026-11-04)
+
+An MCP connection can list its server's tools again. No migration is needed.
+
+- Adds `mcp.Connection.RefreshTools`, which lists the server's tools again so a tool the server added, removed, or changed since `Connect` is seen. On failure the previous list stays, and on a stopped server it returns `ErrServerStopped`.
+- Changes `mcp.Connection.Tools` and `Warnings` to be safe to call while `RefreshTools` runs.
+
 ## v0.13.0 (2026-11-04)
 
 Tools can return images, and an MCP server's tools can run as elelem tools. No migration is needed.

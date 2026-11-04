@@ -143,13 +143,40 @@ func validateServer(server Server) error {
 // Tools returns the server's tools, ready to add to a Request. A call after
 // the connection ended fails with ErrServerStopped.
 func (c *Connection) Tools() []elelem.Tool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
 	return slices.Clone(c.tools)
 }
 
 // Warnings lists problems that did not stop the connection, such as an
 // allowed tool the server does not offer.
 func (c *Connection) Warnings() []string {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
 	return slices.Clone(c.warnings)
+}
+
+// RefreshTools lists the server's tools again, so a server that added,
+// removed, or changed a tool since Connect is seen. Tools returned earlier
+// keep working. On failure the previous list stays.
+func (c *Connection) RefreshTools(ctx context.Context) error {
+	if err := c.Err(); err != nil {
+		return err
+	}
+
+	tools, warnings, err := c.listTools(ctx)
+	if err != nil {
+		return ctxerrors.Wrap(err, "refresh MCP server tools")
+	}
+
+	c.mutex.Lock()
+	c.tools = tools
+	c.warnings = warnings
+	c.mutex.Unlock()
+
+	return nil
 }
 
 // Done is closed when the connection ends, by Close or because the server
