@@ -54,6 +54,7 @@ func LookupModel(id string) elelem.Model {
 		return model
 	case modelKindGLM53, modelKindGLM53Flash:
 		model.ContextSize = glm53ContextSize
+		model.MaxOutputTokens = glm53MaxOutputTokens
 		model.SupportsReasoning = true
 		model.ReasoningLevels = reasoningLevels()
 	}

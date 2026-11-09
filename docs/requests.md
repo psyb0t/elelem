@@ -158,6 +158,8 @@ are not discovered. `ContextSize` drives budgeting; `Pricing` drives
 `Response.Cost`, which is `0` when pricing is absent. **`0` means unknown, not
 free.**
 
+`MaxOutputTokens` is the largest `max_tokens` the provider accepts for the model, reasoning included, and `0` means unknown. The Z.ai Coding catalog fills it for GLM 5.3 and GLM 5.3 Flash. elelem never sends it on its own. Pass it to `WithMaxOutputTokens` to cap a reply at the model's ceiling.
+
 Ask the driver what a model can do:
 
 ```go

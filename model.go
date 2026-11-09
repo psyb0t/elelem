@@ -1,8 +1,13 @@
 package elelem
 
 type Model struct {
-	ID                string
-	ContextSize       int
+	ID          string
+	ContextSize int
+	// MaxOutputTokens is the largest max_tokens the provider accepts for
+	// the model, reasoning included. 0 means unknown. elelem never sends it
+	// on its own: a caller that wants output capped at the model's ceiling
+	// passes it to WithMaxOutputTokens.
+	MaxOutputTokens   int
 	SupportsReasoning bool
 	ReasoningLevels   ReasoningLevels
 	Pricing           ModelPricing

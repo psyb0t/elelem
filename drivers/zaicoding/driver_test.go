@@ -439,28 +439,39 @@ func TestLookupModel(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		id               string
-		wantContextSize  int
-		wantReasoning    bool
-		wantReasoningMax elelem.ReasoningEffort
+		id                  string
+		wantContextSize     int
+		wantMaxOutputTokens int
+		wantReasoning       bool
+		wantReasoningMax    elelem.ReasoningEffort
 	}{
 		{
-			id:               modelGLM53,
-			wantContextSize:  glm53ContextSize,
-			wantReasoning:    true,
-			wantReasoningMax: elelem.ReasoningEffortMax,
+			id:                  modelGLM53,
+			wantContextSize:     glm53ContextSize,
+			wantMaxOutputTokens: glm53MaxOutputTokens,
+			wantReasoning:       true,
+			wantReasoningMax:    elelem.ReasoningEffortMax,
 		},
 		{
-			id:               "GLM-5.3",
-			wantContextSize:  glm53ContextSize,
-			wantReasoning:    true,
-			wantReasoningMax: elelem.ReasoningEffortMax,
+			id:                  "GLM-5.3",
+			wantContextSize:     glm53ContextSize,
+			wantMaxOutputTokens: glm53MaxOutputTokens,
+			wantReasoning:       true,
+			wantReasoningMax:    elelem.ReasoningEffortMax,
 		},
 		{
-			id:               modelGLM53Flash,
-			wantContextSize:  glm53ContextSize,
-			wantReasoning:    true,
-			wantReasoningMax: elelem.ReasoningEffortMax,
+			id:                  modelGLM53Flash,
+			wantContextSize:     glm53ContextSize,
+			wantMaxOutputTokens: glm53MaxOutputTokens,
+			wantReasoning:       true,
+			wantReasoningMax:    elelem.ReasoningEffortMax,
+		},
+		{
+			id:                  modelGLM47Routed,
+			wantContextSize:     glm53ContextSize,
+			wantMaxOutputTokens: glm53MaxOutputTokens,
+			wantReasoning:       true,
+			wantReasoningMax:    elelem.ReasoningEffortMax,
 		},
 		{id: "unlisted-model"},
 	}
@@ -472,6 +483,7 @@ func TestLookupModel(t *testing.T) {
 			model := LookupModel(tc.id)
 			assert.Equal(t, tc.id, model.ID)
 			assert.Equal(t, tc.wantContextSize, model.ContextSize)
+			assert.Equal(t, tc.wantMaxOutputTokens, model.MaxOutputTokens)
 			assert.Equal(t, tc.wantReasoning, model.SupportsReasoning)
 			assert.Equal(t, tc.wantReasoningMax, model.ReasoningLevels.Max)
 		})

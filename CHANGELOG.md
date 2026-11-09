@@ -4,6 +4,13 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.15.0 (2026-11-09)
+
+A model can carry the output limit its provider accepts. No migration is needed.
+
+- Adds `Model.MaxOutputTokens`, the largest `max_tokens` the provider accepts for the model, reasoning included. `0` means unknown. elelem does not send it on its own.
+- Adds the documented 131,072-token output limit to GLM 5.3, GLM 5.3 Flash, and the IDs the Z.ai Coding catalog routes to them.
+
 ## v0.14.0 (2026-11-04)
 
 An MCP connection can list its server's tools again. No migration is needed.
