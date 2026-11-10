@@ -55,9 +55,9 @@ response, err := elelem.NewRequest(client).
 - [Drivers](#drivers)
 - [Shit that can bite you](#shit-that-can-bite-you)
 - [Logging](#logging)
-- [Package shape](#package-shape)
 - [Documentation](#documentation)
 - [Development](#development)
+- [Sponsor](#sponsor)
 
 ## Quick start
 
@@ -103,194 +103,70 @@ Want the model to fill in a struct instead? `RunInto(ctx, &dst)`. Same builder,
 typed answer, and it validates before it assigns, so a half-decoded object
 never lands in your variable.
 
-Every knob these examples don't show is in
-[docs/requests.md](docs/requests.md).
+Every knob these examples don't show is on the
+[Requests](https://psyb0t.github.io/elelem/requests/) page.
 
 ## The pieces
 
 | Area | What you get |
 |---|---|
-| **[Requests](docs/requests.md)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, queued user turns, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
-| **[Prompts](docs/prompts.md)** | An immutable `Prompt` carrying the system message, the history and this turn. Build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read gets refused locally instead of by the provider a round trip later. |
-| **[Tools](docs/tools.md)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of taking your process down with it, per-call denial, and tools that inject messages. |
-| **[Callbacks](docs/callbacks.md)** | Sixteen observation points: run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
-| **[History](docs/history.md)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
-| **[Retries](docs/retries.md)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and keeps a ledger of what the failed attempts cost you. |
-| **[Structured output](docs/structured-output.md)** | `RunInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request when the model shits out malformed JSON. |
-| **[Drivers](docs/drivers.md)** | OpenAI-compatible, Anthropic, and Z.ai Coding transports. `KnownModels()` / `LookupModel(id)` provide known metadata; unknown ids stay usable. |
-| **[Test doubles](docs/testing.md)** | A scripted `Driver` that imports no test framework, a generated mock, and the conformance suite for when you write a third driver. |
+| **[Requests](https://psyb0t.github.io/elelem/requests/)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, queued user turns, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
+| **[Prompts](https://psyb0t.github.io/elelem/prompts/)** | An immutable `Prompt` carrying the system message, the history and this turn. Build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read gets refused locally instead of by the provider a round trip later. |
+| **[Tools](https://psyb0t.github.io/elelem/tools/)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of taking your process down with it, per-call denial, and tools that inject messages. |
+| **[Callbacks](https://psyb0t.github.io/elelem/callbacks/)** | Sixteen observation points: run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
+| **[History](https://psyb0t.github.io/elelem/history/)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
+| **[Retries](https://psyb0t.github.io/elelem/retries/)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and keeps a ledger of what the failed attempts cost you. |
+| **[Structured output](https://psyb0t.github.io/elelem/structured-output/)** | `RunInto` derives a JSON schema from your own struct, validates against it, and can spend one bounded repair request when the model shits out malformed JSON. |
+| **[Drivers](https://psyb0t.github.io/elelem/drivers/)** | OpenAI-compatible, Anthropic, and Z.ai Coding transports. `KnownModels()` / `LookupModel(id)` provide known metadata; unknown ids stay usable. |
+| **[Test doubles](https://psyb0t.github.io/elelem/testing/)** | A scripted `Driver` that imports no test framework, a generated mock, and the conformance suite for when you write a third driver. |
 
 ## Drivers
-
-The OpenAI-compatible driver takes these options:
-
-```go
-openai.NewDriver(
-	openai.WithAPIKey(apiKey),
-	openai.WithBaseURL("https://your-openai-compatible-endpoint/v1"),
-	openai.WithHTTPClient(httpClient),
-	openai.WithSDKOptions(/* raw SDK options */),
-)
-```
-
-`NewDriver` is convenient for a one-provider program, because the official SDK
-can read its usual environment variables. A multi-provider application that owns
-credential resolution should start every configured driver with
-`WithoutEnvironmentDefaults()`, then pass only that upstream's own key and
-HTTP client plus a URL when it is not the driver's official default. That
-stops one provider's environment credential from quietly reaching a keyless
-local endpoint.
 
 | | `drivers/openai` | `drivers/anthropic` | `drivers/zaicoding` |
 |---|---|---|---|
 | Talks to | OpenAI and anything OpenAI-shaped, including vLLM, Ollama, OpenRouter, LM Studio, and compatible proxies | The Anthropic Messages API | Z.ai Coding's OpenAI-shaped endpoint |
 | Model discovery | `ListModels(ctx)` live, plus `KnownModels()` / `LookupModel(id)` | same | same |
-| Unknown model ids | accepted, the provider decides | accepted | accepted when no reasoning control is set |
 
-The OpenAI-compatible driver also preserves supported reasoning extensions through tool rounds, including signed and encrypted state. Persist `Message.ProviderReasoning` unchanged with your history. See [reasoning replay](docs/drivers.md#reasoning-on-compatible-endpoints) for the supported fields and model matching rules.
+The OpenAI-compatible and Anthropic drivers let the official SDK read its usual environment variables. A multi-provider application that resolves credentials itself should start both of those drivers with `WithoutEnvironmentDefaults()`, so one provider's key never reaches another endpoint.
 
-`zaicoding.NewDriver` sends Z.ai's `thinking` object and preserves
-`reasoning_content` through tool rounds. Use it instead of the generic OpenAI
-driver when calling Z.ai Coding models:
+**Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)` reports what one model supports, and the engine rejects an unsupported parameter **locally**, before any network call, instead of firing it off and eating a cryptic 400.
 
-```go
-driver := zaicoding.NewDriver(zaicoding.WithAPIKey(apiKey))
-model := zaicoding.LookupModel("glm-5.3")
-```
-
-**Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)`
-reports what one model supports: seed, tool choice, parallel tool calls,
-strict tool arguments, JSON schema, sampling parameters, reasoning effort and
-its ceiling. Anthropic rejects a non-default temperature on newer models while
-happily eating it on older ones, so a single per-provider table would just be a
-lie you shipped. The engine reads that struct and rejects an unsupported
-parameter **locally**, before any network call, instead of firing it off and
-eating a cryptic 400.
-
-Streaming is on by default. Some OpenAI- and Anthropic-compatible backends
-can't do it (an async job queue sitting in front of a model has nowhere to put
-a token stream), so `WithStreaming(false)` sends the same request with
-streaming off and feeds the finished response through the exact same callbacks.
-Your renderer never has to know. See
-[docs/requests.md](docs/requests.md#streaming).
-
-Writing a third driver is [docs/drivers.md](docs/drivers.md), and
-`elelemtest/conformance.Run` is the contract suite all shipped drivers run
-against, so it's alive, not a document that quietly drifted out of date two
-years ago.
+The OpenAI-compatible driver preserves reasoning extensions through tool rounds; persist `Message.ProviderReasoning` unchanged with your history. Use `zaicoding.NewDriver` instead of the generic OpenAI driver for Z.ai Coding models. Options, reasoning replay, the Z.ai specifics and the contract for writing a third driver are on the [Drivers](https://psyb0t.github.io/elelem/drivers/) page, and `elelemtest/conformance.Run` is the contract suite all shipped drivers run against.
 
 ## Shit that can bite you
 
-Two inputs are untrusted, and nobody has to be malicious for it to matter. A
-model that hallucinates, an OpenAI-compatible endpoint, or a proxy is plenty.
+Two inputs are untrusted: provider output and tool results. Nobody has to be malicious for it to matter; a model that hallucinates or a proxy is plenty.
 
-**Provider output.** Tool-call ids, names, arguments, indices and the finish
-reason are all model-chosen. The engine bounds distinct tool calls per round
-and accumulated argument bytes unconditionally. **Tool-result size is bounded
-only if you ask**. `WithMaxToolResultTokens` is unset by default, and until
-you set it a result goes through at whatever length it showed up. A call with
-no id, a duplicate id, or an index reused for two different calls gets dropped
-or split at ingest with a logged `reason`. Otherwise the provider
-rejects each of those on the NEXT request instead of the one that produced it,
-and good luck with that afternoon.
+- **Tool results are not sanitized, and not bounded unless you set `WithMaxToolResultTokens`.** A result saying "ignore your instructions" is delivered exactly as written. Defending against that is your fucking job, not the library's.
+- **A tool can inject a system message**, so a tool is exactly as privileged as your system prompt.
+- **A handler's error text reaches the provider.** A lazy `return err` from a failed database call will cheerfully post your connection string to somebody else's inference cluster.
+- **`WithTimeout` is the only bound on an endless stream**, and it's unset by default.
 
-**Tool results.** A tool reads web pages, files and databases, so its output is
-attacker-influenced content going straight into the model's context. The engine
-**does not sanitize it, and does not bound it unless you set
-`WithMaxToolResultTokens`**. A result saying "ignore your instructions" is
-delivered exactly as written, at whatever length it arrived. Defending against
-that is your fucking job, not the library's.
-
-Three specifics worth knowing before you ship:
-
-- **A tool can inject a system message.** That's the feature, and it means a
-  tool is exactly as privileged as your system prompt, so treat anything that can
-  register one the way you'd treat a line in `sudoers`.
-- **A handler's error text reaches the provider.** Handler errors become tool
-  results the model reads, so a lazy `return err` from a failed database call
-  will cheerfully post your connection string to somebody else's inference
-  cluster.
-- **`WithTimeout` is the only bound on an endless stream**, and it's unset by
-  default. A provider that dribbles one token every thirty seconds will keep
-  your goroutine company for as long as it damn well pleases.
-
-API keys are never logged, and credentials embedded in a `WithBaseURL` endpoint
-get stripped before the SDK sees them. The SDKs stuff the request URL into the
-text of every error they build, and those errors get logged.
-
-Full detail in [docs/tools.md](docs/tools.md).
+API keys are never logged, and credentials embedded in a `WithBaseURL` endpoint get stripped before the SDK sees them. Full detail on the [Security](https://psyb0t.github.io/elelem/security/) page.
 
 ## Logging
 
-Structured `log/slog` through
-[`ctxscope`](https://github.com/psyb0t/ctxscope), pulled from the
-context. The library never takes a logger parameter and never installs a
-global. Whatever you configured on `slog.Default()` at startup is where it
-writes, and any scope attributes you set (`request_id`, `user_id`) ride along
-on every line the engine emits.
-
-It shuts up on purpose. DEBUG carries the per-round and per-tool detail. INFO
-is spent on exactly two events: a transcript compacted to fit the budget, and
-a stream that only survived because a retry saved its ass. Both get INFO because
-you want them in a production log without flipping DEBUG on, and neither is
-an error. WARN is the recoverable weirdness: a malformed tool call dropped at
-ingest, a decision matching no pending call, an unknown tool requested, the
-retry loop giving up. ERROR is shit that actually broke.
-
-Compaction is INFO rather than WARN deliberately. It happens routinely on any
-long conversation, and a WARN that fires on the normal path is exactly how a
-log turns into noise nobody reads.
-
-Every decision the engine makes quietly carries a `reason` field with a stable,
-greppable value: `token_budget_exceeded`, `tool_call_denied`,
-`max_attempts_exhausted`, `finish_reason_unmapped`, and so on. They're exported
-as `elelem.LogReason*` constants, so your alerting matches the same symbol the
-engine emits instead of some string you copy-pasted out of a log line and
-typo'd.
-
-## Package shape
-
-A provider-neutral engine plus provider drivers. Your code holds
-`elelem.Driver`, `elelem.Client` and `elelem.Request`; provider SDK types stay
-locked inside their driver package and never leak out.
-
-```text
-client.go, request.go, engine.go   request construction and execution
-user_message_queue.go              bounded user input between provider rounds
-driver.go, errors.go               provider boundary and sentinels
-message.go, transcript.go          transcript primitives and repair
-usage.go                           token and retry accounting
-tool.go                            tools, hooks, and message injection
-limit.go, tokens.go                history budgeting
-retry.go                           retry decorator
-structured.go                      typed structured responses
-elelemtest/                        scripted Driver (imports no test framework)
-elelemtest/conformance/            driver contract suite
-elelemtest/mocks/                  generated Driver mock
-drivers/openai/                    OpenAI-compatible transport
-drivers/anthropic/                 Anthropic transport
-drivers/zaicoding/                 Z.ai Coding transport
-mcp/                               MCP server tools as elelem tools
-```
-
-Three placements the filename alone won't give you: the round/tool loop lives
-in `engine.go`, every sentinel this package exports lives in `errors.go` (each
-driver package has its own), and `structured.go` holds `RunInto` together with
-the request-validation helpers it shares with `request.go`.
+Structured `log/slog` through [`ctxscope`](https://github.com/psyb0t/ctxscope), pulled from the context. The library never takes a logger parameter and never installs a global, and it shuts up on purpose: INFO is spent on exactly two events. Every decision carries a stable `reason` field, exported as `elelem.LogReason*` constants. Levels and every reason value are on the [Logging](https://psyb0t.github.io/elelem/logging/) page.
 
 ## Documentation
 
-| Doc | What's in it |
+The full documentation lives at **[https://psyb0t.github.io/elelem/](https://psyb0t.github.io/elelem/)**.
+
+| Page | What's in it |
 |---|---|
-| [requests.md](docs/requests.md) | Every builder method, what it sets, and what happens when you don't set it. |
-| [callbacks.md](docs/callbacks.md) | The sixteen observation points, their ordering guarantees, and a worked example. |
-| [tools.md](docs/tools.md) | Tools, images in tool results, the hook lifecycle, message injection, denial, and the bounds that keep a tool loop honest. |
-| [mcp.md](docs/mcp.md) | Turning an MCP server's tools into elelem tools, over stdio or Streamable HTTP. |
-| [history.md](docs/history.md) | Token budgets, transcript units, limiting handlers, counting, and what to persist. |
-| [retries.md](docs/retries.md) | The retry decorator, failure classification, and the sentinel taxonomy. |
-| [structured-output.md](docs/structured-output.md) | `RunInto`, JSON mode, JSON schema, validation and repair. |
-| [drivers.md](docs/drivers.md) | The `Driver` contract and how to write a third one without guessing. |
-| [testing.md](docs/testing.md) | `ScriptedDriver` vs `MockDriver` vs the conformance suite. |
+| [Requests](https://psyb0t.github.io/elelem/requests/) | Every builder method, what it sets, and what happens when you don't set it. |
+| [Prompts](https://psyb0t.github.io/elelem/prompts/) | The `Prompt` builder, history and origins, images, audio and documents, and which provider takes what. |
+| [Callbacks](https://psyb0t.github.io/elelem/callbacks/) | The sixteen observation points, their ordering guarantees, and a worked example. |
+| [Tools](https://psyb0t.github.io/elelem/tools/) | Tools, images in tool results, the hook lifecycle, message injection, denial, and the bounds that keep a tool loop honest. |
+| [MCP tools](https://psyb0t.github.io/elelem/mcp/) | Turning an MCP server's tools into elelem tools, over stdio or Streamable HTTP. |
+| [History](https://psyb0t.github.io/elelem/history/) | Token budgets, transcript units, limiting handlers, counting, and what to persist. |
+| [Retries](https://psyb0t.github.io/elelem/retries/) | The retry decorator, failure classification, and the sentinel taxonomy. |
+| [Structured output](https://psyb0t.github.io/elelem/structured-output/) | `RunInto`, JSON mode, JSON schema, validation and repair. |
+| [Drivers](https://psyb0t.github.io/elelem/drivers/) | The shipped drivers, the `Driver` contract, and how to write a third one without guessing. |
+| [Security](https://psyb0t.github.io/elelem/security/) | The untrusted inputs, what the engine bounds, and what stays your job. |
+| [Logging](https://psyb0t.github.io/elelem/logging/) | Log levels and the stable `reason` values. |
+| [Testing](https://psyb0t.github.io/elelem/testing/) | `ScriptedDriver` vs `MockDriver` vs the conformance suite. |
+| [Development](https://psyb0t.github.io/elelem/development/) | Package layout, Make targets and CI. |
 
 Generated API reference on
 [pkg.go.dev](https://pkg.go.dev/github.com/psyb0t/elelem).
@@ -309,9 +185,16 @@ make lint-fix       # lint + auto-fix
 make test           # go test -race ./...
 make test-coverage  # coverage with minimum threshold
 make sec            # govulncheck + semgrep, writes sec.sarif
+make docs           # build the documentation site into .testing/docs-site
 make shell          # shell in the development image
 make help           # every target
 ```
+
+The package layout and the CI pipeline are on the [Development](https://psyb0t.github.io/elelem/development/) page.
+
+## Sponsor
+
+<a href="https://www.buymeacoffee.com/psyb0t"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" height="60" width="217"></a>
 
 ## License
 

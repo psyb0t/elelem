@@ -1,3 +1,9 @@
+---
+title: "History"
+description: "How elelem resolves a token budget, drops whole transcript units oldest first, runs limiting handlers, counts tokens and persists conversations."
+nav_order: 6
+---
+
 # History and token budgets
 
 ## Contents
@@ -52,6 +58,7 @@ Pinned, always counted, never dropped:
 - the first system message
 - the current prompt
 - an unresolved live tool exchange
+- an injected message the model has not answered yet
 
 Droppable, oldest first:
 
@@ -139,6 +146,8 @@ func myHandler(ctx context.Context, event *elelem.TokenLimitEvent) error {
 }
 ```
 
+Besides `Messages` and `Tools`, the event carries `EstimatedTokens`, `BudgetTokens` (the resolved prompt budget) and `Round`. `event.IsOverBudget()` recounts the current `Messages` and `Tools` with the request's counter, refreshes `EstimatedTokens`, and reports whether the count is still above `BudgetTokens`. Call it after each edit instead of trusting the initial estimate.
+
 Returning an error aborts the run and the engine keeps its own transcript. It
 adopts your rewrite only on success.
 
@@ -171,6 +180,8 @@ deterministic framing overhead.
 intended for startup wiring rather than per-request swapping. Passing `nil`
 **resets to the built-in estimator**. It does not leave a previously installed
 counter in place.
+
+`elelem.DefaultTokenCounter()` returns the counter currently installed at the process tier.
 
 The interface is one method:
 

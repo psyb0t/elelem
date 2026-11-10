@@ -4,6 +4,8 @@ MIN_TEST_COVERAGE ?= 90
 # time, so a host needs Docker and Make, not a Go toolchain.
 APP_NAME := elelem
 DEV_IMAGE ?= $(APP_NAME)-dev
+DOCS_SITE := .testing/docs-site
+JEKYLL_IMAGE := ghcr.io/actions/jekyll-build-pages:v1.0.13@sha256:6791ebfd912185ed59bfb5fb102664fa872496b79f87ff8b9cfba292a7345041
 UID := $(shell id -u)
 GID := $(shell id -g)
 
@@ -19,7 +21,7 @@ DEV_RUN := docker run --rm --init \
 	-w /work \
 	$(DEV_IMAGE)
 
-.PHONY: all dev-image shell dep generate lint lint-fix test test-coverage sec clean help
+.PHONY: all dev-image shell dep generate lint lint-fix test test-coverage sec docs clean help
 
 all: dep lint test ## Run dep, lint and test
 
@@ -61,6 +63,20 @@ test-coverage: dev-image ## Run tests with coverage check
 
 sec: dev-image ## Security scan with govulncheck and semgrep
 	@$(DEV_RUN) bash scripts/sec.sh
+
+docs: ## Build the documentation site into .testing/docs-site
+	@echo "Building the documentation site..."
+	@mkdir -p "$(DOCS_SITE)"
+	@docker run --rm \
+		--user $(UID):$(GID) \
+		-e HOME=/tmp \
+		-e GITHUB_WORKSPACE=/work \
+		-e GITHUB_REPOSITORY=psyb0t/$(APP_NAME) \
+		-e INPUT_SOURCE=docs \
+		-e INPUT_DESTINATION="$(DOCS_SITE)" \
+		-e INPUT_VERBOSE=false \
+		-v "$(CURDIR):/work" \
+		$(JEKYLL_IMAGE)
 
 clean: ## Remove coverage artifacts and the Go build/test caches
 	@echo "Cleaning..."

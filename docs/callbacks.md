@@ -1,3 +1,9 @@
+---
+title: "Callbacks"
+description: "The sixteen elelem callbacks for run, round, text, reasoning, tool calls, retries and token limits, with ordering guarantees and error behavior."
+nav_order: 4
+---
+
 # Callbacks
 
 Sixteen observation points. All optional, all with the same signature shape:
@@ -9,6 +15,8 @@ Registering the same one twice **appends** rather than replaces. See
 **Returning an error from any callback stops the request.** They are your code,
 so a failure in one is a caller-code failure, not a model condition. If you
 want a logging callback that can't take the run down, don't return the error.
+
+`OnError` is the exception: it fires when the run has already failed, so an error it returns is logged at WARN and dropped, and the caller still gets the run's original error.
 
 Delivery stays **ordered** even when tools execute concurrently. You will never
 see a `OnToolResult` for a call whose `OnToolCallStart` hasn't fired.

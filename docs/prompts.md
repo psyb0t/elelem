@@ -1,3 +1,9 @@
+---
+title: "Prompts"
+description: "The immutable elelem Prompt: system message, history and origins, content parts for images, audio and files, and what each provider accepts."
+nav_order: 3
+---
+
 # Prompts and content
 
 A prompt is the whole conversation, not the last thing the user typed. That is
@@ -142,6 +148,8 @@ write `ImageBytes` either way.
 `ImageDetail` (`ImageDetailLow` / `ImageDetailHigh` / `ImageDetailAuto`) is an
 OpenAI concept, and a driver with no equivalent ignores it.
 
+No constructor takes a detail level. Set it on the part a constructor returns: `part := elelem.ImageBytes(png, elelem.MediaTypePNG); part.Image.Detail = elelem.ImageDetailLow`.
+
 ## Audio and files
 
 Audio is OpenAI-only. Anthropic has no audio block at all, so audio against
@@ -151,6 +159,8 @@ and `text/plain` as a document block and refuses the rest. `FileRef` names a
 file already uploaded to the provider, so it needs a provider with an upload
 API. Anthropic's document block has no id field, and an id minted elsewhere
 would not resolve there anyway.
+
+`AudioBytes` takes `AudioFormatWAV` or `AudioFormatMP3`; any other format fails validation with `ErrAudioFormatUnknown`.
 
 ## What each provider accepts
 
@@ -168,6 +178,8 @@ so Anthropic's image media-type whitelist applies even with
 | Audio | yes | no block exists |
 | File bytes | any media type | `application/pdf`, `text/plain` |
 | `FileRef` | yes | no |
+
+`drivers/zaicoding` uses the OpenAI translation, but GLM 5.3 reports no image, audio or file support, so it takes text only. See [drivers.md](drivers.md).
 
 A structurally broken part (image bytes with no media type, both a URL and
 bytes on one source) is reported as invalid rather than unsupported, because it

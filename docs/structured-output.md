@@ -1,3 +1,9 @@
+---
+title: "Structured output"
+description: "Typed replies with RunInto, your own schema with WithJSONSchema, untyped WithJSONMode, plus validation, the repair request and failure modes."
+nav_order: 8
+---
+
 # Structured output
 
 Three tiers, from most typed to least.
@@ -85,6 +91,8 @@ When it does fire, it is **one** bounded repair request. Usage and cost from
 both calls are accumulated into the response, so the ledger reflects what you
 actually spent.
 
+Both knobs are read only by `RunInto`. `Run` with `WithJSONSchema` or `WithJSONMode` returns the reply text without decoding, validating or repairing it.
+
 `WithTranscriptRepair()` is the separate, adjacent knob for fixing a transcript
 the provider would reject.
 
@@ -93,8 +101,8 @@ the provider would reject.
 | Error | Means |
 |---|---|
 | `ErrResponseTruncated` | The response was cut off mid-object. |
-| `ErrResponseSchemaMismatch` | It parsed but didn't match the schema. |
-| `ErrInvalidRequest` | The model can't do structured responses at all. |
+| `ErrResponseSchemaMismatch` | It wasn't valid JSON for the destination type, or, with strict validation, it parsed but didn't match the schema. |
+| `ErrInvalidRequest` | The model can't do structured responses at all, or the destination is not a non-nil pointer or has no derivable schema. |
 
 **A truncated response is never repaired automatically.** Repair means asking
 the model to fix malformed JSON; a truncation means the content itself is

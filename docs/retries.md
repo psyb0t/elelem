@@ -1,3 +1,9 @@
+---
+title: "Retries"
+description: "The elelem retry decorator: when a retry is allowed, failure classification, Retry-After and backoff, failed-attempt accounting and sentinels."
+nav_order: 7
+---
+
 # Retries and errors
 
 ## Contents

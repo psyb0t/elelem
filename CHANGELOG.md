@@ -4,6 +4,17 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.15.1 (2026-11-10)
+
+Documentation and CI only. No code changes and no migration.
+
+- Adds the documentation site at [psyb0t.github.io/elelem](https://psyb0t.github.io/elelem/), built from `docs/`, with new Security, Logging and Development pages. The README links to it and keeps the tour.
+- Fixes the requests docs: a request without a model ID is refused with `ErrInvalidRequest`, and `WithParam` keys are provider-specific (the OpenAI driver drops keys for fields it builds, the Anthropic driver accepts only `top_k`). Documents `WithToolChoice(ToolChoiceTool(name))`.
+- Fixes the structured output docs: `WithJSONSchema` and `WithJSONMode` take effect only through `RunInto`, and the error table lists every case that returns each sentinel.
+- Documents `Image.Detail`, the WAV and MP3 audio formats, and that Z.ai Coding models take text only.
+- Changes the pipeline: a release tag no longer reruns the checks. It waits for its commit's `main` run to pass, then cuts the release. Branch runs also fail when `make generate` leaves a diff.
+- Adds Buy Me a Coffee to the funding links, and commits `AGENTS.md` plus the project rules in `.agents/rules/` for coding agents.
+
 ## v0.15.0 (2026-11-09)
 
 A model can carry the output limit its provider accepts. No migration is needed.

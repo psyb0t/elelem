@@ -3,11 +3,9 @@
 .env.local
 .env.*
 !.env.example
-AGENTS.md
 CODEX.local.md
 *coverage.*
 *.out
-CLAUDE.md
 .test*
 .research_files
 .agent_notes

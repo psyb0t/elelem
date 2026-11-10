@@ -1,3 +1,10 @@
+---
+title: "Tools"
+description: "Defining elelem tools: handlers, images in results, the hook lifecycle, message injection, manual driving, denial and the bounds on tool output."
+nav_order: 5
+has_children: true
+---
+
 # Tools
 
 ## Contents
@@ -55,12 +62,14 @@ per-tool bound, so the only limit is the caller's context.
 
 A tool can return images next to its text, such as a screenshot or a rendered chart:
 
+<!-- {% raw %} -->
 ```go
 return elelem.ToolResult{
 	Content: "the login page",
 	Images:  []elelem.ImageSource{{Data: png, MediaType: elelem.MediaTypePNG}},
 }, nil
 ```
+<!-- {% endraw %} -->
 
 The engine puts the images on the tool message after the text, and `Message.ToolImages` reads them back. Each driver sends them the way its provider can:
 

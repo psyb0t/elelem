@@ -1,3 +1,10 @@
+---
+title: "MCP tools"
+description: "Connect an MCP server over stdio or Streamable HTTP and use its tools as elelem tools: naming, results, lifetime, failures and limits."
+nav_order: 1
+parent: "Tools"
+---
+
 # MCP tools
 
 The `mcp` package turns the tools of an [MCP](https://modelcontextprotocol.io) server into ordinary `elelem.Tool` values.

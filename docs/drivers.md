@@ -1,16 +1,51 @@
-# Writing a driver
+---
+title: "Drivers"
+description: "The OpenAI-compatible, Anthropic and Z.ai Coding drivers, their options and capabilities, and the Driver contract for writing a new one."
+nav_order: 9
+---
 
-The engine is provider-neutral; drivers are where the vendor lives. If you're
-adding a third one, this is the contract.
+# Drivers
+
+The engine is provider-neutral; drivers are where the vendor lives. elelem ships three, and if you're adding another one, the rest of this page is the contract.
 
 ## Contents
 
+- [Using the shipped drivers](#using-the-shipped-drivers)
 - [The interface](#the-interface)
 - [The one rule](#the-one-rule)
+- [Reasoning on compatible endpoints](#reasoning-on-compatible-endpoints)
+- [Z.ai Coding](#zai-coding)
 - [Capabilities are a promise](#capabilities-are-a-promise)
 - [Errors](#errors)
 - [The conformance suite](#the-conformance-suite)
 - [Wire tests](#wire-tests)
+
+## Using the shipped drivers
+
+| | [`drivers/openai`](https://github.com/psyb0t/elelem/tree/main/drivers/openai) | [`drivers/anthropic`](https://github.com/psyb0t/elelem/tree/main/drivers/anthropic) | [`drivers/zaicoding`](https://github.com/psyb0t/elelem/tree/main/drivers/zaicoding) |
+|---|---|---|---|
+| Talks to | OpenAI and anything OpenAI-shaped, including vLLM, Ollama, OpenRouter, LM Studio, and compatible proxies | The Anthropic Messages API | Z.ai Coding's OpenAI-shaped endpoint |
+| Model discovery | `ListModels(ctx)` live, plus `KnownModels()` / `LookupModel(id)` | same | same |
+| Unknown model ids | accepted, the provider decides | accepted | accepted when no reasoning control is set |
+
+The OpenAI-compatible and Anthropic drivers take the same options:
+
+```go
+openai.NewDriver(
+	openai.WithAPIKey(apiKey),
+	openai.WithBaseURL("https://your-openai-compatible-endpoint/v1"),
+	openai.WithHTTPClient(httpClient),
+	openai.WithSDKOptions(/* raw SDK options */),
+)
+```
+
+`NewDriver` is convenient for a one-provider program, because the official SDK can read its usual environment variables (`OPENAI_*` or `ANTHROPIC_*`). A multi-provider application that owns credential resolution should start every configured driver with `WithoutEnvironmentDefaults()`, then pass only that upstream's own key and HTTP client plus a URL when it is not the driver's official default. That stops one provider's environment credential from quietly reaching a keyless local endpoint. `zaicoding.NewDriver` never reads the environment and has no such option.
+
+`WithBaseURL` strips userinfo credentials from the URL before the SDK sees it, because the SDKs put the request URL into the text of every error they build. The OpenAI driver also has `WithAssistantMessageExtra` and `WithFinishReasonMapper` for specialized drivers built on its transport; the Z.ai Coding driver is one.
+
+**Capabilities are per MODEL, not per provider.** `Driver.Capabilities(model)` reports what one model supports: seed, tool choice, parallel tool calls, strict tool arguments, JSON schema, sampling parameters, reasoning effort and its ceiling. Anthropic rejects a non-default temperature on newer models while accepting it on older ones, so a single per-provider table would be wrong. The engine reads that struct and rejects an unsupported parameter **locally**, before any network call, instead of sending it and getting a cryptic 400 back.
+
+Streaming is on by default. Some OpenAI- and Anthropic-compatible backends can't do it, so `WithStreaming(false)` sends the same request with streaming off and feeds the finished response through the same callbacks. See [Requests](requests.md#streaming).
 
 ## The interface
 
@@ -159,6 +194,7 @@ case. See [retries.md](retries.md#how-failures-are-classified).
 `elelemtest/conformance.Run` is aimed at you, and all shipped drivers run it,
 so it's a live contract, not a document that drifted.
 
+<!-- {% raw %} -->
 ```go
 func TestDriverConformance(t *testing.T) {
 	server := httptest.NewServer(/* a fake provider endpoint */)
@@ -182,6 +218,7 @@ func TestDriverConformance(t *testing.T) {
 	)
 }
 ```
+<!-- {% endraw %} -->
 
 What it checks:
 

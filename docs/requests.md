@@ -1,3 +1,9 @@
+---
+title: "Requests"
+description: "Every elelem request builder method: terminal calls, streaming, prompt, model, generation parameters, the tool loop, queued input, bounds and Response."
+nav_order: 2
+---
+
 # Requests
 
 Everything a request can be told to do. Every method returns `*Request`, so it
@@ -9,7 +15,6 @@ all chains.
 - [Terminal calls](#terminal-calls)
 - [Streaming](#streaming)
 - [The prompt](#the-prompt)
-- [History](#history)
 - [Model](#model)
 - [Generation parameters](#generation-parameters)
 - [Provider-specific parameters](#provider-specific-parameters)
@@ -39,7 +44,8 @@ request := elelem.NewRequest(client)
 ```
 
 `WithDefaultModel` is worth setting. Without it a request that names no model
-falls back to a bare `Model{}`, which has no `ContextSize`, which silently
+falls back to a bare `Model{}`, which has no ID, so `Run` refuses it with
+`ErrInvalidRequest`. A model with an ID but no `ContextSize` silently
 disables every context-size check. Nothing errors; the budget just stops
 existing.
 
@@ -207,8 +213,11 @@ request.
 	WithParams(map[string]any{"user": "tenant-42"})
 ```
 
-These go through as-is. Reserved request fields are refused rather than
-silently overwriting what the engine set.
+The OpenAI driver sends these as top-level body fields as-is, and drops a key
+naming a field it builds itself (`messages`, `model`, `stream`, `tools`,
+`tool_choice`) rather than letting it overwrite what the engine set. The
+Anthropic driver accepts only `top_k` and refuses any other key with its
+`ErrUnsupportedParameter`.
 
 ## The tool loop
 
@@ -222,6 +231,8 @@ request.
 	WithParallelToolCalls(true).
 	WithForceFinalAnswer(true)          // withhold tools on the last allowed round
 ```
+
+`WithToolChoiceMode` takes `ToolChoiceModeAuto`, `ToolChoiceModeNone` or `ToolChoiceModeRequired`. Forcing one tool needs its name, so it goes through `WithToolChoice(elelem.ToolChoiceTool("name"))`; a name that is not in the set, or a driver without tool choice support, is refused locally with `ErrInvalidRequest`.
 
 `WithToolProvider(func(ctx) (*ToolSet, error))` resolves a fresh set before
 every round, for catalogs or authorization that can change mid-conversation.
@@ -254,7 +265,8 @@ if err := queue.EnqueueText("Stop and explain the last action."); err != nil {
 }
 ```
 
-The engine drains queued input before its first provider request, after every
+The engine drains queued input before its first provider request (automatic
+loop only), after every
 set of tool results and injections, and after a terminal assistant answer. It
 never changes a provider request that is already in flight. Pending input is
 FIFO and becomes normal `MessageOriginTurn` transcript entries.
