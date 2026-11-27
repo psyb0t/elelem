@@ -30,6 +30,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	internalConfig "github.com/vektra/mockery/v3/internal/config"
+	internalFile "github.com/vektra/mockery/v3/internal/file"
 	"github.com/vektra/mockery/v3/internal/logging"
 	"github.com/vektra/mockery/v3/internal/stackerr"
 	"github.com/vektra/mockery/v3/template_funcs"
@@ -46,7 +47,7 @@ type TemplateData struct {
 	InterfaceDir string
 	// InterfaceDirRelative is the same as InterfaceDir, but made relative to mockery's current working directory.
 	InterfaceDirRelative string
-	// InterfaceFile is the filename of where the interface is defined.
+	// InterfaceFile is the absolute path with filename of where the interface is defined. To get only the filename, use {{.InterfaceFile | base}} in the template.
 	InterfaceFile string
 	// InterfaceName is the name of the interface (duh).
 	InterfaceName string
@@ -89,6 +90,7 @@ func NewDefaultKoanf(ctx context.Context) (*koanf.Koanf, error) {
 		StructName:                  addr("{{.Mock}}{{.InterfaceName}}"),
 		PkgName:                     addr("{{.SrcPackageName}}"),
 		Recursive:                   addr(false),
+		ResolveInternalAliases:      addr(false),
 		RequireTemplateSchemaExists: addr(true),
 		Template:                    addr("testify"),
 		TemplateData:                map[string]any{},
@@ -265,6 +267,23 @@ func mergeStringMaps(src, dest map[string]any) {
 	}
 }
 
+// mergeReplaceTypes merges the replace-type entries in src into dest. Entries
+// already present in dest take precedence over those in src.
+func mergeReplaceTypes(src, dest map[string]map[string]*ReplaceType) {
+	for pkgPath, srcTypes := range src {
+		destTypes, ok := dest[pkgPath]
+		if !ok {
+			destTypes = make(map[string]*ReplaceType, len(srcTypes))
+			dest[pkgPath] = destTypes
+		}
+		for typeName, replacement := range srcTypes {
+			if _, exists := destTypes[typeName]; !exists {
+				destTypes[typeName] = replacement
+			}
+		}
+	}
+}
+
 // mergeConfigs merges the values from c1 into c2.
 func mergeConfigs(ctx context.Context, src Config, dest *Config) {
 	log := zerolog.Ctx(ctx)
@@ -281,7 +300,17 @@ func mergeConfigs(ctx context.Context, src Config, dest *Config) {
 		srcFieldValue := srcValue.Field(i)
 		destFieldValue := destValue.Elem().Field(i)
 
-		if srcFieldValue.Kind() == reflect.Map {
+		if srcReplaceTypes, ok := srcFieldValue.Interface().(map[string]map[string]*ReplaceType); ok {
+			// replace-type isn't a map[string]any, so it needs its own merge.
+			// Without this it would never be inherited from the root or
+			// package config.
+			destReplaceTypes, _ := destFieldValue.Interface().(map[string]map[string]*ReplaceType)
+			if destReplaceTypes == nil {
+				destReplaceTypes = make(map[string]map[string]*ReplaceType, len(srcReplaceTypes))
+				destFieldValue.Set(reflect.ValueOf(destReplaceTypes))
+			}
+			mergeReplaceTypes(srcReplaceTypes, destReplaceTypes)
+		} else if srcFieldValue.Kind() == reflect.Map {
 			srcMap, ok := srcFieldValue.Interface().(map[string]any)
 			if !ok {
 				log.Debug().Msg("field value is not `any`, skipping merge")
@@ -336,6 +365,18 @@ func (c *RootConfig) Initialize(ctx context.Context) error {
 		pkgLog := log.With().Str("package-path", pkgName).Logger()
 		pkgCtx := pkgLog.WithContext(ctx)
 
+		// resolve-internal-aliases is only read from the root config, so say so
+		// rather than silently ignoring it below the root.
+		if pkgConfig.Config.ResolveInternalAliases != nil {
+			pkgLog.Warn().Msg("`resolve-internal-aliases` is a root-level setting and is ignored at the package level")
+		}
+		for ifaceName, ifaceConfig := range pkgConfig.Interfaces {
+			if ifaceConfig != nil && ifaceConfig.Config != nil && ifaceConfig.Config.ResolveInternalAliases != nil {
+				pkgLog.Warn().Str("interface", ifaceName).
+					Msg("`resolve-internal-aliases` is a root-level setting and is ignored at the interface level")
+			}
+		}
+
 		mergeConfigs(pkgCtx, c.Config, pkgConfig.Config)
 		if err := pkgConfig.Initialize(pkgCtx); err != nil {
 			return fmt.Errorf("initializing root config: %w", err)
@@ -360,7 +401,11 @@ func (c *RootConfig) Initialize(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("getting package config: %w", err)
 			}
-			if recursivePkgConfig.Config.ShouldExcludeSubpkg(subpkg) {
+			excluded, err := recursivePkgConfig.Config.ShouldExcludeSubpkg(subpkg)
+			if err != nil {
+				return err
+			}
+			if excluded {
 				pkgLog.Debug().Msg("package was marked for exclusion")
 				continue
 			}
@@ -410,7 +455,7 @@ func (c *RootConfig) GetPackageConfig(ctx context.Context, pkgPath string) (*Pac
 // GetPackages returns a list of the packages that are defined in
 // the `packages` config section.
 func (c *RootConfig) GetPackages(ctx context.Context) ([]string, error) {
-	packages := []string{}
+	packages := make([]string, 0, len(c.Packages))
 	for key := range c.Packages {
 		packages = append(packages, key)
 	}
@@ -503,11 +548,12 @@ func (c PackageConfig) ShouldGenerateInterface(
 	hasDirectiveComment bool,
 ) (bool, error) {
 	log := zerolog.Ctx(ctx)
+	// An explicit `generate: false` always wins, including over `all: true`.
+	if ifaceConfig.Generate != nil && !*ifaceConfig.Generate {
+		log.Debug().Msg("generate: false is set, skipping generation")
+		return false, nil
+	}
 	if hasDirectiveComment {
-		if ifaceConfig.Generate != nil && !*ifaceConfig.Generate {
-			log.Debug().Msg("interface has directive comment with generate: false, skipping generation")
-			return false, nil
-		}
 		log.Debug().Msg("interface has directive comment, generating mock")
 		return true, nil
 	}
@@ -621,6 +667,7 @@ type Config struct {
 	Anchors               map[string]any `koanf:"_anchors" yaml:"_anchors,omitempty"`
 	BuildTags             *string        `koanf:"build-tags" yaml:"build-tags,omitempty"`
 	ConfigFile            *string        `koanf:"config" yaml:"config,omitempty"`
+	Cpuprofile            *string        `koanf:"cpuprofile" yaml:"cpuprofile,omitempty"`
 	Dir                   *string        `koanf:"dir" yaml:"dir,omitempty"`
 	ExcludeSubpkgRegex    []string       `koanf:"exclude-subpkg-regex" yaml:"exclude-subpkg-regex,omitempty"`
 	ExcludeInterfaceRegex *string        `koanf:"exclude-interface-regex" yaml:"exclude-interface-regex,omitempty"`
@@ -634,11 +681,16 @@ type Config struct {
 	IncludeInterfaceRegex *string           `koanf:"include-interface-regex" yaml:"include-interface-regex,omitempty"`
 	InPackage             *bool             `koanf:"inpackage" yaml:"inpackage,omitempty"`
 	LogLevel              *string           `koanf:"log-level" yaml:"log-level,omitempty"`
+	Memprofile            *string           `koanf:"memprofile" yaml:"memprofile,omitempty"`
 	StructName            *string           `koanf:"structname" yaml:"structname,omitempty"`
 	PkgName               *string           `koanf:"pkgname" yaml:"pkgname,omitempty"`
 	Recursive             *bool             `koanf:"recursive" yaml:"recursive,omitempty"`
 	// ReplaceType is a nested map of format map["package path"]["type name"]*ReplaceType
 	ReplaceType map[string]map[string]*ReplaceType `koanf:"replace-type" yaml:"replace-type,omitempty"`
+	// ResolveInternalAliases renders public aliases (`type X = internal.X`) in
+	// place of the internal types they point at, so generated mocks do not
+	// import packages that can't be imported from outside their module.
+	ResolveInternalAliases *bool `koanf:"resolve-internal-aliases" yaml:"resolve-internal-aliases,omitempty"`
 	// RequireTemplateSchemaExists sets whether mockery will fail if the specified
 	// template did not have an associated JSON schema.
 	RequireTemplateSchemaExists *bool          `koanf:"require-template-schema-exists" yaml:"require-template-schema-exists,omitempty"`
@@ -666,17 +718,21 @@ func (c *Config) FilePath() string {
 	return filepath.ToSlash(filepath.Clean(filepath.Join(*c.Dir, *c.FileName)))
 }
 
-func (c *Config) ShouldExcludeSubpkg(pkgPath string) bool {
+// ShouldExcludeSubpkg reports whether pkgPath matches any of the
+// `exclude-subpkg-regex` patterns. An unparsable pattern is returned as an
+// error so it surfaces as a configuration failure, the same way
+// `include-interface-regex` and `exclude-interface-regex` do.
+func (c *Config) ShouldExcludeSubpkg(pkgPath string) (bool, error) {
 	for _, regex := range c.ExcludeSubpkgRegex {
 		matched, err := regexp.MatchString(regex, pkgPath)
 		if err != nil {
-			panic(err)
+			return false, fmt.Errorf("evaluating `exclude-subpkg-regex`: %w", err)
 		}
 		if matched {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 var ErrInfiniteLoop = fmt.Errorf("infinite loop in template variables detected")
@@ -697,54 +753,12 @@ func (c *Config) ParseTemplates(
 ) error {
 	log := zerolog.Ctx(ctx)
 
-	mock := "mock"
-	if ast.IsExported(ifaceName) {
-		mock = "Mock"
-	}
-
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	workingDir = filepath.ToSlash(workingDir)
-	ifaceFilePath = filepath.ToSlash(filepath.Clean(ifaceFilePath))
-	interfaceDirPath := filepath.ToSlash(filepath.Dir(ifaceFilePath))
-	interfaceDirRelativePath, err := filepath.Rel(filepath.FromSlash(workingDir), filepath.FromSlash(interfaceDirPath))
-
-	var interfaceDirRelative string
-
-	if err != nil {
-		log.Debug().
-			Err(err).
-			Str("working-dir", workingDir).
-			Str("interfaceDirPath", interfaceDirPath).
-			Str("interface-dir-relative-path", interfaceDirRelativePath).
-			Str("iface-file-path", ifaceFilePath).
-			Msg("can't make path relative to working dir, setting to './'")
-		interfaceDirRelative = "."
-	} else {
-		interfaceDirRelativePath = filepath.ToSlash(interfaceDirRelativePath)
-		log.Debug().
-			Str("working-dir", workingDir).
-			Str("interfaceDirPath", interfaceDirPath).
-			Str("interface-dir-relative-path", interfaceDirRelativePath).
-			Msg("found relative path")
-		interfaceDirRelative = interfaceDirRelativePath
-	}
-
 	// data is the struct sent to the template parser
-	data := TemplateData{
-		ConfigDir:            filepath.Dir(*c.ConfigFile),
-		InterfaceDir:         interfaceDirPath,
-		InterfaceDirRelative: interfaceDirRelative,
-		InterfaceFile:        ifaceFilePath,
-		InterfaceName:        ifaceName,
-		Mock:                 mock,
-		StructName:           *c.StructName,
-		SrcPackageName:       srcPkg.Types.Name(),
-		SrcPackagePath:       srcPkg.Types.Path(),
-		Template:             *c.Template,
+	data, err := c.buildTemplateData(ctx, ifaceFilePath, ifaceName, srcPkg)
+	if err != nil {
+		return fmt.Errorf("building template data: %w", err)
 	}
+
 	// These are the config options that we allow
 	// to be parsed by the templater. The keys are
 	// just labels we're using for logs/errors
@@ -792,6 +806,99 @@ func (c *Config) ParseTemplates(
 	}
 
 	return nil
+}
+
+func (c *Config) buildTemplateData(
+	ctx context.Context,
+	// ifaceFilePath is the absolute path of the original interface.
+	ifaceFilePath string,
+	ifaceName string,
+	srcPkg *packages.Package,
+) (TemplateData, error) {
+	log := zerolog.Ctx(ctx)
+
+	mock := "mock"
+	if ast.IsExported(ifaceName) {
+		mock = "Mock"
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return TemplateData{}, fmt.Errorf("get working directory: %w", err)
+	}
+	workingDir = filepath.ToSlash(workingDir)
+	ifaceFilePath = filepath.ToSlash(filepath.Clean(ifaceFilePath))
+	interfaceDirPath := filepath.ToSlash(filepath.Dir(ifaceFilePath))
+
+	var interfaceDirRelative string
+	outsideCurrentRepo, err := isPathOutsideCurrentGoModRepo(workingDir, interfaceDirPath)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Msg("failed to determine whether interface path is outside current go.mod repo")
+	}
+	if outsideCurrentRepo {
+		log.Debug().
+			Str("working-dir", workingDir).
+			Str("interfaceDirPath", interfaceDirPath).
+			Str("src-package-path", srcPkg.Types.Path()).
+			Msg("interface path is outside current go.mod repo; using fully-qualified package path")
+		interfaceDirRelative = srcPkg.Types.Path()
+	} else {
+		interfaceDirRelativePath, err := filepath.Rel(filepath.FromSlash(workingDir), filepath.FromSlash(interfaceDirPath))
+		if err != nil {
+			log.Debug().
+				Err(err).
+				Str("working-dir", workingDir).
+				Str("interfaceDirPath", interfaceDirPath).
+				Str("interface-dir-relative-path", interfaceDirRelativePath).
+				Str("iface-file-path", ifaceFilePath).
+				Msg("can't make path relative to working dir, setting to './'")
+			interfaceDirRelative = "."
+		} else {
+			interfaceDirRelativePath = filepath.ToSlash(interfaceDirRelativePath)
+			log.Debug().
+				Str("working-dir", workingDir).
+				Str("interfaceDirPath", interfaceDirPath).
+				Str("interface-dir-relative-path", interfaceDirRelativePath).
+				Msg("found relative path")
+			interfaceDirRelative = interfaceDirRelativePath
+		}
+	}
+
+	return TemplateData{
+		ConfigDir:            filepath.Dir(*c.ConfigFile),
+		InterfaceDir:         interfaceDirPath,
+		InterfaceDirRelative: interfaceDirRelative,
+		InterfaceFile:        ifaceFilePath,
+		InterfaceName:        ifaceName,
+		Mock:                 mock,
+		StructName:           *c.StructName,
+		SrcPackageName:       srcPkg.Types.Name(),
+		SrcPackagePath:       srcPkg.Types.Path(),
+		Template:             *c.Template,
+	}, nil
+}
+
+func isPathOutsideCurrentGoModRepo(workingDir string, targetPath string) (bool, error) {
+	goModFile, _, err := internalFile.FindInHierarchy(workingDir, []string{"go.mod"})
+	if err != nil {
+		return false, err
+	}
+
+	repoRoot := filepath.ToSlash(filepath.Dir(goModFile))
+	targetPath = filepath.ToSlash(filepath.Clean(targetPath))
+
+	relFromRepoRoot, err := filepath.Rel(filepath.FromSlash(repoRoot), filepath.FromSlash(targetPath))
+	// Windows can return an error here if the paths are on different drives.
+	// In that case, we can just assume the target path is outside the repo.
+	if err != nil {
+		//nolint:nilerr // Intentional: treat cross-drive Rel errors as "outside repo", not a fatal error.
+		return true, nil
+	}
+	relFromRepoRoot = filepath.ToSlash(relFromRepoRoot)
+
+	return relFromRepoRoot == ".." || strings.HasPrefix(relFromRepoRoot, "../"), nil
 }
 
 func (c *Config) GetReplacement(pkgPath string, typeName string) *ReplaceType {

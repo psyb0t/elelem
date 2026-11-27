@@ -2,7 +2,6 @@ package aichteeteapee
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 )
@@ -23,8 +22,8 @@ func WriteJSON(
 
 	if err := encoder.Encode(data); err != nil {
 		slog.Error(
-			"Failed to encode JSON response",
-			"error", fmt.Sprintf("%v", err),
+			"failed to encode JSON response",
+			"err", err,
 		)
 	}
 }

@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 package openai
 
@@ -30,13 +30,21 @@ type AudioSpeechService struct {
 // there is one), and before any request-specific options.
 func NewAudioSpeechService(opts ...option.RequestOption) (r AudioSpeechService) {
 	r = AudioSpeechService{}
-	r.Options = opts
+	r.Options = requestconfig.InheritedOptions(opts...)
 	return
 }
 
 // Generates audio from the input text.
 //
 // Returns the audio file content, or a stream of audio events.
+//
+// The `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, `gpt-4o-mini-tts-2025-03-20`, and
+// `gpt-4o-mini-tts-2025-12-15` models are deprecated and scheduled to shut down on
+// January 6, 2027. These examples use the existing Speech API; for new
+// integrations, migrate to `gpt-realtime-2.1-mini` through the
+// [Realtime API](https://developers.openai.com/api/docs/guides/realtime). See the
+// [deprecation schedule](https://developers.openai.com/api/docs/deprecations) for
+// migration details.
 func (r *AudioSpeechService) New(ctx context.Context, body AudioSpeechNewParams, opts ...option.RequestOption) (res *http.Response, err error) {
 	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
 	opts = slices.Concat(preClientOpts, r.Options, opts)
@@ -49,16 +57,29 @@ func (r *AudioSpeechService) New(ctx context.Context, body AudioSpeechNewParams,
 type SpeechModel = string
 
 const (
-	SpeechModelTTS1                   SpeechModel = "tts-1"
-	SpeechModelTTS1HD                 SpeechModel = "tts-1-hd"
-	SpeechModelGPT4oMiniTTS           SpeechModel = "gpt-4o-mini-tts"
+	// Deprecated: Announced shutdown date: 2027-01-06. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	SpeechModelTTS1 SpeechModel = "tts-1"
+	// Deprecated: Announced shutdown date: 2027-01-06. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	SpeechModelTTS1HD SpeechModel = "tts-1-hd"
+	// Deprecated: Announced shutdown date: 2027-01-06. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	SpeechModelGPT4oMiniTTS SpeechModel = "gpt-4o-mini-tts"
+	// Deprecated: Announced shutdown date: 2027-01-06. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
 	SpeechModelGPT4oMiniTTS2025_12_15 SpeechModel = "gpt-4o-mini-tts-2025-12-15"
 )
 
 type AudioSpeechNewParams struct {
 	// The text to generate audio for. The maximum length is 4096 characters.
 	Input string `json:"input" api:"required"`
-	// One of the available [TTS models](https://platform.openai.com/docs/models#tts):
+	// One of the available
+	// [TTS models](https://developers.openai.com/api/docs/guides/text-to-speech):
 	// `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, or `gpt-4o-mini-tts-2025-12-15`.
 	Model SpeechModel `json:"model,omitzero" api:"required"`
 	// The voice to use when generating the audio. Supported built-in voices are
@@ -66,7 +87,9 @@ type AudioSpeechNewParams struct {
 	// `shimmer`, `verse`, `marin`, and `cedar`. You may also provide a custom voice
 	// object with an `id`, for example `{ "id": "voice_1234" }`. Previews of the
 	// voices are available in the
-	// [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
+	// [Text to speech guide](https://developers.openai.com/api/docs/guides/text-to-speech#voice-options).
+	// Custom voices must be created from audio samples. Voices created from text
+	// prompts are supported only in Live.
 	Voice AudioSpeechNewParamsVoiceUnion `json:"voice,omitzero" api:"required"`
 	// Control the voice of your generated audio with additional instructions. Does not
 	// work with `tts-1` or `tts-1-hd`.
@@ -114,17 +137,14 @@ func (u *AudioSpeechNewParamsVoiceUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
 }
 
-func (u *AudioSpeechNewParamsVoiceUnion) asAny() any {
-	if !param.IsOmitted(u.OfString) {
-		return &u.OfString.Value
-	} else if !param.IsOmitted(u.OfAudioSpeechNewsVoiceString2) {
-		return &u.OfAudioSpeechNewsVoiceString2
-	} else if !param.IsOmitted(u.OfAudioSpeechNewsVoiceID) {
-		return u.OfAudioSpeechNewsVoiceID
-	}
-	return nil
-}
-
+// The voice to use when generating the audio. Supported built-in voices are
+// `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`,
+// `shimmer`, `verse`, `marin`, and `cedar`. You may also provide a custom voice
+// object with an `id`, for example `{ "id": "voice_1234" }`. Previews of the
+// voices are available in the
+// [Text to speech guide](https://developers.openai.com/api/docs/guides/text-to-speech#voice-options).
+// Custom voices must be created from audio samples. Voices created from text
+// prompts are supported only in Live.
 type AudioSpeechNewParamsVoiceString2 string
 
 const (
@@ -138,6 +158,9 @@ const (
 	AudioSpeechNewParamsVoiceString2Verse   AudioSpeechNewParamsVoiceString2 = "verse"
 	AudioSpeechNewParamsVoiceString2Marin   AudioSpeechNewParamsVoiceString2 = "marin"
 	AudioSpeechNewParamsVoiceString2Cedar   AudioSpeechNewParamsVoiceString2 = "cedar"
+	AudioSpeechNewParamsVoiceString2Fable   AudioSpeechNewParamsVoiceString2 = "fable"
+	AudioSpeechNewParamsVoiceString2Onyx    AudioSpeechNewParamsVoiceString2 = "onyx"
+	AudioSpeechNewParamsVoiceString2Nova    AudioSpeechNewParamsVoiceString2 = "nova"
 )
 
 // Custom voice reference.

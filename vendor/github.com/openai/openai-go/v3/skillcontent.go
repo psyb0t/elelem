@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 package openai
 
@@ -27,7 +27,7 @@ type SkillContentService struct {
 // there is one), and before any request-specific options.
 func NewSkillContentService(opts ...option.RequestOption) (r SkillContentService) {
 	r = SkillContentService{}
-	r.Options = opts
+	r.Options = requestconfig.InheritedOptions(opts...)
 	return
 }
 
@@ -35,7 +35,7 @@ func NewSkillContentService(opts ...option.RequestOption) (r SkillContentService
 func (r *SkillContentService) Get(ctx context.Context, skillID string, opts ...option.RequestOption) (res *http.Response, err error) {
 	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
 	opts = slices.Concat(preClientOpts, r.Options, opts)
-	opts = append([]option.RequestOption{option.WithHeader("Accept", "application/binary")}, opts...)
+	opts = append([]option.RequestOption{option.WithHeader("Accept", "application/json, application/zip")}, opts...)
 	if skillID == "" {
 		err = errors.New("missing required skill_id parameter")
 		return nil, err

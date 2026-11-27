@@ -55,6 +55,33 @@ type Server struct {
 	// ClientName is the client name sent to the server. Empty sends
 	// "elelem".
 	ClientName string
+
+	// Elicit answers the server's questions for the user. Nil advertises no
+	// elicitation, so a server that asks anyway gets an error. See
+	// ElicitHandler.
+	Elicit ElicitHandler
+
+	// OnListChanged is called when the server says its tools, resources, or
+	// prompts changed. It runs on the connection's notification goroutine,
+	// so it must return quickly. Connection.Changed reports the same news.
+	OnListChanged func(kind ListKind)
+	// OnResourceUpdated is called when a resource passed to Subscribe
+	// changed. Read it again to see the change. It runs on the
+	// notification goroutine, so it must return quickly.
+	OnResourceUpdated func(uri string)
+
+	// MaxInstructionsBytes bounds the instructions ServerInfo keeps. Longer
+	// instructions are cut at a UTF-8 boundary and InstructionsCut is set.
+	// Zero takes DefaultMaxInstructionsBytes.
+	MaxInstructionsBytes int
+	// MaxResourceBytes bounds one ReadResource result, text and blob bytes
+	// together. A larger one fails with ErrResultTooLarge. Zero takes
+	// DefaultMaxResourceBytes.
+	MaxResourceBytes int
+	// MaxPromptBytes bounds one GetPrompt result, text and binary bytes
+	// together. A larger one fails with ErrResultTooLarge. Zero takes
+	// DefaultMaxPromptBytes.
+	MaxPromptBytes int
 }
 
 // Connection is one connected server. Its methods are safe for concurrent
@@ -62,9 +89,20 @@ type Server struct {
 type Connection struct {
 	server   Server
 	session  *sdk.ClientSession
+	info     ServerInfo
 	tools    []elelem.Tool
 	warnings []string
 	stop     context.CancelFunc
+
+	// changed holds the lists the server said changed since they were last
+	// listed.
+	changed map[ListKind]bool
+	// progress routes progress notifications to the call that asked for
+	// them, by token.
+	progress  map[string]func(Progress)
+	nextToken uint64
+	// elicitations wait for the server to finish URL elicitations, by ID.
+	elicitations map[string]chan struct{}
 
 	done      chan struct{}
 	mutex     sync.Mutex
@@ -85,17 +123,24 @@ func Connect(ctx context.Context, server Server) (*Connection, error) {
 	// under a context only Close cancels.
 	lifetime, stop := context.WithCancel(context.WithoutCancel(ctx))
 
-	session, err := open(ctx, lifetime, server)
+	connection := &Connection{
+		server: server, stop: stop,
+		changed:      map[ListKind]bool{},
+		progress:     map[string]func(Progress){},
+		elicitations: map[string]chan struct{}{},
+		done:         make(chan struct{}),
+	}
+
+	session, err := connection.open(ctx, lifetime)
 	if err != nil {
 		stop()
 
 		return nil, err
 	}
 
-	connection := &Connection{
-		server: server, session: session, stop: stop,
-		done: make(chan struct{}),
-	}
+	connection.session = session
+	connection.info = newServerInfo(session.InitializeResult(),
+		limit(server.MaxInstructionsBytes, DefaultMaxInstructionsBytes))
 
 	tools, warnings, err := connection.listTools(ctx)
 	if err != nil {
@@ -137,7 +182,22 @@ func validateServer(server Server) error {
 		}
 	}
 
+	if server.MaxInstructionsBytes < 0 || server.MaxResourceBytes < 0 ||
+		server.MaxPromptBytes < 0 {
+		return ctxerrors.Wrap(ErrInvalidServer,
+			"size limits must not be negative")
+	}
+
 	return nil
+}
+
+// limit is value, or fallback when value is zero.
+func limit(value, fallback int) int {
+	if value == 0 {
+		return fallback
+	}
+
+	return value
 }
 
 // Tools returns the server's tools, ready to add to a Request. A call after
@@ -160,13 +220,25 @@ func (c *Connection) Warnings() []string {
 
 // RefreshTools lists the server's tools again, so a server that added,
 // removed, or changed a tool since Connect is seen. Tools returned earlier
-// keep working. On failure the previous list stays.
+// keep working. On failure the previous list stays. Success clears
+// Changed(ListKindTools).
 func (c *Connection) RefreshTools(ctx context.Context) error {
 	if err := c.Err(); err != nil {
 		return err
 	}
 
-	tools, warnings, err := c.listTools(ctx)
+	var (
+		tools    []elelem.Tool
+		warnings []string
+	)
+
+	err := c.listing(ListKindTools, "", func() error {
+		var err error
+
+		tools, warnings, err = c.listTools(ctx)
+
+		return err
+	})
 	if err != nil {
 		return ctxerrors.Wrap(err, "refresh MCP server tools")
 	}
@@ -250,27 +322,66 @@ func (c *Connection) watch(ctx context.Context) {
 	)
 }
 
-func open(
+// open connects the SDK client. Its notification handlers write only to
+// fields guarded by the mutex, so they are safe before open returns.
+func (c *Connection) open(
 	ctx, lifetime context.Context,
-	server Server,
 ) (*sdk.ClientSession, error) {
-	clientName := server.ClientName
+	clientName := c.server.ClientName
 	if clientName == "" {
 		clientName = defaultClientName
 	}
 
 	client := sdk.NewClient(
-		&sdk.Implementation{Name: clientName},
-		&sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}},
+		&sdk.Implementation{Name: clientName}, c.clientOptions(),
 	)
 
-	session, err := client.Connect(ctx, transport(ctx, lifetime, server), nil)
+	session, err := client.Connect(ctx,
+		transport(ctx, lifetime, c.server), nil)
 	if err != nil {
 		return nil, ctxerrors.Wrap(errors.Join(ErrConnectFailed, err),
 			"connect")
 	}
 
 	return session, nil
+}
+
+// clientOptions advertises elicitation only with a handler, and never the
+// deprecated roots, sampling, or logging features. The list-changed
+// handlers are always set: they clear the SDK's list caches and, on the
+// current protocol, make Connect open the subscriptions/listen stream.
+func (c *Connection) clientOptions() *sdk.ClientOptions {
+	options := &sdk.ClientOptions{
+		Capabilities: &sdk.ClientCapabilities{},
+		ToolListChangedHandler: func(
+			context.Context, *sdk.ToolListChangedRequest,
+		) {
+			c.listChanged(ListKindTools)
+		},
+		ResourceListChangedHandler: func(
+			context.Context, *sdk.ResourceListChangedRequest,
+		) {
+			c.listChanged(ListKindResources)
+		},
+		PromptListChangedHandler: func(
+			context.Context, *sdk.PromptListChangedRequest,
+		) {
+			c.listChanged(ListKindPrompts)
+		},
+		ResourceUpdatedHandler:      c.resourceUpdated,
+		ProgressNotificationHandler: c.progressNotified,
+	}
+
+	if c.server.Elicit != nil {
+		options.Capabilities.Elicitation = &sdk.ElicitationCapabilities{
+			Form: &sdk.FormElicitationCapabilities{},
+			URL:  &sdk.URLElicitationCapabilities{},
+		}
+		options.ElicitationHandler = c.elicit
+		options.ElicitationCompleteHandler = c.elicitationCompleted
+	}
+
+	return options
 }
 
 //nolint:ireturn // The SDK takes a Transport interface.
@@ -291,6 +402,12 @@ func transport(ctx, lifetime context.Context, server Server) sdk.Transport {
 			headers[aichteeteapee.HeaderNameAuthorization] = authorization
 		}
 
+		// The SDK ends the whole connection when the optional standalone SSE
+		// stream fails with a 5xx or a network error, so it is never opened.
+		// A server on 2026-07-28 sends notifications on subscriptions/listen
+		// instead; an older one still reaches the client on the response
+		// stream of a request in flight, and its lists are fresh on every
+		// list call.
 		return &sdk.StreamableClientTransport{
 			Endpoint: server.URL,
 			HTTPClient: &http.Client{Transport: headerTransport{
@@ -410,7 +527,8 @@ func inputSchema(schema any) (json.RawMessage, error) {
 }
 
 // handler calls one remote tool. A transport failure is returned as an
-// error, which the engine shows the model as a tool error.
+// error, which the engine shows the model as a tool error. A context from
+// WithProgress receives the call's progress notifications.
 func (c *Connection) handler(remoteName string) elelem.ToolHandler {
 	return func(
 		ctx context.Context,
@@ -425,9 +543,16 @@ func (c *Connection) handler(remoteName string) elelem.ToolHandler {
 			arguments = json.RawMessage(emptyArguments)
 		}
 
-		result, err := c.session.CallTool(ctx, &sdk.CallToolParams{
-			Name: remoteName, Arguments: arguments,
-		})
+		params := &sdk.CallToolParams{Name: remoteName, Arguments: arguments}
+
+		if report := progressReporter(ctx); report != nil {
+			token, release := c.watchProgress(report)
+			defer release()
+
+			params.SetProgressToken(token)
+		}
+
+		result, err := c.callTool(ctx, params)
 		if err != nil {
 			return elelem.ToolResult{}, ctxerrors.Wrapf(err,
 				"call MCP tool %s", remoteName)
@@ -435,6 +560,31 @@ func (c *Connection) handler(remoteName string) elelem.ToolHandler {
 
 		return convertResult(result)
 	}
+}
+
+// callTool calls a tool, and once more after the URL elicitations a server
+// can demand with a URLElicitationRequired error.
+func (c *Connection) callTool(
+	ctx context.Context,
+	params *sdk.CallToolParams,
+) (*sdk.CallToolResult, error) {
+	result, err := c.session.CallTool(ctx, params)
+	if err == nil || c.server.Elicit == nil {
+		return result, requestError(err, "call")
+	}
+
+	elicitations, required := urlElicitationsRequired(err)
+	if !required {
+		return nil, requestError(err, "call")
+	}
+
+	if err := c.elicitURLs(ctx, elicitations); err != nil {
+		return nil, err
+	}
+
+	result, err = c.session.CallTool(ctx, params)
+
+	return result, requestError(err, "call after URL elicitation")
 }
 
 // headerTransport adds fixed headers to every request.

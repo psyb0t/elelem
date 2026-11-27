@@ -105,6 +105,9 @@ linters:
             - github.com/spf13/viper
             - github.com/sirupsen/logrus
             - github.com/google/uuid
+            - github.com/go-jose/go-jose/v4
+            - github.com/modelcontextprotocol/go-sdk/mcp
+            - github.com/modelcontextprotocol/go-sdk/oauthex
             - github.com/psyb0t
             - github.com/joho/godotenv
             - github.com/spf13/cobra
@@ -116,6 +119,7 @@ linters:
             - github.com/getkin/kin-openapi/
             - github.com/oapi-codegen/
             - github.com/swaggo/
+            - golang.org/x/net/publicsuffix
 
   exclusions:
     generated: lax

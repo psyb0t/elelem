@@ -1,7 +1,6 @@
 ---
 title: "Security"
 description: "What elelem treats as untrusted: provider output and tool results, the bounds it applies, the ones you must set, and how credentials stay out of logs."
-nav_order: 10
 ---
 
 # Security
@@ -24,6 +23,8 @@ A call with no id, a duplicate id, or an index reused for two different calls ge
 ## Tool results
 
 A tool reads web pages, files and databases, so its output is attacker-influenced content going straight into the model's context. The engine **does not sanitize it, and does not bound it unless you set `WithMaxToolResultTokens`**. A result saying "ignore your instructions" is delivered exactly as written, at whatever length it arrived. Defending against that is your job, not the library's.
+
+An MCP server is the same kind of input, with more ways in. Its instructions, resource contents, prompt text, elicitation questions, progress messages and server info are all server-written, and a server you connect to can be anyone's. The `mcp` package bounds the instructions, resource reads and prompts it keeps (see [MCP size limits](mcp.md#size-limits)), never shows a binary resource's bytes as text, and never advertises roots or sampling. It does not sanitize any of it, so quote server text as the server's, not as yours.
 
 ## Before you ship
 

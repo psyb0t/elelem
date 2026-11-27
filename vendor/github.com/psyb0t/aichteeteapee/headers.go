@@ -73,9 +73,11 @@ const (
 	HeaderNameProxyAuthenticate  = "Proxy-Authenticate"
 	HeaderNameProxyAuthorization = "Proxy-Authorization"
 	HeaderNameTE                 = "Te"
-	HeaderNameTrailers           = "Trailers"
-	HeaderNameTransferEncoding   = "Transfer-Encoding"
-	HeaderNameUpgrade            = "Upgrade"
+	HeaderNameTrailer            = "Trailer"
+	// HeaderNameTrailers is kept for compatibility with older callers.
+	HeaderNameTrailers         = "Trailers"
+	HeaderNameTransferEncoding = "Transfer-Encoding"
+	HeaderNameUpgrade          = "Upgrade"
 
 	// Security.
 	HeaderNameStrictTransportSecurity = "Strict-Transport-Security"

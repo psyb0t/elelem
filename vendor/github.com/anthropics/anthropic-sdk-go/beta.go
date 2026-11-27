@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 package anthropic
 
 import (
@@ -7,6 +5,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go/internal/apijson"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/anthropics/anthropic-sdk-go/packages/respjson"
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
 )
@@ -34,6 +33,7 @@ type BetaService struct {
 	UserProfiles   BetaUserProfileService
 	Dreams         BetaDreamService
 	Tunnels        BetaTunnelService
+	Organization   BetaOrganizationService
 }
 
 // NewBetaService generates a new service that applies the given options to each
@@ -57,42 +57,65 @@ func NewBetaService(opts ...option.RequestOption) (r BetaService) {
 	r.UserProfiles = NewBetaUserProfileService(opts...)
 	r.Dreams = NewBetaDreamService(opts...)
 	r.Tunnels = NewBetaTunnelService(opts...)
+	r.Organization = NewBetaOrganizationService(opts...)
 	return
 }
 
 type AnthropicBeta = string
 
 const (
-	AnthropicBetaMessageBatches2024_09_24             AnthropicBeta = "message-batches-2024-09-24"
-	AnthropicBetaPromptCaching2024_07_31              AnthropicBeta = "prompt-caching-2024-07-31"
-	AnthropicBetaComputerUse2024_10_22                AnthropicBeta = "computer-use-2024-10-22"
-	AnthropicBetaComputerUse2025_01_24                AnthropicBeta = "computer-use-2025-01-24"
-	AnthropicBetaPDFs2024_09_25                       AnthropicBeta = "pdfs-2024-09-25"
-	AnthropicBetaTokenCounting2024_11_01              AnthropicBeta = "token-counting-2024-11-01"
-	AnthropicBetaTokenEfficientTools2025_02_19        AnthropicBeta = "token-efficient-tools-2025-02-19"
-	AnthropicBetaOutput128k2025_02_19                 AnthropicBeta = "output-128k-2025-02-19"
-	AnthropicBetaFilesAPI2025_04_14                   AnthropicBeta = "files-api-2025-04-14"
-	AnthropicBetaMCPClient2025_04_04                  AnthropicBeta = "mcp-client-2025-04-04"
-	AnthropicBetaMCPClient2025_11_20                  AnthropicBeta = "mcp-client-2025-11-20"
-	AnthropicBetaDevFullThinking2025_05_14            AnthropicBeta = "dev-full-thinking-2025-05-14"
-	AnthropicBetaInterleavedThinking2025_05_14        AnthropicBeta = "interleaved-thinking-2025-05-14"
-	AnthropicBetaCodeExecution2025_05_22              AnthropicBeta = "code-execution-2025-05-22"
-	AnthropicBetaExtendedCacheTTL2025_04_11           AnthropicBeta = "extended-cache-ttl-2025-04-11"
-	AnthropicBetaContext1m2025_08_07                  AnthropicBeta = "context-1m-2025-08-07"
-	AnthropicBetaContextManagement2025_06_27          AnthropicBeta = "context-management-2025-06-27"
-	AnthropicBetaModelContextWindowExceeded2025_08_26 AnthropicBeta = "model-context-window-exceeded-2025-08-26"
-	AnthropicBetaSkills2025_10_02                     AnthropicBeta = "skills-2025-10-02"
-	AnthropicBetaFastMode2026_02_01                   AnthropicBeta = "fast-mode-2026-02-01"
-	AnthropicBetaOutput300k2026_03_24                 AnthropicBeta = "output-300k-2026-03-24"
-	AnthropicBetaUserProfiles2026_03_24               AnthropicBeta = "user-profiles-2026-03-24"
-	AnthropicBetaAdvisorTool2026_03_01                AnthropicBeta = "advisor-tool-2026-03-01"
-	AnthropicBetaManagedAgents2026_04_01              AnthropicBeta = "managed-agents-2026-04-01"
-	AnthropicBetaCacheDiagnosis2026_04_07             AnthropicBeta = "cache-diagnosis-2026-04-07"
-	AnthropicBetaDreaming2026_04_21                   AnthropicBeta = "dreaming-2026-04-21"
-	AnthropicBetaThinkingTokenCount2026_05_13         AnthropicBeta = "thinking-token-count-2026-05-13"
-	AnthropicBetaServerSideFallback2026_06_01         AnthropicBeta = "server-side-fallback-2026-06-01"
-	AnthropicBetaFallbackCredit2026_06_01             AnthropicBeta = "fallback-credit-2026-06-01"
-	AnthropicBetaAgentMemory2026_07_22                AnthropicBeta = "agent-memory-2026-07-22"
+	AnthropicBetaMessageBatches2024_09_24               AnthropicBeta = "message-batches-2024-09-24"
+	AnthropicBetaPromptCaching2024_07_31                AnthropicBeta = "prompt-caching-2024-07-31"
+	AnthropicBetaComputerUse2024_10_22                  AnthropicBeta = "computer-use-2024-10-22"
+	AnthropicBetaComputerUse2025_01_24                  AnthropicBeta = "computer-use-2025-01-24"
+	AnthropicBetaPDFs2024_09_25                         AnthropicBeta = "pdfs-2024-09-25"
+	AnthropicBetaTokenCounting2024_11_01                AnthropicBeta = "token-counting-2024-11-01"
+	AnthropicBetaTokenEfficientTools2025_02_19          AnthropicBeta = "token-efficient-tools-2025-02-19"
+	AnthropicBetaOutput128k2025_02_19                   AnthropicBeta = "output-128k-2025-02-19"
+	AnthropicBetaFilesAPI2025_04_14                     AnthropicBeta = "files-api-2025-04-14"
+	AnthropicBetaMCPClient2025_04_04                    AnthropicBeta = "mcp-client-2025-04-04"
+	AnthropicBetaMCPClient2025_11_20                    AnthropicBeta = "mcp-client-2025-11-20"
+	AnthropicBetaDevFullThinking2025_05_14              AnthropicBeta = "dev-full-thinking-2025-05-14"
+	AnthropicBetaInterleavedThinking2025_05_14          AnthropicBeta = "interleaved-thinking-2025-05-14"
+	AnthropicBetaCodeExecution2025_05_22                AnthropicBeta = "code-execution-2025-05-22"
+	AnthropicBetaExtendedCacheTTL2025_04_11             AnthropicBeta = "extended-cache-ttl-2025-04-11"
+	AnthropicBetaContext1m2025_08_07                    AnthropicBeta = "context-1m-2025-08-07"
+	AnthropicBetaContextManagement2025_06_27            AnthropicBeta = "context-management-2025-06-27"
+	AnthropicBetaModelContextWindowExceeded2025_08_26   AnthropicBeta = "model-context-window-exceeded-2025-08-26"
+	AnthropicBetaSkills2025_10_02                       AnthropicBeta = "skills-2025-10-02"
+	AnthropicBetaFastMode2026_02_01                     AnthropicBeta = "fast-mode-2026-02-01"
+	AnthropicBetaOutput300k2026_03_24                   AnthropicBeta = "output-300k-2026-03-24"
+	AnthropicBetaUserProfiles2026_03_24                 AnthropicBeta = "user-profiles-2026-03-24"
+	AnthropicBetaUserProfiles2026_08_18                 AnthropicBeta = "user-profiles-2026-08-18"
+	AnthropicBetaUserProfiles2026_09_04                 AnthropicBeta = "user-profiles-2026-09-04"
+	AnthropicBetaAdvisorTool2026_03_01                  AnthropicBeta = "advisor-tool-2026-03-01"
+	AnthropicBetaManagedAgents2026_04_01                AnthropicBeta = "managed-agents-2026-04-01"
+	AnthropicBetaCacheDiagnosis2026_04_07               AnthropicBeta = "cache-diagnosis-2026-04-07"
+	AnthropicBetaDreaming2026_04_21                     AnthropicBeta = "dreaming-2026-04-21"
+	AnthropicBetaThinkingTokenCount2026_05_13           AnthropicBeta = "thinking-token-count-2026-05-13"
+	AnthropicBetaServerSideFallback2026_06_01           AnthropicBeta = "server-side-fallback-2026-06-01"
+	AnthropicBetaServerSideFallback2026_07_01           AnthropicBeta = "server-side-fallback-2026-07-01"
+	AnthropicBetaFallbackCredit2026_06_01               AnthropicBeta = "fallback-credit-2026-06-01"
+	AnthropicBetaFallbackCredit2026_07_01               AnthropicBeta = "fallback-credit-2026-07-01"
+	AnthropicBetaAgentMemory2026_07_22                  AnthropicBeta = "agent-memory-2026-07-22"
+	AnthropicBetaMidConversationToolChanges2026_07_01   AnthropicBeta = "mid-conversation-tool-changes-2026-07-01"
+	AnthropicBetaCompact2026_01_12                      AnthropicBeta = "compact-2026-01-12"
+	AnthropicBetaComputerUse2025_11_24                  AnthropicBeta = "computer-use-2025-11-24"
+	AnthropicBetaMCPTunnels2026_06_22                   AnthropicBeta = "mcp-tunnels-2026-06-22"
+	AnthropicBetaStructuredOutputs2025_11_13            AnthropicBeta = "structured-outputs-2025-11-13"
+	AnthropicBetaTaskBudgets2026_03_13                  AnthropicBeta = "task-budgets-2026-03-13"
+	AnthropicBetaThinkingDisplayUpdates2026_08_18       AnthropicBeta = "thinking-display-updates-2026-08-18"
+	AnthropicBetaCEUserManagement2026_07_13             AnthropicBeta = "ce-user-management-2026-07-13"
+	AnthropicBetaMidConversationOutputConfig2026_07_01  AnthropicBeta = "mid-conversation-output-config-2026-07-01"
+	AnthropicBetaThinkingBindingControls2026_08_01      AnthropicBeta = "thinking-binding-controls-2026-08-01"
+	AnthropicBetaMidConversationSystemClearAt2026_08_21 AnthropicBeta = "mid-conversation-system-clear-at-2026-08-21"
+	AnthropicBetaCompact2026_09_04                      AnthropicBeta = "compact-2026-09-04"
+	AnthropicBetaInlineTools2026_09_15                  AnthropicBeta = "inline-tools-2026-09-15"
+	AnthropicBetaMCPClient2026_09_15                    AnthropicBeta = "mcp-client-2026-09-15"
+	AnthropicBetaCEPlugins2026_09_01                    AnthropicBeta = "ce-plugins-2026-09-01"
+	AnthropicBetaSpendLimitReads2026_09_26              AnthropicBeta = "spend-limit-reads-2026-09-26"
+	AnthropicBetaTelemetryDestinations2026_08_11        AnthropicBeta = "telemetry-destinations-2026-08-11"
+	AnthropicBetaWebhooks2026_10_07                     AnthropicBeta = "webhooks-2026-10-07"
 )
 
 type BetaAPIError struct {
@@ -148,6 +171,12 @@ func (r BetaBillingError) RawJSON() string { return r.JSON.raw }
 func (r *BetaBillingError) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
+
+type BetaCurrency string
+
+const (
+	BetaCurrencyUSD BetaCurrency = "USD"
+)
 
 // BetaErrorUnion contains all possible properties and values from
 // [BetaInvalidRequestError], [BetaAuthenticationError], [BetaBillingError],
@@ -330,6 +359,67 @@ type BetaInvalidRequestError struct {
 // Returns the unmodified JSON received from the API
 func (r BetaInvalidRequestError) RawJSON() string { return r.JSON.raw }
 func (r *BetaInvalidRequestError) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// A monetary amount in a specific currency.
+type BetaMonetaryAmount struct {
+	// Amount in minor units of the currency, as an integer decimal string with no
+	// leading zeros: "2500" is $25.00 and "50" is fifty cents. A string rather than a
+	// number so no float rounding is ever applied.
+	Amount string `json:"amount" api:"required"`
+	// Uppercase ISO-4217 currency code. `USD` is the only currency currently
+	// supported; the accepted set is closed and grows only when a new currency is
+	// priced.
+	//
+	// Any of "USD".
+	Currency BetaCurrency `json:"currency" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Amount      respjson.Field
+		Currency    respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaMonetaryAmount) RawJSON() string { return r.JSON.raw }
+func (r *BetaMonetaryAmount) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaMonetaryAmount to a BetaMonetaryAmountParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaMonetaryAmountParam.Overrides()
+func (r BetaMonetaryAmount) ToParam() BetaMonetaryAmountParam {
+	return param.Override[BetaMonetaryAmountParam](json.RawMessage(r.RawJSON()))
+}
+
+// A monetary amount in a specific currency.
+//
+// The properties Amount, Currency are required.
+type BetaMonetaryAmountParam struct {
+	// Amount in minor units of the currency, as an integer decimal string with no
+	// leading zeros: "2500" is $25.00 and "50" is fifty cents. A string rather than a
+	// number so no float rounding is ever applied.
+	Amount string `json:"amount" api:"required"`
+	// Uppercase ISO-4217 currency code. `USD` is the only currency currently
+	// supported; the accepted set is closed and grows only when a new currency is
+	// priced.
+	//
+	// Any of "USD".
+	Currency BetaCurrency `json:"currency,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaMonetaryAmountParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaMonetaryAmountParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaMonetaryAmountParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 

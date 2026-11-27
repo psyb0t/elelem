@@ -3,6 +3,7 @@ package template
 import (
 	"context"
 	"fmt"
+	"go/token"
 	"go/types"
 	"sort"
 
@@ -16,11 +17,12 @@ import (
 // imports and ensures there are no conflicts in the imported package
 // qualifiers.
 type Registry struct {
-	dstPkgPath       string
-	srcPkg           *packages.Package
-	srcPkgName       string
-	imports          map[string]*Package
-	importQualifiers map[string]*Package
+	dstPkgPath         string
+	srcPkg             *packages.Package
+	srcPkgName         string
+	imports            map[string]*Package
+	importQualifiers   map[string]*Package
+	reservedQualifiers map[string]struct{}
 	// inPackage specifies whether this registry is considered to be in the same
 	// package as the srcPkg. This is needed because of the way that Go package
 	// qualifiers work. For example, test files for a package are allowed to have
@@ -35,13 +37,20 @@ type Registry struct {
 // New loads the source package info and returns a new instance of
 // Registry.
 func NewRegistry(srcPkg *packages.Package, dstPkgPath string, inPackage bool) (*Registry, error) {
-	return &Registry{
-		dstPkgPath:       dstPkgPath,
-		srcPkg:           srcPkg,
-		imports:          make(map[string]*Package),
-		importQualifiers: make(map[string]*Package),
-		inPackage:        inPackage,
-	}, nil
+	registry := &Registry{
+		dstPkgPath:         dstPkgPath,
+		srcPkg:             srcPkg,
+		imports:            make(map[string]*Package),
+		importQualifiers:   make(map[string]*Package),
+		reservedQualifiers: make(map[string]struct{}),
+		inPackage:          inPackage,
+	}
+	if inPackage && srcPkg != nil && srcPkg.Types != nil {
+		for _, name := range srcPkg.Types.Scope().Names() {
+			registry.reservedQualifiers[name] = struct{}{}
+		}
+	}
+	return registry, nil
 }
 
 func (r Registry) SrcPkg() *packages.Package {
@@ -66,9 +75,12 @@ func (r Registry) LookupInterface(name string) (*types.Interface, *types.TypePar
 	}
 
 	var tparams *types.TypeParamList
-	named, ok := obj.Type().(*types.Named)
-	if ok {
-		tparams = named.TypeParams()
+	switch t := obj.Type().(type) {
+	case *types.Named:
+		tparams = t.TypeParams()
+	case *types.Alias:
+		// A generic alias, `type L[T any] = pkg.L[T]`, declares its own type parameters.
+		tparams = t.TypeParams()
 	}
 
 	return obj.Type().Underlying().(*types.Interface).Complete(), tparams, nil
@@ -109,6 +121,36 @@ func (r *Registry) AddImport(pkgName string, pkgPath string) *Package {
 	})
 }
 
+// AddImportWithAlias adds an import with the exact alias or returns an error on
+// conflict. Adding the same path and alias again returns the existing import.
+func (r *Registry) AddImportWithAlias(alias string, pkgPath string) (*Package, error) {
+	if !token.IsIdentifier(alias) || alias == "_" {
+		return nil, fmt.Errorf("invalid import name %q: expected a Go identifier other than _", alias)
+	}
+	if pkgPath == "" {
+		return nil, fmt.Errorf("import %q requires a non-empty package path", alias)
+	}
+	if r.srcPkg != nil && pkgPath == r.srcPkg.PkgPath && r.inPackage {
+		return nil, fmt.Errorf("cannot import source package %q from itself; use unqualified types instead", pkgPath)
+	}
+	if imprt, ok := r.imports[pkgPath]; ok {
+		if imprt.Qualifier() != alias {
+			return nil, fmt.Errorf("cannot import %q as %q: already imported as %q", pkgPath, alias, imprt.Qualifier())
+		}
+		return imprt, nil
+	}
+	if imprt, ok := r.importQualifiers[alias]; ok {
+		return nil, fmt.Errorf("cannot import %q as %q: name already used by import %q", pkgPath, alias, imprt.Path())
+	}
+	if _, ok := r.reservedQualifiers[alias]; ok {
+		return nil, fmt.Errorf("cannot import %q as %q: name already declared in the destination package", pkgPath, alias)
+	}
+
+	imprt := r.AddImport(alias, pkgPath)
+	imprt.Alias = alias
+	return imprt, nil
+}
+
 func (r *Registry) addImport(ctx context.Context, pkg TypesPackage) *Package {
 	path := pkg.Path()
 	logContext := zerolog.Ctx(ctx).With().
@@ -136,7 +178,9 @@ func (r *Registry) addImport(ctx context.Context, pkg TypesPackage) *Package {
 	originalQualifier := imprt.Qualifier()
 	var aliasSuggestion string = imprt.Qualifier()
 	for i := 0; ; i++ {
-		if _, conflict := r.importQualifiers[aliasSuggestion]; conflict {
+		_, importConflict := r.importQualifiers[aliasSuggestion]
+		_, reservedConflict := r.reservedQualifiers[aliasSuggestion]
+		if importConflict || reservedConflict {
 			aliasSuggestion = fmt.Sprintf("%s%d", imprt.Qualifier(), i)
 			continue
 		}

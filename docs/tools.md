@@ -1,8 +1,6 @@
 ---
 title: "Tools"
 description: "Defining elelem tools: handlers, images in results, the hook lifecycle, message injection, manual driving, denial and the bounds on tool output."
-nav_order: 5
-has_children: true
 ---
 
 # Tools
@@ -62,14 +60,12 @@ per-tool bound, so the only limit is the caller's context.
 
 A tool can return images next to its text, such as a screenshot or a rendered chart:
 
-<!-- {% raw %} -->
 ```go
 return elelem.ToolResult{
 	Content: "the login page",
 	Images:  []elelem.ImageSource{{Data: png, MediaType: elelem.MediaTypePNG}},
 }, nil
 ```
-<!-- {% endraw %} -->
 
 The engine puts the images on the tool message after the text, and `Message.ToolImages` reads them back. Each driver sends them the way its provider can:
 
@@ -167,7 +163,10 @@ deliberate**. Tool-driven system injection is the feature, which also means a
 tool is exactly as privileged as your system prompt. `RoleTool` is not usable:
 an injection is a NEW message and can carry no `tool_call_id`, so it would be
 an orphan the provider rejects. Anything else, including the zero value, is
-dropped with an ERROR log rather than written to the transcript.
+dropped with an ERROR log rather than written to the transcript. How the
+Anthropic driver sends an injected system message depends on the model and
+the message's position; see
+[system messages on Anthropic](drivers.md#system-messages-on-anthropic).
 
 **Injections are ephemeral.** They affect only the current run and must not be
 persisted as ordinary history. The engine enforces the lifetime rather than

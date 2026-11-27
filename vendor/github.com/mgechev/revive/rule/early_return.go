@@ -18,10 +18,15 @@ type EarlyReturnRule struct {
 	allowJump bool
 }
 
+var _ lint.ConfigurableRule = (*EarlyReturnRule)(nil)
+
 // Configure validates the rule configuration, and configures the rule accordingly.
 //
 // Configuration implements the [lint.ConfigurableRule] interface.
 func (e *EarlyReturnRule) Configure(arguments lint.Arguments) error {
+	e.preserveScope = false
+	e.allowJump = false
+
 	for _, arg := range arguments {
 		sarg, ok := arg.(string)
 		if !ok {

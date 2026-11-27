@@ -14,7 +14,7 @@ A Go library (`github.com/psyb0t/elelem`) for LLM requests. One provider-neutral
 
 - Root package `elelem`: `Client` and `Request` (`client.go`, `request.go`), the round and tool loop (`engine.go`), immutable prompts and content parts (`prompt.go`, `content.go`), the `Driver` boundary (`driver.go`), transcript repair and history budgets (`transcript.go`, `limit.go`, `tokens.go`), tools and hooks (`tool.go`, `toolimages.go`), the retry decorator (`retry.go`), `RunInto` (`structured.go`), sentinels (`errors.go`) and log reason values (`log_reason.go`).
 - `drivers/openai`, `drivers/anthropic`, `drivers/zaicoding`: one package per provider. `zaicoding` is built on the OpenAI transport through `openai.WithAssistantMessageExtra` and `openai.WithFinishReasonMapper`.
-- `mcp`: turns an MCP server's tools into `elelem.Tool` values over stdio or Streamable HTTP.
+- `mcp`: an MCP client over stdio or Streamable HTTP. It turns a server's tools into `elelem.Tool` values and exposes its instructions, resources, prompts, completion, change notifications, progress and elicitation. It never advertises the deprecated roots, sampling or logging; lint's SA1019 refuses deprecated SDK APIs.
 - `elelemtest`: `ScriptedDriver` (imports no test framework), `elelemtest/mocks` (generated `MockDriver`) and `elelemtest/conformance` (the driver contract suite).
 - `sdkprobe`: opt-in live probes of the raw provider SDKs behind the `sdkprobe` build tag.
 
@@ -22,11 +22,12 @@ Request path: caller builds a `Request` -> engine resolves the model and budget 
 
 ## Stack
 
-- Go `1.26.10` (`go.mod`, `Dockerfile.dev`), dependencies vendored in `vendor/`.
+- Go `1.26.11` (`go.mod`, `Dockerfile.dev`), dependencies vendored in `vendor/`.
 - Provider SDKs: `openai-go/v3`, `anthropic-sdk-go`. MCP: `modelcontextprotocol/go-sdk`. Schemas: `google/jsonschema-go`. Token counting: `tiktoken-go/tokenizer`.
 - Logging and errors: `ctxscope` (logger from the context), `ctxerrors` and its `commerr` sentinels.
 - Tools pinned in `go.mod`'s `tool` block: golangci-lint and mockery.
-- CI: `.github/workflows/pipeline.yml` calling `psyb0t/reusable-github-workflows`.
+- CI: `.github/workflows/pipeline.yml` calling `psyb0t/reusable-github-workflows`; `.github/workflows/docs.yml` builds and deploys the documentation site.
+- Docs: Docusaurus in `website/`, packages pinned exactly in `package.json`, locked with pnpm.
 
 ## Layout
 
@@ -34,26 +35,30 @@ Request path: caller builds a `Request` -> engine resolves the model and budget 
 | --- | --- |
 | `*.go` (root) | The engine and the public API |
 | `drivers/` | One package per provider |
-| `mcp/` | MCP tools as elelem tools |
+| `mcp/` | The MCP client |
 | `elelemtest/` | Test doubles and the conformance suite |
 | `sdkprobe/` | Live SDK probes, build tag `sdkprobe` |
-| `scripts/` | `test-coverage.sh`, `sec.sh` |
-| `docs/` | The documentation site (GitHub Pages, Jekyll, Just the Docs) |
+| `scripts/` | `test-coverage.sh`, `sec.sh`, `pkg-update.sh` |
+| `docs/` | The documentation pages, plain Markdown |
+| `website/` | The Docusaurus site that builds `docs/` for GitHub Pages |
 | `.agents/rules/` | Rules for changing this repository |
 
 ## Commands
 
-Docker and Make are enough. Every Go target runs in the image built from `Dockerfile.dev`.
+Docker and Make are enough. Every Go target runs in the image built from `Dockerfile.dev`; the docs targets run in a pinned Node image.
 
 ```bash
 make help           # every target
 make dep            # go mod tidy + go mod vendor
+make pkg-update PKG="module@vX.Y.Z ..."  # exact versions, 7-day age check, tidy, vendor
 make generate       # go generate ./... (the Driver mock)
 make lint           # go fix diff check + golangci-lint
 make test           # go test -race ./...
 make test-coverage  # coverage gate, MIN_TEST_COVERAGE=90
 make sec            # govulncheck + semgrep, writes sec.sarif
-make docs           # build the documentation site into .testing/docs-site
+make docs           # build the Docusaurus site into website/build
+make docs-lock      # refresh website/pnpm-lock.yaml
+make docs-audit     # pnpm audit of the docs dependencies
 ```
 
 Live SDK probes: `go test -tags sdkprobe -v ./sdkprobe/` inside `make shell`. Each probe skips when its endpoint variables are unset.

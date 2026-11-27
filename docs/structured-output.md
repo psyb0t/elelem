@@ -1,7 +1,6 @@
 ---
 title: "Structured output"
 description: "Typed replies with RunInto, your own schema with WithJSONSchema, untyped WithJSONMode, plus validation, the repair request and failure modes."
-nav_order: 8
 ---
 
 # Structured output

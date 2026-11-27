@@ -1,10 +1,8 @@
 ---
-title: "Home"
+title: "elelem"
+sidebar_label: "Home"
 description: "elelem is a Go library for LLM requests: one engine for OpenAI-compatible, Anthropic and Z.ai Coding models, with tools, budgets and retries."
-nav_order: 1
-permalink: /
-seo:
-  type: WebSite
+slug: /
 ---
 
 # elelem
@@ -37,7 +35,7 @@ The [README](https://github.com/psyb0t/elelem/blob/main/README.md) is the tour. 
 | [Prompts](prompts.md) | The `Prompt` builder (system message, history, origins), plus images, audio and documents, and which provider takes what. |
 | [Callbacks](callbacks.md) | The sixteen observation points: text, reasoning, tool calls, rounds, retries, token limits. Ordering guarantees and what an error from one does. |
 | [Tools](tools.md) | Tools, images in tool results, the hook lifecycle, message injection, denial, and the bounds that stop a tool loop eating your process. |
-| [MCP tools](mcp.md) | Turning an MCP server's tools into elelem tools, over stdio or Streamable HTTP. |
+| [MCP client](mcp.md) | An MCP server over stdio or Streamable HTTP: its tools as elelem tools, plus instructions, resources, prompts, completion, elicitation and progress. |
 | [History](history.md) | Token budgets, transcript units, the limiting handlers, and counting. |
 | [Retries](retries.md) | The retry decorator, how failures get classified, and the sentinel taxonomy. |
 | [Structured output](structured-output.md) | `RunInto`, JSON mode, JSON schema, validation and repair. |

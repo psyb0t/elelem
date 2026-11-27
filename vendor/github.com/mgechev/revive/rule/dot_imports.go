@@ -8,7 +8,7 @@ import (
 	"github.com/mgechev/revive/lint"
 )
 
-// DotImportsRule forbids . imports.
+// DotImportsRule forbids dot imports.
 type DotImportsRule struct {
 	allowedPackages allowPackages
 }
@@ -36,6 +36,8 @@ func (r *DotImportsRule) Apply(file *lint.File, _ lint.Arguments) []lint.Failure
 func (*DotImportsRule) Name() string {
 	return "dot-imports"
 }
+
+var _ lint.ConfigurableRule = (*DotImportsRule)(nil)
 
 // Configure validates the rule configuration, and configures the rule accordingly.
 //

@@ -17,6 +17,8 @@ type CognitiveComplexityRule struct {
 
 const defaultMaxCognitiveComplexity = 7
 
+var _ lint.ConfigurableRule = (*CognitiveComplexityRule)(nil)
+
 // Configure validates the rule configuration, and configures the rule accordingly.
 //
 // Configuration implements the [lint.ConfigurableRule] interface.
@@ -95,7 +97,7 @@ func (v *cognitiveComplexityVisitor) subTreeComplexity(n ast.Node) int {
 	return v.complexity
 }
 
-// Visit implements the ast.Visitor interface.
+// Visit implements the [ast.Visitor] interface.
 func (v *cognitiveComplexityVisitor) Visit(n ast.Node) ast.Visitor {
 	switch n := n.(type) {
 	case *ast.IfStmt:

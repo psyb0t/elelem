@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 package anthropic
 
 import (
@@ -10,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/internal/apijson"
@@ -19,6 +18,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/pagination"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/anthropics/anthropic-sdk-go/packages/respjson"
+	"github.com/anthropics/anthropic-sdk-go/shared/constant"
 )
 
 // BetaMemoryStoreMemoryVersionService contains methods and other services that
@@ -40,10 +40,20 @@ func NewBetaMemoryStoreMemoryVersionService(opts ...option.RequestOption) (r Bet
 	return
 }
 
-// Retrieve a memory version
+// Retrieve a Memory Version
 func (r *BetaMemoryStoreMemoryVersionService) Get(ctx context.Context, memoryVersionID string, params BetaMemoryStoreMemoryVersionGetParams, opts ...option.RequestOption) (res *BetaManagedAgentsMemoryVersion, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
@@ -55,16 +65,27 @@ func (r *BetaMemoryStoreMemoryVersionService) Get(ctx context.Context, memoryVer
 		err = errors.New("missing required memory_version_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s/memory_versions/%s?beta=true", params.MemoryStoreID, memoryVersionID)
+	path := fmt.Sprintf("v1/memory_stores/%s/memory_versions/%s?beta=true", url.PathEscape(params.MemoryStoreID), url.PathEscape(memoryVersionID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.memory_versions.retrieve", "/v1/memory_stores/{memory_store_id}/memory_versions/{memory_version_id}", "view"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", params.MemoryStoreID), requestconfig.WithSpanAttribute("anthropic.memory_store.memory_version.id", memoryVersionID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, params, &res, opts...)
 	return res, err
 }
 
-// List memory versions
+// List Memory Versions
 func (r *BetaMemoryStoreMemoryVersionService) List(ctx context.Context, memoryStoreID string, params BetaMemoryStoreMemoryVersionListParams, opts ...option.RequestOption) (res *pagination.PageCursor[BetaManagedAgentsMemoryVersion], err error) {
 	var raw *http.Response
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22"), option.WithResponseInto(&raw)}, opts...)
@@ -72,7 +93,8 @@ func (r *BetaMemoryStoreMemoryVersionService) List(ctx context.Context, memorySt
 		err = errors.New("missing required memory_store_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s/memory_versions?beta=true", memoryStoreID)
+	path := fmt.Sprintf("v1/memory_stores/%s/memory_versions?beta=true", url.PathEscape(memoryStoreID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.memory_versions.list", "/v1/memory_stores/{memory_store_id}/memory_versions", "api_key_id", "created_at[gte]", "created_at[lte]", "limit", "memory_id", "operation", "page", "service_account_id", "session_id", "view"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", memoryStoreID))
 	cfg, err := requestconfig.NewRequestConfig(ctx, http.MethodGet, path, params, &res, opts...)
 	if err != nil {
 		return nil, err
@@ -85,15 +107,25 @@ func (r *BetaMemoryStoreMemoryVersionService) List(ctx context.Context, memorySt
 	return res, nil
 }
 
-// List memory versions
+// List Memory Versions
 func (r *BetaMemoryStoreMemoryVersionService) ListAutoPaging(ctx context.Context, memoryStoreID string, params BetaMemoryStoreMemoryVersionListParams, opts ...option.RequestOption) *pagination.PageCursorAutoPager[BetaManagedAgentsMemoryVersion] {
 	return pagination.NewPageCursorAutoPager(r.List(ctx, memoryStoreID, params, opts...))
 }
 
-// Redact a memory version
+// Redact a Memory Version
 func (r *BetaMemoryStoreMemoryVersionService) Redact(ctx context.Context, memoryVersionID string, params BetaMemoryStoreMemoryVersionRedactParams, opts ...option.RequestOption) (res *BetaManagedAgentsMemoryVersion, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
@@ -105,14 +137,15 @@ func (r *BetaMemoryStoreMemoryVersionService) Redact(ctx context.Context, memory
 		err = errors.New("missing required memory_version_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s/memory_versions/%s/redact?beta=true", params.MemoryStoreID, memoryVersionID)
+	path := fmt.Sprintf("v1/memory_stores/%s/memory_versions/%s/redact?beta=true", url.PathEscape(params.MemoryStoreID), url.PathEscape(memoryVersionID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.memory_versions.redact", "/v1/memory_stores/{memory_store_id}/memory_versions/{memory_version_id}/redact"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", params.MemoryStoreID), requestconfig.WithSpanAttribute("anthropic.memory_store.memory_version.id", memoryVersionID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
 	return res, err
 }
 
 // BetaManagedAgentsActorUnion contains all possible properties and values from
 // [BetaManagedAgentsSessionActor], [BetaManagedAgentsAPIActor],
-// [BetaManagedAgentsUserActor].
+// [BetaManagedAgentsUserActor], [BetaManagedAgentsServiceAccountActor].
 //
 // Use the [BetaManagedAgentsActorUnion.AsAny] method to switch on the variant.
 //
@@ -120,18 +153,21 @@ func (r *BetaMemoryStoreMemoryVersionService) Redact(ctx context.Context, memory
 type BetaManagedAgentsActorUnion struct {
 	// This field is from variant [BetaManagedAgentsSessionActor].
 	SessionID string `json:"session_id"`
-	// Any of "session_actor", "api_actor", "user_actor".
+	// Any of "session_actor", "api_actor", "user_actor", "service_account_actor".
 	Type string `json:"type"`
 	// This field is from variant [BetaManagedAgentsAPIActor].
 	APIKeyID string `json:"api_key_id"`
 	// This field is from variant [BetaManagedAgentsUserActor].
 	UserID string `json:"user_id"`
-	JSON   struct {
-		SessionID respjson.Field
-		Type      respjson.Field
-		APIKeyID  respjson.Field
-		UserID    respjson.Field
-		raw       string
+	// This field is from variant [BetaManagedAgentsServiceAccountActor].
+	ServiceAccountID string `json:"service_account_id"`
+	JSON             struct {
+		SessionID        respjson.Field
+		Type             respjson.Field
+		APIKeyID         respjson.Field
+		UserID           respjson.Field
+		ServiceAccountID respjson.Field
+		raw              string
 	} `json:"-"`
 }
 
@@ -142,9 +178,10 @@ type anyBetaManagedAgentsActor interface {
 	implBetaManagedAgentsActorUnion()
 }
 
-func (BetaManagedAgentsSessionActor) implBetaManagedAgentsActorUnion() {}
-func (BetaManagedAgentsAPIActor) implBetaManagedAgentsActorUnion()     {}
-func (BetaManagedAgentsUserActor) implBetaManagedAgentsActorUnion()    {}
+func (BetaManagedAgentsSessionActor) implBetaManagedAgentsActorUnion()        {}
+func (BetaManagedAgentsAPIActor) implBetaManagedAgentsActorUnion()            {}
+func (BetaManagedAgentsUserActor) implBetaManagedAgentsActorUnion()           {}
+func (BetaManagedAgentsServiceAccountActor) implBetaManagedAgentsActorUnion() {}
 
 // Use the following switch statement to find the correct variant
 //
@@ -152,6 +189,7 @@ func (BetaManagedAgentsUserActor) implBetaManagedAgentsActorUnion()    {}
 //	case anthropic.BetaManagedAgentsSessionActor:
 //	case anthropic.BetaManagedAgentsAPIActor:
 //	case anthropic.BetaManagedAgentsUserActor:
+//	case anthropic.BetaManagedAgentsServiceAccountActor:
 //	default:
 //	  fmt.Errorf("no variant present")
 //	}
@@ -163,6 +201,8 @@ func (u BetaManagedAgentsActorUnion) AsAny() anyBetaManagedAgentsActor {
 		return u.AsAPIActor()
 	case "user_actor":
 		return u.AsUserActor()
+	case "service_account_actor":
+		return u.AsServiceAccountActor()
 	}
 	return nil
 }
@@ -182,6 +222,11 @@ func (u BetaManagedAgentsActorUnion) AsUserActor() (v BetaManagedAgentsUserActor
 	return
 }
 
+func (u BetaManagedAgentsActorUnion) AsServiceAccountActor() (v BetaManagedAgentsServiceAccountActor) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
 // Returns the unmodified JSON received from the API
 func (u BetaManagedAgentsActorUnion) RawJSON() string { return u.JSON.raw }
 
@@ -189,10 +234,10 @@ func (r *BetaManagedAgentsActorUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// Attribution for a write made directly via the public API (outside of any
-// session).
+// A direct caller of the public API, identified by the API key that authenticated
+// the request.
 type BetaManagedAgentsAPIActor struct {
-	// ID of the API key that performed the write. This identifies the key, not the
+	// ID of the API key (an `apikey_...` value). This identifies the key, not the
 	// secret.
 	APIKeyID string `json:"api_key_id" api:"required"`
 	// Any of "api_actor".
@@ -218,26 +263,35 @@ const (
 	BetaManagedAgentsAPIActorTypeAPIActor BetaManagedAgentsAPIActorType = "api_actor"
 )
 
-// A `memory_version` object: one immutable, attributed row in a memory's
-// append-only history. Every non-no-op mutation to a memory produces a new
-// version. Versions belong to the store (not the individual memory) and persist
-// after the memory is deleted. Retrieving a redacted version returns 200 with
-// `content`, `path`, `content_size_bytes`, and `content_sha256` set to `null`;
-// branch on `redacted_at`, not HTTP status.
+// One entry in a memory's history, recording a single change and who made it.
+//
+// Every change to a memory adds one version. Only redaction can change a version
+// after that. Versions belong to the memory store and stay after the memory is
+// deleted. Each version is retained for at least the version retention period
+// after it was written, unless the store itself is deleted.
+//
+// Retrieving a redacted version succeeds, with `content`, `path`,
+// `content_size_bytes`, and `content_sha256` set to `null`. Check `redacted_at` to
+// find out whether a version was redacted.
+//
+// See the
+// [memory guide](https://platform.claude.com/docs/en/managed-agents/memory#audit-memory-changes)
+// to learn more about memory versions.
 type BetaManagedAgentsMemoryVersion struct {
 	// Unique identifier for this version (a `memver_...` value).
 	ID string `json:"id" api:"required"`
-	// A timestamp in RFC 3339 format
+	// When this version was written, in RFC 3339 format.
 	CreatedAt time.Time `json:"created_at" api:"required" format:"date-time"`
-	// ID of the memory this version snapshots (a `mem_...` value). Remains valid after
-	// the memory is deleted; pass it as `memory_id` to
-	// [List memory versions](/en/api/beta/memory_stores/memory_versions/list) to
-	// retrieve the full lineage including the `deleted` row.
+	// The ID of the memory that this version belongs to (`mem_...`).
+	//
+	// The ID stays valid after the memory is deleted. Pass it as `memory_id` to
+	// [List Memory Versions](https://platform.claude.com/docs/en/api/beta/memory_stores/memory_versions/list)
+	// to get the memory's retained versions, including its `deleted` version while the
+	// lineage is retained.
 	MemoryID string `json:"memory_id" api:"required"`
 	// ID of the memory store this version belongs to (a `memstore_...` value).
 	MemoryStoreID string `json:"memory_store_id" api:"required"`
-	// The kind of mutation a `memory_version` records. Every non-no-op mutation to a
-	// memory appends exactly one version row with one of these values.
+	// The kind of mutation this version records: `created`, `modified`, or `deleted`.
 	//
 	// Any of "created", "modified", "deleted".
 	Operation BetaManagedAgentsMemoryVersionOperation `json:"operation" api:"required"`
@@ -253,22 +307,32 @@ type BetaManagedAgentsMemoryVersion struct {
 	// Size of `content` in bytes as of this version. `null` when `redacted_at` is set
 	// or `operation` is `deleted`. Populated regardless of `view` otherwise.
 	ContentSizeBytes int64 `json:"content_size_bytes" api:"nullable"`
-	// Identifies who performed a write or redact operation. Captured at write time on
-	// the `memory_version` row. The API key that created a session is not recorded on
-	// agent writes; attribution answers who made the write, not who is ultimately
-	// responsible. Look up session provenance separately via the
-	// [Sessions API](/en/api/sessions-retrieve).
+	// Who made this change to the memory, or `null` if the author wasn't recorded.
+	//
+	// Redacting the version doesn't change this field. A `session_actor` here is an
+	// agent that wrote through the store's mounted filesystem at `/mnt/memory/`. The
+	// version doesn't record the API key that created that session. So the author in
+	// `created_by` is who made the change, not who is ultimately responsible for it.
+	//
+	// You can
+	// [retrieve the session](https://platform.claude.com/docs/en/api/beta/sessions/retrieve)
+	// to learn more about where the change came from.
 	CreatedBy BetaManagedAgentsActorUnion `json:"created_by"`
 	// The memory's path at the time of this write. `null` if and only if `redacted_at`
 	// is set.
 	Path string `json:"path" api:"nullable"`
-	// A timestamp in RFC 3339 format
+	// When the version was redacted, in RFC 3339, or `null` if it hasn't been.
+	//
+	// When set, `content`, `path`, `content_size_bytes`, and `content_sha256` are
+	// `null`.
+	//
+	// See the
+	// [memory guide](https://platform.claude.com/docs/en/managed-agents/memory#redact-a-version)
+	// to learn more about redaction.
 	RedactedAt time.Time `json:"redacted_at" api:"nullable" format:"date-time"`
-	// Identifies who performed a write or redact operation. Captured at write time on
-	// the `memory_version` row. The API key that created a session is not recorded on
-	// agent writes; attribution answers who made the write, not who is ultimately
-	// responsible. Look up session provenance separately via the
-	// [Sessions API](/en/api/sessions-retrieve).
+	// Who redacted this version, or `null` if it has not been redacted. In practice
+	// always an `api_actor`, `user_actor`, or `service_account_actor` (agents do not
+	// have a redact capability).
 	RedactedBy BetaManagedAgentsActorUnion `json:"redacted_by"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
@@ -302,22 +366,51 @@ const (
 	BetaManagedAgentsMemoryVersionTypeMemoryVersion BetaManagedAgentsMemoryVersionType = "memory_version"
 )
 
-// The kind of mutation a `memory_version` records. Every non-no-op mutation to a
-// memory appends exactly one version row with one of these values.
+// The kind of change that a memory version records.
+//
+// Every change to a memory adds one version. If you update a memory and nothing
+// changes, the memory doesn't get a new version.
 type BetaManagedAgentsMemoryVersionOperation string
 
 const (
-	BetaManagedAgentsMemoryVersionOperationCreated  BetaManagedAgentsMemoryVersionOperation = "created"
+	// The memory was created. The first version in any memory's lineage.
+	BetaManagedAgentsMemoryVersionOperationCreated BetaManagedAgentsMemoryVersionOperation = "created"
+	// The memory's `content`, `path`, or both were changed via update. Writes the
+	// agent makes through the filesystem mount also appear as `modified`.
 	BetaManagedAgentsMemoryVersionOperationModified BetaManagedAgentsMemoryVersionOperation = "modified"
-	BetaManagedAgentsMemoryVersionOperationDeleted  BetaManagedAgentsMemoryVersionOperation = "deleted"
+	// The memory was deleted. The `content`, `content_size_bytes`, and
+	// `content_sha256` fields are `null` on this version. The preceding version, while
+	// it is retained, records the deleted content's size and hash.
+	BetaManagedAgentsMemoryVersionOperationDeleted BetaManagedAgentsMemoryVersionOperation = "deleted"
 )
 
-// Attribution for a write made by an agent during a session, through the mounted
-// filesystem at `/mnt/memory/`.
+// A workload authenticated as a service account, for example via Workload Identity
+// Federation.
+type BetaManagedAgentsServiceAccountActor struct {
+	// ID of the service account (a `svac_...` value).
+	ServiceAccountID string                       `json:"service_account_id" api:"required"`
+	Type             constant.ServiceAccountActor `json:"type" default:"service_account_actor"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		ServiceAccountID respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsServiceAccountActor) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsServiceAccountActor) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// An agent acting during a session, for example through the session's mounted
+// filesystem. It names the session itself, not the user or API key that started
+// the session.
 type BetaManagedAgentsSessionActor struct {
-	// ID of the session that performed the write (a `sesn_...` value). Look up the
-	// session via [Retrieve a session](/en/api/sessions-retrieve) for further
-	// provenance.
+	// ID of the session (a `sesn_...` value). Look up the session via
+	// [Retrieve a session](/en/api/beta/sessions/retrieve) for further provenance.
 	SessionID string `json:"session_id" api:"required"`
 	// Any of "session_actor".
 	Type BetaManagedAgentsSessionActorType `json:"type" api:"required"`
@@ -342,11 +435,11 @@ const (
 	BetaManagedAgentsSessionActorTypeSessionActor BetaManagedAgentsSessionActorType = "session_actor"
 )
 
-// Attribution for a write made by a human user through the Anthropic Console.
+// A human user, for example acting through the Anthropic Console.
 type BetaManagedAgentsUserActor struct {
 	// Any of "user_actor".
 	Type BetaManagedAgentsUserActorType `json:"type" api:"required"`
-	// ID of the user who performed the write (a `user_...` value).
+	// ID of the user (a `user_...` value).
 	UserID string `json:"user_id" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
@@ -370,12 +463,25 @@ const (
 )
 
 type BetaMemoryStoreMemoryVersionGetParams struct {
+	// The ID of the memory store that holds the version (`memstore_...`).
 	MemoryStoreID string `path:"memory_store_id" api:"required" json:"-"`
-	// Query parameter for view
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// Whether a `memory` or `memory_version` in the response includes its `content`.
+	// Defaults to `full` on retrieve operations and to `basic` on list, create, and
+	// update operations.
+	//
+	// With `full`, list operations return at most 20 items per page.
 	//
 	// Any of "basic", "full".
 	View BetaManagedAgentsMemoryView `query:"view,omitzero" json:"-"`
-	// Optional header to specify the beta version(s) you want to use.
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -390,29 +496,50 @@ func (r BetaMemoryStoreMemoryVersionGetParams) URLQuery() (v url.Values, err err
 }
 
 type BetaMemoryStoreMemoryVersionListParams struct {
-	// Query parameter for api_key_id
+	// Return only versions written with the API key that has this ID.
 	APIKeyID param.Opt[string] `query:"api_key_id,omitzero" json:"-"`
 	// Return versions created at or after this time (inclusive).
 	CreatedAtGte param.Opt[time.Time] `query:"created_at[gte],omitzero" format:"date-time" json:"-"`
 	// Return versions created at or before this time (inclusive).
 	CreatedAtLte param.Opt[time.Time] `query:"created_at[lte],omitzero" format:"date-time" json:"-"`
-	// Query parameter for limit
+	// The maximum number of versions to return per page, from 1 to 100. Defaults
+	// to 20.
+	//
+	// With `view=full`, a page holds at most 20 versions.
 	Limit param.Opt[int64] `query:"limit,omitzero" json:"-"`
-	// Query parameter for memory_id
+	// Return only versions of the memory with this ID (`mem_...`).
+	//
+	// The filter still works after the memory is deleted. While that memory's versions
+	// are retained, the results include the version whose `operation` is `deleted`.
 	MemoryID param.Opt[string] `query:"memory_id,omitzero" json:"-"`
-	// Query parameter for page
+	// The `next_page` value from a previous response, to get the next page. Omit it to
+	// get the first page.
 	Page param.Opt[string] `query:"page,omitzero" json:"-"`
-	// Query parameter for session_id
+	// Return only versions written by the service account with this ID (`svac_...`).
+	ServiceAccountID param.Opt[string] `query:"service_account_id,omitzero" json:"-"`
+	// Return only versions written by the session with this ID.
 	SessionID param.Opt[string] `query:"session_id,omitzero" json:"-"`
-	// Query parameter for operation
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// Return only versions that record this kind of change.
 	//
 	// Any of "created", "modified", "deleted".
 	Operation BetaManagedAgentsMemoryVersionOperation `query:"operation,omitzero" json:"-"`
-	// Query parameter for view
+	// Whether a `memory` or `memory_version` in the response includes its `content`.
+	// Defaults to `full` on retrieve operations and to `basic` on list, create, and
+	// update operations.
+	//
+	// With `full`, list operations return at most 20 items per page.
 	//
 	// Any of "basic", "full".
 	View BetaManagedAgentsMemoryView `query:"view,omitzero" json:"-"`
-	// Optional header to specify the beta version(s) you want to use.
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -427,8 +554,17 @@ func (r BetaMemoryStoreMemoryVersionListParams) URLQuery() (v url.Values, err er
 }
 
 type BetaMemoryStoreMemoryVersionRedactParams struct {
+	// The ID of the memory store that holds the version (`memstore_...`).
 	MemoryStoreID string `path:"memory_store_id" api:"required" json:"-"`
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/vektra/mockery/v3/config"
@@ -52,12 +54,48 @@ func NewRootCmd() (*cobra.Command, error) {
 	pFlags = cmd.PersistentFlags()
 	pFlags.String("config", "", "config file to use")
 	pFlags.String("log-level", os.Getenv("MOCKERY_LOG_LEVEL"), "Level of logging")
+	pFlags.String("cpuprofile", "", "write a cpu profile of the mockery run to this file")
+	pFlags.String("memprofile", "", "write a memory profile of the mockery run to this file")
 
 	cmd.AddCommand(NewShowConfigCmd())
 	cmd.AddCommand(NewVersionCmd())
 	cmd.AddCommand(NewInitCmd())
 	cmd.AddCommand(NewMigrateCmd())
 	return cmd, nil
+}
+
+// startCPUProfile begins writing a CPU profile to path. The returned stop
+// function must be called to flush a valid profile and close the file.
+func startCPUProfile(path string) (func() error, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, stackerr.NewStackErrf(err, "failed to create cpuprofile file")
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("failed to start cpu profile: %w", err)
+	}
+	return func() error {
+		pprof.StopCPUProfile()
+		return f.Close()
+	}, nil
+}
+
+// startMemProfile creates the memory profile file at path. The returned stop
+// function writes a heap profile of the run to it and closes the file.
+func startMemProfile(path string) (func() error, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, stackerr.NewStackErrf(err, "failed to create memprofile file")
+	}
+	return func() error {
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			f.Close()
+			return fmt.Errorf("failed to write memory profile: %w", err)
+		}
+		return f.Close()
+	}, nil
 }
 
 func logFatalErr(ctx context.Context, err error) {
@@ -178,6 +216,18 @@ func (i *InterfaceCollection) Append(ctx context.Context, iface *internal.Interf
 	return nil
 }
 
+func writeFile(path string, data []byte) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return stackerr.NewStackErr(err)
+	}
+	defer f.Close()
+	if _, err = f.Write(data); err != nil {
+		return stackerr.NewStackErr(err)
+	}
+	return nil
+}
+
 func (r *RootApp) Run() error {
 	remoteTemplateCache := make(map[string]*internal.RemoteTemplate)
 
@@ -188,6 +238,29 @@ func (r *RootApp) Run() error {
 	}
 	log.Info().Str("config-file", r.Config.ConfigFileUsed()).Msgf("Starting mockery")
 	ctx := log.WithContext(context.Background())
+
+	if profilePath := *r.Config.Cpuprofile; profilePath != "" {
+		stop, err := startCPUProfile(profilePath)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := stop(); err != nil {
+				log.Err(err).Msg("failed to stop cpu profile")
+			}
+		}()
+	}
+	if profilePath := *r.Config.Memprofile; profilePath != "" {
+		stop, err := startMemProfile(profilePath)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := stop(); err != nil {
+				log.Err(err).Msg("failed to write memory profile")
+			}
+		}()
+	}
 
 	buildTags := strings.Split(*r.Config.BuildTags, " ")
 
@@ -208,7 +281,7 @@ func (r *RootApp) Run() error {
 	//
 	// NOTE: We do that here without relying on parser, because parses iterates
 	// over existing go files and interfaces, while user could've had a typo in
-	// interface or pacakge name, making it impossible for parser to find these
+	// interface or package name, making it impossible for parser to find these
 	// files/interfaces in the first place.
 	log.Debug().Msg("Making seen map...")
 	missingMap := make(map[string]map[string]struct{}, len(configuredPackages))
@@ -346,6 +419,7 @@ func (r *RootApp) Run() error {
 			packageConfig.Config,
 			collection.config.OutPkgName,
 			collection.config.InPackage,
+			parser.Aliases(),
 		)
 		if err != nil {
 			return err
@@ -374,13 +448,8 @@ func (r *RootApp) Run() error {
 			return fmt.Errorf("outfile exists")
 		}
 
-		file, err := os.Create(outFilePath)
-		if err != nil {
-			return stackerr.NewStackErr(err)
-		}
-		defer file.Close()
-		if _, err = file.Write(templateBytes); err != nil {
-			return stackerr.NewStackErr(err)
+		if err := writeFile(outFilePath, templateBytes); err != nil {
+			return err
 		}
 	}
 

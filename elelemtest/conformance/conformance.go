@@ -27,6 +27,7 @@ import (
 const (
 	capabilityTestValue = 0.25
 	capabilityTestSeed  = int64(42)
+	capabilityTestTool  = "lookup"
 )
 
 // Options configures Run for a driver's fake provider endpoint.
@@ -381,7 +382,7 @@ func toolCapabilityCases() []capabilityCase {
 			},
 			configure: func(request *elelem.DriverRequest) {
 				request.Tools = []elelem.Tool{{
-					Name:            "lookup",
+					Name:            capabilityTestTool,
 					ArgumentsSchema: json.RawMessage(`{"type":"object"}`),
 					StrictArguments: true,
 				}}
@@ -394,10 +395,11 @@ func toolCapabilityCases() []capabilityCase {
 			},
 			configure: func(request *elelem.DriverRequest) {
 				request.Tools = []elelem.Tool{{
-					Name:            "lookup",
+					Name:            capabilityTestTool,
 					ArgumentsSchema: json.RawMessage(`{"type":"object"}`),
 				}}
-				request.Params.ToolChoice = elelem.ToolChoiceTool("lookup")
+				request.Params.ToolChoice = elelem.ToolChoiceTool(
+					capabilityTestTool)
 			},
 		},
 		{
@@ -407,7 +409,7 @@ func toolCapabilityCases() []capabilityCase {
 			},
 			configure: func(request *elelem.DriverRequest) {
 				value := false
-				request.Tools = []elelem.Tool{{Name: "lookup"}}
+				request.Tools = []elelem.Tool{{Name: capabilityTestTool}}
 				request.Params.ParallelToolCalls = &value
 			},
 		},

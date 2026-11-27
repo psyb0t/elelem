@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 package anthropic
 
 import (
@@ -10,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/internal/apijson"
@@ -51,15 +50,26 @@ func NewBetaMessageBatchService(opts ...option.RequestOption) (r BetaMessageBatc
 // Learn more about the Message Batches API in our
 // [user guide](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
 func (r *BetaMessageBatchService) New(ctx context.Context, params BetaMessageBatchNewParams, opts ...option.RequestOption) (res *BetaMessageBatch, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
 	}
 	if !param.IsOmitted(params.UserProfileID) {
 		opts = append(opts, option.WithHeader("anthropic-user-profile-id", fmt.Sprintf("%v", params.UserProfileID.Value)))
 	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
+	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "message-batches-2024-09-24")}, opts...)
 	path := "v1/messages/batches?beta=true"
+	opts = append(opts, requestconfig.WithSpan("anthropic.messages.batches.create", "/v1/messages/batches"), messageBatchesCreateSpan(len(params.Requests)), requestconfig.WithSpanCreatedID("anthropic.message.batch.id", &res, func(created *BetaMessageBatch) string { return created.ID }))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, params, &res, opts...)
 	return res, err
 }
@@ -71,8 +81,18 @@ func (r *BetaMessageBatchService) New(ctx context.Context, params BetaMessageBat
 // Learn more about the Message Batches API in our
 // [user guide](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
 func (r *BetaMessageBatchService) Get(ctx context.Context, messageBatchID string, query BetaMessageBatchGetParams, opts ...option.RequestOption) (res *BetaMessageBatch, err error) {
-	for _, v := range query.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(query.Betas) > 0 {
+		headerValues := make([]string, len(query.Betas))
+		for i, v := range query.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(query.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", query.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "message-batches-2024-09-24")}, opts...)
@@ -80,7 +100,8 @@ func (r *BetaMessageBatchService) Get(ctx context.Context, messageBatchID string
 		err = errors.New("missing required message_batch_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/messages/batches/%s?beta=true", messageBatchID)
+	path := fmt.Sprintf("v1/messages/batches/%s?beta=true", url.PathEscape(messageBatchID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.messages.batches.retrieve", "/v1/messages/batches/{message_batch_id}"), requestconfig.WithSpanAttribute("anthropic.message.batch.id", messageBatchID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
 	return res, err
 }
@@ -92,12 +113,23 @@ func (r *BetaMessageBatchService) Get(ctx context.Context, messageBatchID string
 // [user guide](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
 func (r *BetaMessageBatchService) List(ctx context.Context, params BetaMessageBatchListParams, opts ...option.RequestOption) (res *pagination.Page[BetaMessageBatch], err error) {
 	var raw *http.Response
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "message-batches-2024-09-24"), option.WithResponseInto(&raw)}, opts...)
 	path := "v1/messages/batches?beta=true"
+	opts = append(opts, requestconfig.WithSpan("anthropic.messages.batches.list", "/v1/messages/batches", "after_id", "before_id", "limit"))
 	cfg, err := requestconfig.NewRequestConfig(ctx, http.MethodGet, path, params, &res, opts...)
 	if err != nil {
 		return nil, err
@@ -127,8 +159,18 @@ func (r *BetaMessageBatchService) ListAutoPaging(ctx context.Context, params Bet
 // Learn more about the Message Batches API in our
 // [user guide](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
 func (r *BetaMessageBatchService) Delete(ctx context.Context, messageBatchID string, body BetaMessageBatchDeleteParams, opts ...option.RequestOption) (res *BetaDeletedMessageBatch, err error) {
-	for _, v := range body.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(body.Betas) > 0 {
+		headerValues := make([]string, len(body.Betas))
+		for i, v := range body.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(body.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", body.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "message-batches-2024-09-24")}, opts...)
@@ -136,7 +178,8 @@ func (r *BetaMessageBatchService) Delete(ctx context.Context, messageBatchID str
 		err = errors.New("missing required message_batch_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/messages/batches/%s?beta=true", messageBatchID)
+	path := fmt.Sprintf("v1/messages/batches/%s?beta=true", url.PathEscape(messageBatchID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.messages.batches.delete", "/v1/messages/batches/{message_batch_id}"), requestconfig.WithSpanAttribute("anthropic.message.batch.id", messageBatchID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodDelete, path, nil, &res, opts...)
 	return res, err
 }
@@ -154,8 +197,18 @@ func (r *BetaMessageBatchService) Delete(ctx context.Context, messageBatchID str
 // Learn more about the Message Batches API in our
 // [user guide](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
 func (r *BetaMessageBatchService) Cancel(ctx context.Context, messageBatchID string, body BetaMessageBatchCancelParams, opts ...option.RequestOption) (res *BetaMessageBatch, err error) {
-	for _, v := range body.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(body.Betas) > 0 {
+		headerValues := make([]string, len(body.Betas))
+		for i, v := range body.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(body.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", body.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "message-batches-2024-09-24")}, opts...)
@@ -163,7 +216,8 @@ func (r *BetaMessageBatchService) Cancel(ctx context.Context, messageBatchID str
 		err = errors.New("missing required message_batch_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/messages/batches/%s/cancel?beta=true", messageBatchID)
+	path := fmt.Sprintf("v1/messages/batches/%s/cancel?beta=true", url.PathEscape(messageBatchID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.messages.batches.cancel", "/v1/messages/batches/{message_batch_id}/cancel"), requestconfig.WithSpanAttribute("anthropic.message.batch.id", messageBatchID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
 	return res, err
 }
@@ -181,8 +235,18 @@ func (r *BetaMessageBatchService) ResultsStreaming(ctx context.Context, messageB
 		raw *http.Response
 		err error
 	)
-	for _, v := range query.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(query.Betas) > 0 {
+		headerValues := make([]string, len(query.Betas))
+		for i, v := range query.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(query.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", query.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "message-batches-2024-09-24"), option.WithHeader("Accept", "application/x-jsonl")}, opts...)
@@ -190,7 +254,8 @@ func (r *BetaMessageBatchService) ResultsStreaming(ctx context.Context, messageB
 		err = errors.New("missing required message_batch_id parameter")
 		return jsonl.NewStream[BetaMessageBatchIndividualResponse](nil, err)
 	}
-	path := fmt.Sprintf("v1/messages/batches/%s/results?beta=true", messageBatchID)
+	path := fmt.Sprintf("v1/messages/batches/%s/results?beta=true", url.PathEscape(messageBatchID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.messages.batches.results", "/v1/messages/batches/{message_batch_id}/results"), requestconfig.WithSpanAttribute("anthropic.message.batch.id", messageBatchID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &raw, opts...)
 	return jsonl.NewStream[BetaMessageBatchIndividualResponse](raw, err)
 }
@@ -516,10 +581,17 @@ type BetaMessageBatchNewParams struct {
 	// a Message.
 	Requests []BetaMessageBatchNewParamsRequest `json:"requests,omitzero" api:"required"`
 	// The user profile ID to attribute the requests in this batch to. Use when acting
-	// on behalf of a party other than your organization. Requires the `user-profiles`
-	// beta header. Applies to every request in the batch; an individual request whose
-	// `user_profile_id` body field conflicts with this header is errored.
+	// on behalf of a party other than your organization. Applies to every request in
+	// the batch; an individual request whose `user_profile_id` body field conflicts
+	// with this header is errored.
 	UserProfileID param.Opt[string] `header:"anthropic-user-profile-id,omitzero" json:"-"`
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// Optional header to specify the beta version(s) you want to use.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
@@ -592,7 +664,10 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	//
 	// If the final message uses the `assistant` role, the response content will
 	// continue immediately from the content in that message. This can be used to
-	// constrain part of the model's response.
+	// constrain part of the model's response. This is called prefill. On models that
+	// don't support prefill, creating a message that ends with a partial `assistant`
+	// response returns a 400 error. See
+	// [Prefill not supported](https://platform.claude.com/docs/en/api/errors#prefill-not-supported).
 	//
 	// Example with a single `user` message:
 	//
@@ -604,25 +679,22 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	//
 	// ```json
 	// [
-	//
-	//	{ "role": "user", "content": "Hello there." },
-	//	{ "role": "assistant", "content": "Hi, I'm Claude. How can I help you?" },
-	//	{ "role": "user", "content": "Can you explain LLMs in plain English?" }
-	//
+	//   { "role": "user", "content": "Hello there." },
+	//   { "role": "assistant", "content": "Hi, I'm Claude. How can I help you?" },
+	//   { "role": "user", "content": "Can you explain LLMs in plain English?" }
 	// ]
 	// ```
 	//
-	// Example with a partially-filled response from Claude:
+	// Example with a partially-filled response from Claude, for models that support
+	// prefill:
 	//
 	// ```json
 	// [
-	//
-	//	{
-	//	  "role": "user",
-	//	  "content": "What's the Greek name for Sun? (A) Sol (B) Helios (C) Sun"
-	//	},
-	//	{ "role": "assistant", "content": "The best answer is (" }
-	//
+	//   {
+	//     "role": "user",
+	//     "content": "What's the Greek name for Sun? (A) Sol (B) Helios (C) Sun"
+	//   },
+	//   { "role": "assistant", "content": "The best answer is (" }
 	// ]
 	// ```
 	//
@@ -654,33 +726,17 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	// See [models](https://docs.anthropic.com/en/docs/models-overview) for additional
 	// details and options.
 	Model Model `json:"model,omitzero" api:"required"`
-	// The `fallback_credit_token` from a prior refusal's `stop_details`.
-	//
-	// When a preceding request was refused and returned a `fallback_credit_token`,
-	// pass that code here on the retry to have the retry's cache-creation tokens for
-	// the prefix that was warm on the refused model billed at the cache-read rate.
-	// Must be redeemed by the same organization and workspace, with the same request
-	// body (optionally extended by one appended `assistant` message whose content is
-	// the partial text — with any trailing whitespace stripped from the final text
-	// block — and paired server-tool blocks streamed before the refusal; the
-	// appended-assistant form is not available for requests with `output_format` set
-	// or forced `tool_choice`), on an eligible fallback model, on the same platform,
-	// and within 5 minutes of the refusal; a mismatch is a 400. A token minted
-	// mid-server-tool-loop whose partial content was continuable may only be redeemed
-	// with the appended-assistant form — if an exact-body retry is rejected with a 400
-	// saying the token must be redeemed by continuing the partial response, retry with
-	// the appended-assistant form instead.
-	//
-	// When the appended-assistant form is used on a model that otherwise disallows
-	// assistant-turn prefill, this token also authorizes that one prefill.
-	FallbackCreditToken param.Opt[string] `json:"fallback_credit_token,omitzero"`
 	// Specifies the geographic region for inference processing. If not specified, the
 	// workspace's `default_inference_geo` is used.
 	InferenceGeo param.Opt[string] `json:"inference_geo,omitzero"`
-	// Whether to incrementally stream the response using server-sent events.
+	// Whether to incrementally stream the response using server-sent events. When
+	// `true`, SDKs return a raw event stream.
 	//
-	// See [streaming](https://platform.claude.com/docs/en/build-with-claude/streaming)
-	// for details.
+	// In the TypeScript, Python and Ruby SDKs, the recommended way to stream is
+	// `messages.stream()`. It sets `stream` for you and accumulates the events into
+	// the final message. See
+	// [Streaming with SDKs](https://platform.claude.com/docs/en/build-with-claude/streaming#streaming-with-sdks)
+	// for an example in each language.
 	Stream param.Opt[bool] `json:"stream,omitzero"`
 	// Amount of randomness injected into the response.
 	//
@@ -692,7 +748,7 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	// deterministic.
 	//
 	// Deprecated: Deprecated. Models released after Claude Opus 4.6 do not support
-	// setting temperature. A value of 1.0 of will be accepted for backwards
+	// setting temperature. A value of 1.0 will be accepted for backwards
 	// compatibility, all other values will be rejected with a 400 error.
 	Temperature param.Opt[float64] `json:"temperature,omitzero"`
 	// Only sample from the top K options for each subsequent token.
@@ -719,26 +775,66 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	TopP param.Opt[float64] `json:"top_p,omitzero"`
 	// Container identifier for reuse across requests.
 	Container BetaMessageBatchNewParamsRequestParamsContainerUnion `json:"container,omitzero"`
+	// The `fallback_credit_token` from a prior refusal's `stop_details`.
+	//
+	// When a preceding request was refused and returned a `fallback_credit_token`,
+	// pass that code here on the retry to have the retry's cache-creation tokens for
+	// the prefix that was warm on the refused model billed at the cache-read rate.
+	// Must be redeemed by the same organization and workspace, with the same request
+	// body (optionally extended by one appended `assistant` message whose content is
+	// the partial text — with any trailing whitespace stripped from the final text
+	// block — and paired server-tool blocks streamed before the refusal; the
+	// appended-assistant form is not available for requests with `output_format` set
+	// or forced `tool_choice`), on an eligible fallback model, on the same platform,
+	// and within 5 minutes of the refusal; a mismatch is a 400. A token minted
+	// mid-server-tool-loop whose partial content was continuable may only be redeemed
+	// with the appended-assistant form — if an exact-body retry is rejected with a 400
+	// saying the token must be redeemed by continuing the partial response, retry with
+	// the appended-assistant form instead.
+	//
+	// When the appended-assistant form is used on a model that otherwise disallows
+	// assistant-turn prefill, this token also authorizes that one prefill.
+	FallbackCreditToken BetaMessageBatchNewParamsRequestParamsFallbackCreditTokenUnion `json:"fallback_credit_token,omitzero"`
 	// Opt-in server-side retry on one or more substitute models when the requested
 	// model declines for policy reasons. Tried in order: if the first entry also
-	// declines, the second is tried, and so on.
-	Fallbacks []BetaFallbackParam `json:"fallbacks,omitzero"`
-	// Inference speed mode. `fast` provides significantly faster output token
-	// generation at premium pricing. Not all models support `fast`; invalid
-	// combinations are rejected at create time.
+	// declines, the second is tried, and so on. Some models don't support fallbacks;
+	// on those models, a list of fallback models returns a 400 error. See
+	// [Server-side fallback](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback).
+	// The string "default" requests the requested model's server-defined default
+	// fallback configuration. On a model that doesn't support fallbacks, the request
+	// runs on the requested model alone, so a declined request stays declined.
+	Fallbacks BetaFallbacksParamUnion `json:"fallbacks,omitzero"`
+	// The inference speed mode for this request. `"fast"` enables high
+	// output-tokens-per-second inference.
+	//
+	// Some models require the `fast-mode-2026-02-01` beta header for any `speed`
+	// value. See
+	// [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for
+	// which models.
 	//
 	// Any of "standard", "fast".
 	Speed string `json:"speed,omitzero"`
 	// Top-level cache control automatically applies a cache_control marker to the last
 	// cacheable block in the request.
 	CacheControl BetaCacheControlEphemeralParam `json:"cache_control,omitzero"`
+	// Compaction configuration.
+	//
+	// When set on `POST /v1/messages`, the request is a compaction request: the
+	// conversation in `messages` is summarized and the response holds only the
+	// resulting `compaction` block (`stop_reason` `"compaction"`), which later
+	// requests send first in `messages` in place of the messages it summarizes.
+	// `POST /v1/messages/count_tokens` accepts this parameter and ignores it: the
+	// count it returns is for the conversation in `messages` as sent. Cannot be
+	// combined with `context_management`.
+	Compaction BetaCompactionConfigUnionParam `json:"compaction,omitzero"`
 	// Context management configuration.
 	//
 	// This allows you to control how Claude manages context across multiple requests,
 	// such as whether to clear function results or not.
 	ContextManagement BetaContextManagementConfigParam `json:"context_management,omitzero"`
-	// Request-level diagnostics. Currently carries the previous response id for
-	// prompt-cache divergence reporting.
+	// Request-level diagnostics. Supply `previous_message_id` to have the response
+	// include `diagnostics.cache_miss_reason` explaining any prompt-cache divergence
+	// from that prior request.
 	Diagnostics BetaDiagnosticsParam `json:"diagnostics,omitzero"`
 	// MCP servers to be utilized in this request
 	MCPServers []BetaRequestMCPServerURLDefinitionParam `json:"mcp_servers,omitzero"`
@@ -779,15 +875,16 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	// as specifying a particular goal or role. See our
 	// [guide to system prompts](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices#give-claude-a-role).
 	System []BetaTextBlockParam `json:"system,omitzero"`
-	// Configuration for enabling Claude's extended thinking.
+	// Configuration for Claude's thinking.
 	//
-	// When enabled, responses include `thinking` content blocks showing Claude's
-	// thinking process before the final answer. Requires a minimum budget of 1,024
-	// tokens and counts towards your `max_tokens` limit.
+	// With `{"type": "adaptive"}`, Claude decides when and how much to think. With
+	// `{"type": "enabled"}` (manual extended thinking), you set a `budget_tokens` of
+	// at least 1,024. Thinking tokens count toward your `max_tokens` limit.
 	//
-	// See
-	// [extended thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)
-	// for details.
+	// Which `type` values are accepted, and what happens when you omit `thinking`,
+	// depend on the model. See
+	// [thinking](https://platform.claude.com/docs/en/build-with-claude/thinking#configuring-thinking)
+	// for each model's behavior.
 	Thinking BetaThinkingConfigParamUnion `json:"thinking,omitzero"`
 	// How the model should use the provided tools. The model can use a specific tool,
 	// any available tool, decide by itself, or not use tools at all.
@@ -807,32 +904,30 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	//
 	// Each tool definition includes:
 	//
-	//   - `name`: Name of the tool.
-	//   - `description`: Optional, but strongly-recommended description of the tool.
-	//   - `input_schema`: [JSON schema](https://json-schema.org/draft/2020-12) for the
-	//     tool `input` shape that the model will produce in `tool_use` output content
-	//     blocks.
+	// - `name`: Name of the tool.
+	// - `description`: Optional, but strongly-recommended description of the tool.
+	// - `input_schema`: [JSON schema](https://json-schema.org/draft/2020-12) for the
+	//   tool `input` shape that the model will produce in `tool_use` output content
+	//   blocks.
 	//
 	// For example, if you defined `tools` as:
 	//
 	// ```json
 	// [
-	//
-	//	{
-	//	  "name": "get_stock_price",
-	//	  "description": "Get the current stock price for a given ticker symbol.",
-	//	  "input_schema": {
-	//	    "type": "object",
-	//	    "properties": {
-	//	      "ticker": {
-	//	        "type": "string",
-	//	        "description": "The stock ticker symbol, e.g. AAPL for Apple Inc."
-	//	      }
-	//	    },
-	//	    "required": ["ticker"]
-	//	  }
-	//	}
-	//
+	//   {
+	//     "name": "get_stock_price",
+	//     "description": "Get the current stock price for a given ticker symbol.",
+	//     "input_schema": {
+	//       "type": "object",
+	//       "properties": {
+	//         "ticker": {
+	//           "type": "string",
+	//           "description": "The stock ticker symbol, e.g. AAPL for Apple Inc."
+	//         }
+	//       },
+	//       "required": ["ticker"]
+	//     }
+	//   }
 	// ]
 	// ```
 	//
@@ -841,14 +936,12 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	//
 	// ```json
 	// [
-	//
-	//	{
-	//	  "type": "tool_use",
-	//	  "id": "toolu_01D7FLrfh4GYq7yT1ULFeyMV",
-	//	  "name": "get_stock_price",
-	//	  "input": { "ticker": "^GSPC" }
-	//	}
-	//
+	//   {
+	//     "type": "tool_use",
+	//     "id": "toolu_01D7FLrfh4GYq7yT1ULFeyMV",
+	//     "name": "get_stock_price",
+	//     "input": { "ticker": "^GSPC" }
+	//   }
 	// ]
 	// ```
 	//
@@ -858,13 +951,11 @@ type BetaMessageBatchNewParamsRequestParams struct {
 	//
 	// ```json
 	// [
-	//
-	//	{
-	//	  "type": "tool_result",
-	//	  "tool_use_id": "toolu_01D7FLrfh4GYq7yT1ULFeyMV",
-	//	  "content": "259.75 USD"
-	//	}
-	//
+	//   {
+	//     "type": "tool_result",
+	//     "tool_use_id": "toolu_01D7FLrfh4GYq7yT1ULFeyMV",
+	//     "content": "259.75 USD"
+	//   }
 	// ]
 	// ```
 	//
@@ -921,7 +1012,39 @@ func (u *BetaMessageBatchNewParamsRequestParamsContainerUnion) asAny() any {
 	return nil
 }
 
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaMessageBatchNewParamsRequestParamsFallbackCreditTokenUnion struct {
+	OfString              param.Opt[string]             `json:",omitzero,inline"`
+	OfFallbackCreditToken *BetaFallbackCreditTokenParam `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaMessageBatchNewParamsRequestParamsFallbackCreditTokenUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfString, u.OfFallbackCreditToken)
+}
+func (u *BetaMessageBatchNewParamsRequestParamsFallbackCreditTokenUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaMessageBatchNewParamsRequestParamsFallbackCreditTokenUnion) asAny() any {
+	if !param.IsOmitted(u.OfString) {
+		return &u.OfString.Value
+	} else if !param.IsOmitted(u.OfFallbackCreditToken) {
+		return u.OfFallbackCreditToken
+	}
+	return nil
+}
+
 type BetaMessageBatchGetParams struct {
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// Optional header to specify the beta version(s) you want to use.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
@@ -938,6 +1061,13 @@ type BetaMessageBatchListParams struct {
 	//
 	// Defaults to `20`. Ranges from `1` to `1000`.
 	Limit param.Opt[int64] `query:"limit,omitzero" json:"-"`
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// Optional header to specify the beta version(s) you want to use.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
@@ -953,18 +1083,39 @@ func (r BetaMessageBatchListParams) URLQuery() (v url.Values, err error) {
 }
 
 type BetaMessageBatchDeleteParams struct {
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// Optional header to specify the beta version(s) you want to use.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
 
 type BetaMessageBatchCancelParams struct {
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// Optional header to specify the beta version(s) you want to use.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
 
 type BetaMessageBatchResultsParams struct {
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// Optional header to specify the beta version(s) you want to use.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj

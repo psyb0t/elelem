@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 package anthropic
 
 import (
@@ -10,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/internal/apijson"
@@ -46,20 +45,41 @@ func NewBetaAgentService(opts ...option.RequestOption) (r BetaAgentService) {
 
 // Create Agent
 func (r *BetaAgentService) New(ctx context.Context, params BetaAgentNewParams, opts ...option.RequestOption) (res *BetaManagedAgentsAgent, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "managed-agents-2026-04-01")}, opts...)
 	path := "v1/agents?beta=true"
+	opts = append(opts, requestconfig.WithSpan("anthropic.agents.create", "/v1/agents"), requestconfig.WithSpanCreatedID("gen_ai.agent.id", &res, func(created *BetaManagedAgentsAgent) string { return created.ID }))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, params, &res, opts...)
 	return res, err
 }
 
 // Get Agent
 func (r *BetaAgentService) Get(ctx context.Context, agentID string, params BetaAgentGetParams, opts ...option.RequestOption) (res *BetaManagedAgentsAgent, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "managed-agents-2026-04-01")}, opts...)
@@ -67,15 +87,26 @@ func (r *BetaAgentService) Get(ctx context.Context, agentID string, params BetaA
 		err = errors.New("missing required agent_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/agents/%s?beta=true", agentID)
+	path := fmt.Sprintf("v1/agents/%s?beta=true", url.PathEscape(agentID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.agents.retrieve", "/v1/agents/{agent_id}", "version"), requestconfig.WithSpanAttribute("gen_ai.agent.id", agentID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, params, &res, opts...)
 	return res, err
 }
 
 // Update Agent
 func (r *BetaAgentService) Update(ctx context.Context, agentID string, params BetaAgentUpdateParams, opts ...option.RequestOption) (res *BetaManagedAgentsAgent, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "managed-agents-2026-04-01")}, opts...)
@@ -83,7 +114,8 @@ func (r *BetaAgentService) Update(ctx context.Context, agentID string, params Be
 		err = errors.New("missing required agent_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/agents/%s?beta=true", agentID)
+	path := fmt.Sprintf("v1/agents/%s?beta=true", url.PathEscape(agentID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.agents.update", "/v1/agents/{agent_id}"), requestconfig.WithSpanAttribute("gen_ai.agent.id", agentID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, params, &res, opts...)
 	return res, err
 }
@@ -91,12 +123,23 @@ func (r *BetaAgentService) Update(ctx context.Context, agentID string, params Be
 // List Agents
 func (r *BetaAgentService) List(ctx context.Context, params BetaAgentListParams, opts ...option.RequestOption) (res *pagination.PageCursor[BetaManagedAgentsAgent], err error) {
 	var raw *http.Response
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "managed-agents-2026-04-01"), option.WithResponseInto(&raw)}, opts...)
 	path := "v1/agents?beta=true"
+	opts = append(opts, requestconfig.WithSpan("anthropic.agents.list", "/v1/agents", "created_at[gte]", "created_at[lte]", "include_archived", "limit", "page"))
 	cfg, err := requestconfig.NewRequestConfig(ctx, http.MethodGet, path, params, &res, opts...)
 	if err != nil {
 		return nil, err
@@ -116,8 +159,18 @@ func (r *BetaAgentService) ListAutoPaging(ctx context.Context, params BetaAgentL
 
 // Archive Agent
 func (r *BetaAgentService) Archive(ctx context.Context, agentID string, body BetaAgentArchiveParams, opts ...option.RequestOption) (res *BetaManagedAgentsAgent, err error) {
-	for _, v := range body.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(body.Betas) > 0 {
+		headerValues := make([]string, len(body.Betas))
+		for i, v := range body.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(body.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", body.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "managed-agents-2026-04-01")}, opts...)
@@ -125,25 +178,57 @@ func (r *BetaAgentService) Archive(ctx context.Context, agentID string, body Bet
 		err = errors.New("missing required agent_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/agents/%s/archive?beta=true", agentID)
+	path := fmt.Sprintf("v1/agents/%s/archive?beta=true", url.PathEscape(agentID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.agents.archive", "/v1/agents/{agent_id}/archive"), requestconfig.WithSpanAttribute("gen_ai.agent.id", agentID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
 	return res, err
 }
 
+// Platform advisor roster entry: a model the session's primary thread may consult
+// mid-turn.
+type BetaManagedAgentsAdvisor struct {
+	// The advisor model id.
+	Model string `json:"model" api:"required"`
+	// Any of "advisor".
+	Type BetaManagedAgentsAdvisorType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Model       respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsAdvisor) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsAdvisor) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+type BetaManagedAgentsAdvisorType string
+
+const (
+	BetaManagedAgentsAdvisorTypeAdvisor BetaManagedAgentsAdvisorType = "advisor"
+)
+
 // A Managed Agents `agent`.
 type BetaManagedAgentsAgent struct {
 	ID string `json:"id" api:"required"`
-	// A timestamp in RFC 3339 format
+	// When the agent was archived. Null if not archived.
 	ArchivedAt time.Time `json:"archived_at" api:"required" format:"date-time"`
 	// A timestamp in RFC 3339 format
-	CreatedAt   time.Time                                 `json:"created_at" api:"required" format:"date-time"`
-	Description string                                    `json:"description" api:"required"`
-	MCPServers  []BetaManagedAgentsMCPServerURLDefinition `json:"mcp_servers" api:"required"`
-	Metadata    map[string]string                         `json:"metadata" api:"required"`
+	CreatedAt   time.Time `json:"created_at" api:"required" format:"date-time"`
+	Description string    `json:"description" api:"required"`
+	// Execution principal for runs of this agent. Always present;
+	// `{"type": "service_account"}` when runs carry no customer-named principal.
+	ExecutionIdentity BetaManagedAgentsExecutionIdentityUnion   `json:"execution_identity" api:"required"`
+	MCPServers        []BetaManagedAgentsMCPServerURLDefinition `json:"mcp_servers" api:"required"`
+	Metadata          map[string]string                         `json:"metadata" api:"required"`
 	// Model identifier and configuration.
 	Model BetaManagedAgentsModelConfig `json:"model" api:"required"`
-	// Resolved coordinator topology with a concrete agent roster.
-	Multiagent BetaManagedAgentsMultiagent        `json:"multiagent" api:"required"`
+	// Multiagent orchestration configuration. Null when the agent is single-threaded.
+	Multiagent BetaManagedAgentsMultiagentUnion   `json:"multiagent" api:"required"`
 	Name       string                             `json:"name" api:"required"`
 	Skills     []BetaManagedAgentsAgentSkillUnion `json:"skills" api:"required"`
 	System     string                             `json:"system" api:"required"`
@@ -157,23 +242,24 @@ type BetaManagedAgentsAgent struct {
 	Version int64 `json:"version" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
-		ID          respjson.Field
-		ArchivedAt  respjson.Field
-		CreatedAt   respjson.Field
-		Description respjson.Field
-		MCPServers  respjson.Field
-		Metadata    respjson.Field
-		Model       respjson.Field
-		Multiagent  respjson.Field
-		Name        respjson.Field
-		Skills      respjson.Field
-		System      respjson.Field
-		Tools       respjson.Field
-		Type        respjson.Field
-		UpdatedAt   respjson.Field
-		Version     respjson.Field
-		ExtraFields map[string]respjson.Field
-		raw         string
+		ID                respjson.Field
+		ArchivedAt        respjson.Field
+		CreatedAt         respjson.Field
+		Description       respjson.Field
+		ExecutionIdentity respjson.Field
+		MCPServers        respjson.Field
+		Metadata          respjson.Field
+		Model             respjson.Field
+		Multiagent        respjson.Field
+		Name              respjson.Field
+		Skills            respjson.Field
+		System            respjson.Field
+		Tools             respjson.Field
+		Type              respjson.Field
+		UpdatedAt         respjson.Field
+		Version           respjson.Field
+		ExtraFields       map[string]respjson.Field
+		raw               string
 	} `json:"-"`
 }
 
@@ -256,7 +342,7 @@ func (r *BetaManagedAgentsAgentSkillUnion) UnmarshalJSON(data []byte) error {
 //
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 type BetaManagedAgentsAgentToolUnion struct {
-	// This field is a union of [[]BetaManagedAgentsAgentToolConfig],
+	// This field is a union of [[]BetaManagedAgentsAgentToolConfigUnion],
 	// [[]BetaManagedAgentsMCPToolConfig]
 	Configs BetaManagedAgentsAgentToolUnionConfigs `json:"configs"`
 	// This field is a union of [BetaManagedAgentsAgentToolsetDefaultConfig],
@@ -350,8 +436,8 @@ func (r *BetaManagedAgentsAgentToolUnion) UnmarshalJSON(data []byte) error {
 // OfBetaManagedAgentsMCPToolConfigArray]
 type BetaManagedAgentsAgentToolUnionConfigs struct {
 	// This field will be present if the value is a
-	// [[]BetaManagedAgentsAgentToolConfig] instead of an object.
-	OfBetaManagedAgentsAgentToolConfigArray []BetaManagedAgentsAgentToolConfig `json:",inline"`
+	// [[]BetaManagedAgentsAgentToolConfigUnion] instead of an object.
+	OfBetaManagedAgentsAgentToolConfigArray []BetaManagedAgentsAgentToolConfigUnion `json:",inline"`
 	// This field will be present if the value is a [[]BetaManagedAgentsMCPToolConfig]
 	// instead of an object.
 	OfBetaManagedAgentsMCPToolConfigArray []BetaManagedAgentsMCPToolConfig `json:",inline"`
@@ -442,56 +528,161 @@ const (
 	BetaManagedAgentsAgentReferenceTypeAgent BetaManagedAgentsAgentReferenceType = "agent"
 )
 
-// Configuration for a specific agent tool.
-type BetaManagedAgentsAgentToolConfig struct {
-	Enabled bool `json:"enabled" api:"required"`
-	// Built-in agent tool identifier.
-	//
+// BetaManagedAgentsAgentToolConfigUnion contains all possible properties and
+// values from [BetaManagedAgentsBashToolConfig],
+// [BetaManagedAgentsEditToolConfig], [BetaManagedAgentsReadToolConfig],
+// [BetaManagedAgentsWriteToolConfig], [BetaManagedAgentsGlobToolConfig],
+// [BetaManagedAgentsGrepToolConfig], [BetaManagedAgentsWebFetchToolConfig],
+// [BetaManagedAgentsWebSearchToolConfig].
+//
+// Use the [BetaManagedAgentsAgentToolConfigUnion.AsAny] method to switch on the
+// variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsAgentToolConfigUnion struct {
+	Enabled bool   `json:"enabled"`
+	Name    string `json:"name"`
+	// This field is a union of [BetaManagedAgentsBashToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsEditToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsReadToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsWriteToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsGlobToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsGrepToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion],
+	// [BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion]
+	PermissionPolicy BetaManagedAgentsAgentToolConfigUnionPermissionPolicy `json:"permission_policy"`
 	// Any of "bash", "edit", "read", "write", "glob", "grep", "web_fetch",
 	// "web_search".
-	Name BetaManagedAgentsAgentToolConfigName `json:"name" api:"required"`
-	// Permission policy for tool execution.
-	PermissionPolicy BetaManagedAgentsAgentToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
-	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
-	JSON struct {
+	Type string `json:"type"`
+	// This field is from variant [BetaManagedAgentsWebFetchToolConfig].
+	URLSources     BetaManagedAgentsWebFetchURLSources `json:"url_sources"`
+	AllowedDomains []string                            `json:"allowed_domains"`
+	BlockedDomains []string                            `json:"blocked_domains"`
+	// This field is from variant [BetaManagedAgentsWebFetchToolConfig].
+	MaxContentTokens int64 `json:"max_content_tokens"`
+	// This field is from variant [BetaManagedAgentsWebSearchToolConfig].
+	UserLocation BetaManagedAgentsUserLocation `json:"user_location"`
+	JSON         struct {
 		Enabled          respjson.Field
 		Name             respjson.Field
 		PermissionPolicy respjson.Field
-		ExtraFields      map[string]respjson.Field
+		Type             respjson.Field
+		URLSources       respjson.Field
+		AllowedDomains   respjson.Field
+		BlockedDomains   respjson.Field
+		MaxContentTokens respjson.Field
+		UserLocation     respjson.Field
 		raw              string
 	} `json:"-"`
 }
 
+// anyBetaManagedAgentsAgentToolConfig is implemented by each variant of
+// [BetaManagedAgentsAgentToolConfigUnion] to add type safety for the return type
+// of [BetaManagedAgentsAgentToolConfigUnion.AsAny]
+type anyBetaManagedAgentsAgentToolConfig interface {
+	implBetaManagedAgentsAgentToolConfigUnion()
+}
+
+func (BetaManagedAgentsBashToolConfig) implBetaManagedAgentsAgentToolConfigUnion()      {}
+func (BetaManagedAgentsEditToolConfig) implBetaManagedAgentsAgentToolConfigUnion()      {}
+func (BetaManagedAgentsReadToolConfig) implBetaManagedAgentsAgentToolConfigUnion()      {}
+func (BetaManagedAgentsWriteToolConfig) implBetaManagedAgentsAgentToolConfigUnion()     {}
+func (BetaManagedAgentsGlobToolConfig) implBetaManagedAgentsAgentToolConfigUnion()      {}
+func (BetaManagedAgentsGrepToolConfig) implBetaManagedAgentsAgentToolConfigUnion()      {}
+func (BetaManagedAgentsWebFetchToolConfig) implBetaManagedAgentsAgentToolConfigUnion()  {}
+func (BetaManagedAgentsWebSearchToolConfig) implBetaManagedAgentsAgentToolConfigUnion() {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsAgentToolConfigUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsBashToolConfig:
+//	case anthropic.BetaManagedAgentsEditToolConfig:
+//	case anthropic.BetaManagedAgentsReadToolConfig:
+//	case anthropic.BetaManagedAgentsWriteToolConfig:
+//	case anthropic.BetaManagedAgentsGlobToolConfig:
+//	case anthropic.BetaManagedAgentsGrepToolConfig:
+//	case anthropic.BetaManagedAgentsWebFetchToolConfig:
+//	case anthropic.BetaManagedAgentsWebSearchToolConfig:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsAgentToolConfigUnion) AsAny() anyBetaManagedAgentsAgentToolConfig {
+	switch u.Type {
+	case "bash":
+		return u.AsBash()
+	case "edit":
+		return u.AsEdit()
+	case "read":
+		return u.AsRead()
+	case "write":
+		return u.AsWrite()
+	case "glob":
+		return u.AsGlob()
+	case "grep":
+		return u.AsGrep()
+	case "web_fetch":
+		return u.AsWebFetch()
+	case "web_search":
+		return u.AsWebSearch()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsBash() (v BetaManagedAgentsBashToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsEdit() (v BetaManagedAgentsEditToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsRead() (v BetaManagedAgentsReadToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsWrite() (v BetaManagedAgentsWriteToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsGlob() (v BetaManagedAgentsGlobToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsGrep() (v BetaManagedAgentsGrepToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsWebFetch() (v BetaManagedAgentsWebFetchToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolConfigUnion) AsWebSearch() (v BetaManagedAgentsWebSearchToolConfig) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
 // Returns the unmodified JSON received from the API
-func (r BetaManagedAgentsAgentToolConfig) RawJSON() string { return r.JSON.raw }
-func (r *BetaManagedAgentsAgentToolConfig) UnmarshalJSON(data []byte) error {
+func (u BetaManagedAgentsAgentToolConfigUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsAgentToolConfigUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// Built-in agent tool identifier.
-type BetaManagedAgentsAgentToolConfigName string
-
-const (
-	BetaManagedAgentsAgentToolConfigNameBash      BetaManagedAgentsAgentToolConfigName = "bash"
-	BetaManagedAgentsAgentToolConfigNameEdit      BetaManagedAgentsAgentToolConfigName = "edit"
-	BetaManagedAgentsAgentToolConfigNameRead      BetaManagedAgentsAgentToolConfigName = "read"
-	BetaManagedAgentsAgentToolConfigNameWrite     BetaManagedAgentsAgentToolConfigName = "write"
-	BetaManagedAgentsAgentToolConfigNameGlob      BetaManagedAgentsAgentToolConfigName = "glob"
-	BetaManagedAgentsAgentToolConfigNameGrep      BetaManagedAgentsAgentToolConfigName = "grep"
-	BetaManagedAgentsAgentToolConfigNameWebFetch  BetaManagedAgentsAgentToolConfigName = "web_fetch"
-	BetaManagedAgentsAgentToolConfigNameWebSearch BetaManagedAgentsAgentToolConfigName = "web_search"
-)
-
-// BetaManagedAgentsAgentToolConfigPermissionPolicyUnion contains all possible
-// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
-// [BetaManagedAgentsAlwaysAskPolicy].
+// BetaManagedAgentsAgentToolConfigUnionPermissionPolicy is an implicit subunion of
+// [BetaManagedAgentsAgentToolConfigUnion].
+// BetaManagedAgentsAgentToolConfigUnionPermissionPolicy provides convenient access
+// to the sub-properties of the union.
 //
-// Use the [BetaManagedAgentsAgentToolConfigPermissionPolicyUnion.AsAny] method to
-// switch on the variant.
-//
-// Use the methods beginning with 'As' to cast the union to one of its variants.
-type BetaManagedAgentsAgentToolConfigPermissionPolicyUnion struct {
-	// Any of "always_allow", "always_ask".
+// For type safety it is recommended to directly use a variant of the
+// [BetaManagedAgentsAgentToolConfigUnion].
+type BetaManagedAgentsAgentToolConfigUnionPermissionPolicy struct {
 	Type string `json:"type"`
 	JSON struct {
 		Type respjson.Field
@@ -499,132 +690,245 @@ type BetaManagedAgentsAgentToolConfigPermissionPolicyUnion struct {
 	} `json:"-"`
 }
 
-// anyBetaManagedAgentsAgentToolConfigPermissionPolicy is implemented by each
-// variant of [BetaManagedAgentsAgentToolConfigPermissionPolicyUnion] to add type
-// safety for the return type of
-// [BetaManagedAgentsAgentToolConfigPermissionPolicyUnion.AsAny]
-type anyBetaManagedAgentsAgentToolConfigPermissionPolicy interface {
-	implBetaManagedAgentsAgentToolConfigPermissionPolicyUnion()
-}
-
-func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsAgentToolConfigPermissionPolicyUnion() {
-}
-func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsAgentToolConfigPermissionPolicyUnion() {}
-
-// Use the following switch statement to find the correct variant
-//
-//	switch variant := BetaManagedAgentsAgentToolConfigPermissionPolicyUnion.AsAny().(type) {
-//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
-//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
-//	default:
-//	  fmt.Errorf("no variant present")
-//	}
-func (u BetaManagedAgentsAgentToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsAgentToolConfigPermissionPolicy {
-	switch u.Type {
-	case "always_allow":
-		return u.AsAlwaysAllow()
-	case "always_ask":
-		return u.AsAlwaysAsk()
-	}
-	return nil
-}
-
-func (u BetaManagedAgentsAgentToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
-	return
-}
-
-func (u BetaManagedAgentsAgentToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
-	return
-}
-
-// Returns the unmodified JSON received from the API
-func (u BetaManagedAgentsAgentToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
-
-func (r *BetaManagedAgentsAgentToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+func (r *BetaManagedAgentsAgentToolConfigUnionPermissionPolicy) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
-
-// Configuration override for a specific tool within a toolset.
-//
-// The property Name is required.
-type BetaManagedAgentsAgentToolConfigParams struct {
-	// Built-in agent tool identifier.
-	//
-	// Any of "bash", "edit", "read", "write", "glob", "grep", "web_fetch",
-	// "web_search".
-	Name BetaManagedAgentsAgentToolConfigParamsName `json:"name,omitzero" api:"required"`
-	// Whether this tool is enabled and available to Claude. Overrides the
-	// default_config setting.
-	Enabled param.Opt[bool] `json:"enabled,omitzero"`
-	// Permission policy for tool execution.
-	PermissionPolicy BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
-	paramObj
-}
-
-func (r BetaManagedAgentsAgentToolConfigParams) MarshalJSON() (data []byte, err error) {
-	type shadow BetaManagedAgentsAgentToolConfigParams
-	return param.MarshalObject(r, (*shadow)(&r))
-}
-func (r *BetaManagedAgentsAgentToolConfigParams) UnmarshalJSON(data []byte) error {
-	return apijson.UnmarshalRoot(data, r)
-}
-
-// Built-in agent tool identifier.
-type BetaManagedAgentsAgentToolConfigParamsName string
-
-const (
-	BetaManagedAgentsAgentToolConfigParamsNameBash      BetaManagedAgentsAgentToolConfigParamsName = "bash"
-	BetaManagedAgentsAgentToolConfigParamsNameEdit      BetaManagedAgentsAgentToolConfigParamsName = "edit"
-	BetaManagedAgentsAgentToolConfigParamsNameRead      BetaManagedAgentsAgentToolConfigParamsName = "read"
-	BetaManagedAgentsAgentToolConfigParamsNameWrite     BetaManagedAgentsAgentToolConfigParamsName = "write"
-	BetaManagedAgentsAgentToolConfigParamsNameGlob      BetaManagedAgentsAgentToolConfigParamsName = "glob"
-	BetaManagedAgentsAgentToolConfigParamsNameGrep      BetaManagedAgentsAgentToolConfigParamsName = "grep"
-	BetaManagedAgentsAgentToolConfigParamsNameWebFetch  BetaManagedAgentsAgentToolConfigParamsName = "web_fetch"
-	BetaManagedAgentsAgentToolConfigParamsNameWebSearch BetaManagedAgentsAgentToolConfigParamsName = "web_search"
-)
 
 // Only one field can be non-zero.
 //
 // Use [param.IsOmitted] to confirm if a field is set.
-type BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion struct {
-	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
-	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+type BetaManagedAgentsAgentToolConfigParamsUnion struct {
+	OfBash      *BetaManagedAgentsBashToolConfigParams      `json:",omitzero,inline"`
+	OfEdit      *BetaManagedAgentsEditToolConfigParams      `json:",omitzero,inline"`
+	OfRead      *BetaManagedAgentsReadToolConfigParams      `json:",omitzero,inline"`
+	OfWrite     *BetaManagedAgentsWriteToolConfigParams     `json:",omitzero,inline"`
+	OfGlob      *BetaManagedAgentsGlobToolConfigParams      `json:",omitzero,inline"`
+	OfGrep      *BetaManagedAgentsGrepToolConfigParams      `json:",omitzero,inline"`
+	OfWebFetch  *BetaManagedAgentsWebFetchToolConfigParams  `json:",omitzero,inline"`
+	OfWebSearch *BetaManagedAgentsWebSearchToolConfigParams `json:",omitzero,inline"`
 	paramUnion
 }
 
-func (u BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk)
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfBash,
+		u.OfEdit,
+		u.OfRead,
+		u.OfWrite,
+		u.OfGlob,
+		u.OfGrep,
+		u.OfWebFetch,
+		u.OfWebSearch)
 }
-func (u *BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+func (u *BetaManagedAgentsAgentToolConfigParamsUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
 }
 
-func (u *BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion) asAny() any {
-	if !param.IsOmitted(u.OfAlwaysAllow) {
-		return u.OfAlwaysAllow
-	} else if !param.IsOmitted(u.OfAlwaysAsk) {
-		return u.OfAlwaysAsk
+func (u *BetaManagedAgentsAgentToolConfigParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfBash) {
+		return u.OfBash
+	} else if !param.IsOmitted(u.OfEdit) {
+		return u.OfEdit
+	} else if !param.IsOmitted(u.OfRead) {
+		return u.OfRead
+	} else if !param.IsOmitted(u.OfWrite) {
+		return u.OfWrite
+	} else if !param.IsOmitted(u.OfGlob) {
+		return u.OfGlob
+	} else if !param.IsOmitted(u.OfGrep) {
+		return u.OfGrep
+	} else if !param.IsOmitted(u.OfWebFetch) {
+		return u.OfWebFetch
+	} else if !param.IsOmitted(u.OfWebSearch) {
+		return u.OfWebSearch
 	}
 	return nil
 }
 
 // Returns a pointer to the underlying variant's property, if present.
-func (u BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion) GetType() *string {
-	if vt := u.OfAlwaysAllow; vt != nil {
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetMaxContentTokens() *int64 {
+	if vt := u.OfWebFetch; vt != nil && vt.MaxContentTokens.Valid() {
+		return &vt.MaxContentTokens.Value
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetURLSources() *BetaManagedAgentsWebFetchURLSourcesParams {
+	if vt := u.OfWebFetch; vt != nil {
+		return &vt.URLSources
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetUserLocation() *BetaManagedAgentsUserLocationParam {
+	if vt := u.OfWebSearch; vt != nil {
+		return &vt.UserLocation
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetName() *string {
+	if vt := u.OfBash; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfEdit; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfRead; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfWrite; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfGlob; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfGrep; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfWebFetch; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	} else if vt := u.OfWebSearch; vt != nil {
+		return paramutil.AddrOrDefault(vt.Name)
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetEnabled() *bool {
+	if vt := u.OfBash; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfEdit; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfRead; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfWrite; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfGlob; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfGrep; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfWebFetch; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	} else if vt := u.OfWebSearch; vt != nil && vt.Enabled.Valid() {
+		return &vt.Enabled.Value
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetType() *string {
+	if vt := u.OfBash; vt != nil {
 		return (*string)(&vt.Type)
-	} else if vt := u.OfAlwaysAsk; vt != nil {
+	} else if vt := u.OfEdit; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfRead; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfWrite; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfGlob; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfGrep; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfWebFetch; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfWebSearch; vt != nil {
 		return (*string)(&vt.Type)
 	}
 	return nil
 }
 
+// Returns a subunion which exports methods to access subproperties
+//
+// Or use AsAny() to get the underlying value
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetPermissionPolicy() (res betaManagedAgentsAgentToolConfigParamsUnionPermissionPolicy) {
+	if vt := u.OfBash; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfEdit; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfRead; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfWrite; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfGlob; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfGrep; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfWebFetch; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	} else if vt := u.OfWebSearch; vt != nil {
+		res.any = vt.PermissionPolicy.asAny()
+	}
+	return
+}
+
+// Can have the runtime types [*BetaManagedAgentsAlwaysAllowPolicyParam],
+// [*BetaManagedAgentsAlwaysAskPolicyParam], [*BetaManagedAgentsAutoPolicyParam]
+type betaManagedAgentsAgentToolConfigParamsUnionPermissionPolicy struct{ any }
+
+// Use the following switch statement to get the type of the union:
+//
+//	switch u.AsAny().(type) {
+//	case *anthropic.BetaManagedAgentsAlwaysAllowPolicyParam:
+//	case *anthropic.BetaManagedAgentsAlwaysAskPolicyParam:
+//	case *anthropic.BetaManagedAgentsAutoPolicyParam:
+//	default:
+//	    fmt.Errorf("not present")
+//	}
+func (u betaManagedAgentsAgentToolConfigParamsUnionPermissionPolicy) AsAny() any { return u.any }
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u betaManagedAgentsAgentToolConfigParamsUnionPermissionPolicy) GetType() *string {
+	switch vt := u.any.(type) {
+	case *BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	case *BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion:
+		return vt.GetType()
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's AllowedDomains property, if
+// present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetAllowedDomains() []string {
+	if vt := u.OfWebFetch; vt != nil {
+		return vt.AllowedDomains
+	} else if vt := u.OfWebSearch; vt != nil {
+		return vt.AllowedDomains
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's BlockedDomains property, if
+// present.
+func (u BetaManagedAgentsAgentToolConfigParamsUnion) GetBlockedDomains() []string {
+	if vt := u.OfWebFetch; vt != nil {
+		return vt.BlockedDomains
+	} else if vt := u.OfWebSearch; vt != nil {
+		return vt.BlockedDomains
+	}
+	return nil
+}
+
 func init() {
-	apijson.RegisterUnion[BetaManagedAgentsAgentToolConfigParamsPermissionPolicyUnion](
+	apijson.RegisterUnion[BetaManagedAgentsAgentToolConfigParamsUnion](
 		"type",
-		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
-		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsBashToolConfigParams]("bash"),
+		apijson.Discriminator[BetaManagedAgentsEditToolConfigParams]("edit"),
+		apijson.Discriminator[BetaManagedAgentsReadToolConfigParams]("read"),
+		apijson.Discriminator[BetaManagedAgentsWriteToolConfigParams]("write"),
+		apijson.Discriminator[BetaManagedAgentsGlobToolConfigParams]("glob"),
+		apijson.Discriminator[BetaManagedAgentsGrepToolConfigParams]("grep"),
+		apijson.Discriminator[BetaManagedAgentsWebFetchToolConfigParams]("web_fetch"),
+		apijson.Discriminator[BetaManagedAgentsWebSearchToolConfigParams]("web_search"),
 	)
 }
 
@@ -650,14 +954,14 @@ func (r *BetaManagedAgentsAgentToolsetDefaultConfig) UnmarshalJSON(data []byte) 
 
 // BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion contains all
 // possible properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
-// [BetaManagedAgentsAlwaysAskPolicy].
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
 //
 // Use the [BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion.AsAny]
 // method to switch on the variant.
 //
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 type BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion struct {
-	// Any of "always_allow", "always_ask".
+	// Any of "always_allow", "always_ask", "auto".
 	Type string `json:"type"`
 	JSON struct {
 		Type respjson.Field
@@ -678,12 +982,15 @@ func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsAgentToolsetDefau
 }
 func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion() {
 }
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion() {
+}
 
 // Use the following switch statement to find the correct variant
 //
 //	switch variant := BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion.AsAny().(type) {
 //	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
 //	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
 //	default:
 //	  fmt.Errorf("no variant present")
 //	}
@@ -693,6 +1000,8 @@ func (u BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion) AsAny()
 		return u.AsAlwaysAllow()
 	case "always_ask":
 		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
 	}
 	return nil
 }
@@ -703,6 +1012,11 @@ func (u BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion) AsAlway
 }
 
 func (u BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsAgentToolsetDefaultConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
 	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
@@ -721,7 +1035,8 @@ type BetaManagedAgentsAgentToolsetDefaultConfigParams struct {
 	// Whether tools are enabled and available to Claude by default. Defaults to true
 	// if not specified.
 	Enabled param.Opt[bool] `json:"enabled,omitzero"`
-	// Permission policy for tool execution.
+	// Default permission policy for tools. Controls whether tool calls are
+	// auto-approved or require confirmation.
 	PermissionPolicy BetaManagedAgentsAgentToolsetDefaultConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
 	paramObj
 }
@@ -740,11 +1055,12 @@ func (r *BetaManagedAgentsAgentToolsetDefaultConfigParams) UnmarshalJSON(data []
 type BetaManagedAgentsAgentToolsetDefaultConfigParamsPermissionPolicyUnion struct {
 	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
 	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
 	paramUnion
 }
 
 func (u BetaManagedAgentsAgentToolsetDefaultConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk)
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
 }
 func (u *BetaManagedAgentsAgentToolsetDefaultConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -755,6 +1071,8 @@ func (u *BetaManagedAgentsAgentToolsetDefaultConfigParamsPermissionPolicyUnion) 
 		return u.OfAlwaysAllow
 	} else if !param.IsOmitted(u.OfAlwaysAsk) {
 		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
 	}
 	return nil
 }
@@ -765,6 +1083,8 @@ func (u BetaManagedAgentsAgentToolsetDefaultConfigParamsPermissionPolicyUnion) G
 		return (*string)(&vt.Type)
 	} else if vt := u.OfAlwaysAsk; vt != nil {
 		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
 	}
 	return nil
 }
@@ -774,11 +1094,12 @@ func init() {
 		"type",
 		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
 		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
 	)
 }
 
 type BetaManagedAgentsAgentToolset20260401 struct {
-	Configs []BetaManagedAgentsAgentToolConfig `json:"configs" api:"required"`
+	Configs []BetaManagedAgentsAgentToolConfigUnion `json:"configs" api:"required"`
 	// Resolved default configuration for agent tools.
 	DefaultConfig BetaManagedAgentsAgentToolsetDefaultConfig `json:"default_config" api:"required"`
 	// Any of "agent_toolset_20260401".
@@ -917,8 +1238,8 @@ type BetaManagedAgentsAgentToolset20260401Params struct {
 	// Any of "agent_toolset_20260401".
 	Type BetaManagedAgentsAgentToolset20260401ParamsType `json:"type,omitzero" api:"required"`
 	// Per-tool configuration overrides.
-	Configs []BetaManagedAgentsAgentToolConfigParams `json:"configs,omitzero"`
-	// Default configuration for all tools in a toolset.
+	Configs []BetaManagedAgentsAgentToolConfigParamsUnion `json:"configs,omitzero"`
+	// Default configuration applied to all tools in this set.
 	DefaultConfig BetaManagedAgentsAgentToolsetDefaultConfigParams `json:"default_config,omitzero"`
 	paramObj
 }
@@ -1139,6 +1460,281 @@ const (
 	BetaManagedAgentsAnthropicSkillParamsTypeAnthropic BetaManagedAgentsAnthropicSkillParamsType = "anthropic"
 )
 
+// The server decides each tool call individually: it judges, from the tool, its
+// input, and the session content so far, whether the call is safe to execute or
+// high-risk, and evaluates it to allow when judged safe and to deny when judged
+// high-risk. A call the server cannot reach a judgement on evaluates to ask.
+type BetaManagedAgentsAutoPolicy struct {
+	Type constant.Auto `json:"type" default:"auto"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsAutoPolicy) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsAutoPolicy) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsAutoPolicy to a
+// BetaManagedAgentsAutoPolicyParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsAutoPolicyParam.Overrides()
+func (r BetaManagedAgentsAutoPolicy) ToParam() BetaManagedAgentsAutoPolicyParam {
+	return param.Override[BetaManagedAgentsAutoPolicyParam](json.RawMessage(r.RawJSON()))
+}
+
+func NewBetaManagedAgentsAutoPolicyParam() BetaManagedAgentsAutoPolicyParam {
+	return BetaManagedAgentsAutoPolicyParam{
+		Type: "auto",
+	}
+}
+
+// The server decides each tool call individually: it judges, from the tool, its
+// input, and the session content so far, whether the call is safe to execute or
+// high-risk, and evaluates it to allow when judged safe and to deny when judged
+// high-risk. A call the server cannot reach a judgement on evaluates to ask.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsAutoPolicyParam].
+type BetaManagedAgentsAutoPolicyParam struct {
+	Type constant.Auto `json:"type" default:"auto"`
+	paramObj
+}
+
+func (r BetaManagedAgentsAutoPolicyParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsAutoPolicyParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsAutoPolicyParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// An AWS IAM role principal as returned in API responses.
+type BetaManagedAgentsAWSRoleExecutionIdentity struct {
+	// The IAM role's ARN.
+	RoleARN string           `json:"role_arn" api:"required"`
+	Type    constant.AWSRole `json:"type" default:"aws_role"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		RoleARN     respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsAWSRoleExecutionIdentity) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsAWSRoleExecutionIdentity) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// An AWS IAM role principal.
+//
+// The properties RoleARN, Type are required.
+type BetaManagedAgentsAWSRoleExecutionIdentityParams struct {
+	// The IAM role's ARN, e.g. "arn:aws:iam::123456789012:role/my-agent-runner".
+	// Maximum 2048 characters.
+	RoleARN string `json:"role_arn" api:"required"`
+	// This field can be elided, and will marshal its zero value as "aws_role".
+	Type constant.AWSRole `json:"type" default:"aws_role"`
+	paramObj
+}
+
+func (r BetaManagedAgentsAWSRoleExecutionIdentityParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsAWSRoleExecutionIdentityParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsAWSRoleExecutionIdentityParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration for the bash tool.
+type BetaManagedAgentsBashToolConfig struct {
+	Enabled bool          `json:"enabled" api:"required"`
+	Name    constant.Bash `json:"name" default:"bash"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsBashToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.Bash                                        `json:"type" default:"bash"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsBashToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsBashToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsBashToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsBashToolConfigPermissionPolicyUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsBashToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsBashToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsBashToolConfigPermissionPolicyUnion] to add type
+// safety for the return type of
+// [BetaManagedAgentsBashToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsBashToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsBashToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsBashToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsBashToolConfigPermissionPolicyUnion() {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsBashToolConfigPermissionPolicyUnion()      {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsBashToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsBashToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsBashToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsBashToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsBashToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsBashToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsBashToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsBashToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the bash tool.
+//
+// The property Name is required.
+type BetaManagedAgentsBashToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Any of "bash".
+	Type BetaManagedAgentsBashToolConfigParamsType `json:"type,omitzero"`
+	// Must be "bash".
+	//
+	// This field can be elided, and will marshal its zero value as "bash".
+	Name constant.Bash `json:"name" default:"bash"`
+	paramObj
+}
+
+func (r BetaManagedAgentsBashToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsBashToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsBashToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsBashToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsBashToolConfigParamsType string
+
+const (
+	BetaManagedAgentsBashToolConfigParamsTypeBash BetaManagedAgentsBashToolConfigParamsType = "bash"
+)
+
 // A resolved user-created custom skill.
 type BetaManagedAgentsCustomSkill struct {
 	SkillID string `json:"skill_id" api:"required"`
@@ -1265,7 +1861,7 @@ type BetaManagedAgentsCustomToolInputSchemaParam struct {
 	Required   []string       `json:"required,omitzero"`
 	// This field can be elided, and will marshal its zero value as "object".
 	Type        constant.Object `json:"type" default:"object"`
-	ExtraFields map[string]any  `json:"-"`
+	ExtraFields map[string]any  `json:"-" api:"extrafields"`
 	paramObj
 }
 
@@ -1285,9 +1881,9 @@ func (r *BetaManagedAgentsCustomToolInputSchemaParam) UnmarshalJSON(data []byte)
 // The properties Description, InputSchema, Name, Type are required.
 type BetaManagedAgentsCustomToolParams struct {
 	// Description of what the tool does, shown to the agent to help it decide when to
-	// use the tool. 1-4096 characters.
+	// use the tool.
 	Description string `json:"description" api:"required"`
-	// JSON Schema for custom tool input parameters.
+	// JSON Schema defining the expected input parameters for the tool.
 	InputSchema BetaManagedAgentsCustomToolInputSchemaParam `json:"input_schema,omitzero" api:"required"`
 	// Unique name for the tool. 1-128 characters; letters, digits, underscores, and
 	// hyphens.
@@ -1309,6 +1905,921 @@ type BetaManagedAgentsCustomToolParamsType string
 
 const (
 	BetaManagedAgentsCustomToolParamsTypeCustom BetaManagedAgentsCustomToolParamsType = "custom"
+)
+
+// Configuration for the edit tool.
+type BetaManagedAgentsEditToolConfig struct {
+	Enabled bool          `json:"enabled" api:"required"`
+	Name    constant.Edit `json:"name" default:"edit"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsEditToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.Edit                                        `json:"type" default:"edit"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsEditToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsEditToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsEditToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsEditToolConfigPermissionPolicyUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsEditToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsEditToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsEditToolConfigPermissionPolicyUnion] to add type
+// safety for the return type of
+// [BetaManagedAgentsEditToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsEditToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsEditToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsEditToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsEditToolConfigPermissionPolicyUnion() {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsEditToolConfigPermissionPolicyUnion()      {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsEditToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsEditToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsEditToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsEditToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsEditToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsEditToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsEditToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsEditToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the edit tool.
+//
+// The property Name is required.
+type BetaManagedAgentsEditToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Any of "edit".
+	Type BetaManagedAgentsEditToolConfigParamsType `json:"type,omitzero"`
+	// Must be "edit".
+	//
+	// This field can be elided, and will marshal its zero value as "edit".
+	Name constant.Edit `json:"name" default:"edit"`
+	paramObj
+}
+
+func (r BetaManagedAgentsEditToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsEditToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsEditToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsEditToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsEditToolConfigParamsType string
+
+const (
+	BetaManagedAgentsEditToolConfigParamsTypeEdit BetaManagedAgentsEditToolConfigParamsType = "edit"
+)
+
+// High effort. Favors reasoning depth.
+type BetaManagedAgentsEffortHigh struct {
+	// Any of "high".
+	Type BetaManagedAgentsEffortHighType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsEffortHigh) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsEffortHigh) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsEffortHigh to a
+// BetaManagedAgentsEffortHighParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsEffortHighParam.Overrides()
+func (r BetaManagedAgentsEffortHigh) ToParam() BetaManagedAgentsEffortHighParam {
+	return param.Override[BetaManagedAgentsEffortHighParam](json.RawMessage(r.RawJSON()))
+}
+
+type BetaManagedAgentsEffortHighType string
+
+const (
+	BetaManagedAgentsEffortHighTypeHigh BetaManagedAgentsEffortHighType = "high"
+)
+
+// High effort. Favors reasoning depth.
+//
+// The property Type is required.
+type BetaManagedAgentsEffortHighParam struct {
+	// Any of "high".
+	Type BetaManagedAgentsEffortHighType `json:"type,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaManagedAgentsEffortHighParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsEffortHighParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsEffortHighParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Low effort. Favors latency over reasoning depth.
+type BetaManagedAgentsEffortLow struct {
+	// Any of "low".
+	Type BetaManagedAgentsEffortLowType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsEffortLow) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsEffortLow) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsEffortLow to a
+// BetaManagedAgentsEffortLowParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsEffortLowParam.Overrides()
+func (r BetaManagedAgentsEffortLow) ToParam() BetaManagedAgentsEffortLowParam {
+	return param.Override[BetaManagedAgentsEffortLowParam](json.RawMessage(r.RawJSON()))
+}
+
+type BetaManagedAgentsEffortLowType string
+
+const (
+	BetaManagedAgentsEffortLowTypeLow BetaManagedAgentsEffortLowType = "low"
+)
+
+// Low effort. Favors latency over reasoning depth.
+//
+// The property Type is required.
+type BetaManagedAgentsEffortLowParam struct {
+	// Any of "low".
+	Type BetaManagedAgentsEffortLowType `json:"type,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaManagedAgentsEffortLowParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsEffortLowParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsEffortLowParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Maximum effort. Favors reasoning depth over latency.
+type BetaManagedAgentsEffortMax struct {
+	// Any of "max".
+	Type BetaManagedAgentsEffortMaxType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsEffortMax) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsEffortMax) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsEffortMax to a
+// BetaManagedAgentsEffortMaxParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsEffortMaxParam.Overrides()
+func (r BetaManagedAgentsEffortMax) ToParam() BetaManagedAgentsEffortMaxParam {
+	return param.Override[BetaManagedAgentsEffortMaxParam](json.RawMessage(r.RawJSON()))
+}
+
+type BetaManagedAgentsEffortMaxType string
+
+const (
+	BetaManagedAgentsEffortMaxTypeMax BetaManagedAgentsEffortMaxType = "max"
+)
+
+// Maximum effort. Favors reasoning depth over latency.
+//
+// The property Type is required.
+type BetaManagedAgentsEffortMaxParam struct {
+	// Any of "max".
+	Type BetaManagedAgentsEffortMaxType `json:"type,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaManagedAgentsEffortMaxParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsEffortMaxParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsEffortMaxParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Medium effort. Balances latency and reasoning depth.
+type BetaManagedAgentsEffortMedium struct {
+	// Any of "medium".
+	Type BetaManagedAgentsEffortMediumType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsEffortMedium) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsEffortMedium) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsEffortMedium to a
+// BetaManagedAgentsEffortMediumParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsEffortMediumParam.Overrides()
+func (r BetaManagedAgentsEffortMedium) ToParam() BetaManagedAgentsEffortMediumParam {
+	return param.Override[BetaManagedAgentsEffortMediumParam](json.RawMessage(r.RawJSON()))
+}
+
+type BetaManagedAgentsEffortMediumType string
+
+const (
+	BetaManagedAgentsEffortMediumTypeMedium BetaManagedAgentsEffortMediumType = "medium"
+)
+
+// Medium effort. Balances latency and reasoning depth.
+//
+// The property Type is required.
+type BetaManagedAgentsEffortMediumParam struct {
+	// Any of "medium".
+	Type BetaManagedAgentsEffortMediumType `json:"type,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaManagedAgentsEffortMediumParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsEffortMediumParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsEffortMediumParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Extra-high effort. Not all models accept this level.
+type BetaManagedAgentsEffortXhigh struct {
+	// Any of "xhigh".
+	Type BetaManagedAgentsEffortXhighType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsEffortXhigh) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsEffortXhigh) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsEffortXhigh to a
+// BetaManagedAgentsEffortXhighParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsEffortXhighParam.Overrides()
+func (r BetaManagedAgentsEffortXhigh) ToParam() BetaManagedAgentsEffortXhighParam {
+	return param.Override[BetaManagedAgentsEffortXhighParam](json.RawMessage(r.RawJSON()))
+}
+
+type BetaManagedAgentsEffortXhighType string
+
+const (
+	BetaManagedAgentsEffortXhighTypeXhigh BetaManagedAgentsEffortXhighType = "xhigh"
+)
+
+// Extra-high effort. Not all models accept this level.
+//
+// The property Type is required.
+type BetaManagedAgentsEffortXhighParam struct {
+	// Any of "xhigh".
+	Type BetaManagedAgentsEffortXhighType `json:"type,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaManagedAgentsEffortXhighParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsEffortXhighParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsEffortXhighParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsExecutionIdentityUnion contains all possible properties and
+// values from [BetaManagedAgentsAWSRoleExecutionIdentity],
+// [BetaManagedAgentsServiceAccountExecutionIdentity].
+//
+// Use the [BetaManagedAgentsExecutionIdentityUnion.AsAny] method to switch on the
+// variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsExecutionIdentityUnion struct {
+	// This field is from variant [BetaManagedAgentsAWSRoleExecutionIdentity].
+	RoleARN string `json:"role_arn"`
+	// Any of "aws_role", "service_account".
+	Type string `json:"type"`
+	JSON struct {
+		RoleARN respjson.Field
+		Type    respjson.Field
+		raw     string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsExecutionIdentity is implemented by each variant of
+// [BetaManagedAgentsExecutionIdentityUnion] to add type safety for the return type
+// of [BetaManagedAgentsExecutionIdentityUnion.AsAny]
+type anyBetaManagedAgentsExecutionIdentity interface {
+	implBetaManagedAgentsExecutionIdentityUnion()
+}
+
+func (BetaManagedAgentsAWSRoleExecutionIdentity) implBetaManagedAgentsExecutionIdentityUnion() {}
+func (BetaManagedAgentsServiceAccountExecutionIdentity) implBetaManagedAgentsExecutionIdentityUnion() {
+}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsExecutionIdentityUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAWSRoleExecutionIdentity:
+//	case anthropic.BetaManagedAgentsServiceAccountExecutionIdentity:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsExecutionIdentityUnion) AsAny() anyBetaManagedAgentsExecutionIdentity {
+	switch u.Type {
+	case "aws_role":
+		return u.AsAWSRole()
+	case "service_account":
+		return u.AsServiceAccount()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsExecutionIdentityUnion) AsAWSRole() (v BetaManagedAgentsAWSRoleExecutionIdentity) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsExecutionIdentityUnion) AsServiceAccount() (v BetaManagedAgentsServiceAccountExecutionIdentity) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsExecutionIdentityUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsExecutionIdentityUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func BetaManagedAgentsExecutionIdentityParamsOfAWSRole(roleARN string) BetaManagedAgentsExecutionIdentityParamsUnion {
+	var awsRole BetaManagedAgentsAWSRoleExecutionIdentityParams
+	awsRole.RoleARN = roleARN
+	return BetaManagedAgentsExecutionIdentityParamsUnion{OfAWSRole: &awsRole}
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsExecutionIdentityParamsUnion struct {
+	OfAWSRole        *BetaManagedAgentsAWSRoleExecutionIdentityParams        `json:",omitzero,inline"`
+	OfServiceAccount *BetaManagedAgentsServiceAccountExecutionIdentityParams `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsExecutionIdentityParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAWSRole, u.OfServiceAccount)
+}
+func (u *BetaManagedAgentsExecutionIdentityParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsExecutionIdentityParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfAWSRole) {
+		return u.OfAWSRole
+	} else if !param.IsOmitted(u.OfServiceAccount) {
+		return u.OfServiceAccount
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsExecutionIdentityParamsUnion) GetRoleARN() *string {
+	if vt := u.OfAWSRole; vt != nil {
+		return &vt.RoleARN
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsExecutionIdentityParamsUnion) GetType() *string {
+	if vt := u.OfAWSRole; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfServiceAccount; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsExecutionIdentityParamsUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAWSRoleExecutionIdentityParams]("aws_role"),
+		apijson.Discriminator[BetaManagedAgentsServiceAccountExecutionIdentityParams]("service_account"),
+	)
+}
+
+// Configuration for the glob tool.
+type BetaManagedAgentsGlobToolConfig struct {
+	Enabled bool          `json:"enabled" api:"required"`
+	Name    constant.Glob `json:"name" default:"glob"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsGlobToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.Glob                                        `json:"type" default:"glob"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsGlobToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsGlobToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsGlobToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsGlobToolConfigPermissionPolicyUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsGlobToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsGlobToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsGlobToolConfigPermissionPolicyUnion] to add type
+// safety for the return type of
+// [BetaManagedAgentsGlobToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsGlobToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsGlobToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsGlobToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsGlobToolConfigPermissionPolicyUnion() {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsGlobToolConfigPermissionPolicyUnion()      {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsGlobToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsGlobToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsGlobToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsGlobToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsGlobToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsGlobToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsGlobToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsGlobToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the glob tool.
+//
+// The property Name is required.
+type BetaManagedAgentsGlobToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Any of "glob".
+	Type BetaManagedAgentsGlobToolConfigParamsType `json:"type,omitzero"`
+	// Must be "glob".
+	//
+	// This field can be elided, and will marshal its zero value as "glob".
+	Name constant.Glob `json:"name" default:"glob"`
+	paramObj
+}
+
+func (r BetaManagedAgentsGlobToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsGlobToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsGlobToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsGlobToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsGlobToolConfigParamsType string
+
+const (
+	BetaManagedAgentsGlobToolConfigParamsTypeGlob BetaManagedAgentsGlobToolConfigParamsType = "glob"
+)
+
+// Configuration for the grep tool.
+type BetaManagedAgentsGrepToolConfig struct {
+	Enabled bool          `json:"enabled" api:"required"`
+	Name    constant.Grep `json:"name" default:"grep"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsGrepToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.Grep                                        `json:"type" default:"grep"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsGrepToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsGrepToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsGrepToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsGrepToolConfigPermissionPolicyUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsGrepToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsGrepToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsGrepToolConfigPermissionPolicyUnion] to add type
+// safety for the return type of
+// [BetaManagedAgentsGrepToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsGrepToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsGrepToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsGrepToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsGrepToolConfigPermissionPolicyUnion() {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsGrepToolConfigPermissionPolicyUnion()      {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsGrepToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsGrepToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsGrepToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsGrepToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsGrepToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsGrepToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsGrepToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsGrepToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the grep tool.
+//
+// The property Name is required.
+type BetaManagedAgentsGrepToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Any of "grep".
+	Type BetaManagedAgentsGrepToolConfigParamsType `json:"type,omitzero"`
+	// Must be "grep".
+	//
+	// This field can be elided, and will marshal its zero value as "grep".
+	Name constant.Grep `json:"name" default:"grep"`
+	paramObj
+}
+
+func (r BetaManagedAgentsGrepToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsGrepToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsGrepToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsGrepToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsGrepToolConfigParamsType string
+
+const (
+	BetaManagedAgentsGrepToolConfigParamsTypeGrep BetaManagedAgentsGrepToolConfigParamsType = "grep"
 )
 
 // URL-based MCP server connection as returned in API responses.
@@ -1363,14 +2874,14 @@ func (r *BetaManagedAgentsMCPToolConfig) UnmarshalJSON(data []byte) error {
 
 // BetaManagedAgentsMCPToolConfigPermissionPolicyUnion contains all possible
 // properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
-// [BetaManagedAgentsAlwaysAskPolicy].
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
 //
 // Use the [BetaManagedAgentsMCPToolConfigPermissionPolicyUnion.AsAny] method to
 // switch on the variant.
 //
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 type BetaManagedAgentsMCPToolConfigPermissionPolicyUnion struct {
-	// Any of "always_allow", "always_ask".
+	// Any of "always_allow", "always_ask", "auto".
 	Type string `json:"type"`
 	JSON struct {
 		Type respjson.Field
@@ -1387,12 +2898,14 @@ type anyBetaManagedAgentsMCPToolConfigPermissionPolicy interface {
 
 func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsMCPToolConfigPermissionPolicyUnion() {}
 func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsMCPToolConfigPermissionPolicyUnion()   {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsMCPToolConfigPermissionPolicyUnion()        {}
 
 // Use the following switch statement to find the correct variant
 //
 //	switch variant := BetaManagedAgentsMCPToolConfigPermissionPolicyUnion.AsAny().(type) {
 //	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
 //	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
 //	default:
 //	  fmt.Errorf("no variant present")
 //	}
@@ -1402,6 +2915,8 @@ func (u BetaManagedAgentsMCPToolConfigPermissionPolicyUnion) AsAny() anyBetaMana
 		return u.AsAlwaysAllow()
 	case "always_ask":
 		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
 	}
 	return nil
 }
@@ -1412,6 +2927,11 @@ func (u BetaManagedAgentsMCPToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v 
 }
 
 func (u BetaManagedAgentsMCPToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMCPToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
 	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
@@ -1431,7 +2951,7 @@ type BetaManagedAgentsMCPToolConfigParams struct {
 	Name string `json:"name" api:"required"`
 	// Whether this tool is enabled. Overrides the `default_config` setting.
 	Enabled param.Opt[bool] `json:"enabled,omitzero"`
-	// Permission policy for tool execution.
+	// Permission policy for this tool. Overrides the `default_config` setting.
 	PermissionPolicy BetaManagedAgentsMCPToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
 	paramObj
 }
@@ -1450,11 +2970,12 @@ func (r *BetaManagedAgentsMCPToolConfigParams) UnmarshalJSON(data []byte) error 
 type BetaManagedAgentsMCPToolConfigParamsPermissionPolicyUnion struct {
 	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
 	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
 	paramUnion
 }
 
 func (u BetaManagedAgentsMCPToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk)
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
 }
 func (u *BetaManagedAgentsMCPToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1465,6 +2986,8 @@ func (u *BetaManagedAgentsMCPToolConfigParamsPermissionPolicyUnion) asAny() any 
 		return u.OfAlwaysAllow
 	} else if !param.IsOmitted(u.OfAlwaysAsk) {
 		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
 	}
 	return nil
 }
@@ -1475,6 +2998,8 @@ func (u BetaManagedAgentsMCPToolConfigParamsPermissionPolicyUnion) GetType() *st
 		return (*string)(&vt.Type)
 	} else if vt := u.OfAlwaysAsk; vt != nil {
 		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
 	}
 	return nil
 }
@@ -1484,6 +3009,7 @@ func init() {
 		"type",
 		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
 		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
 	)
 }
 
@@ -1539,14 +3065,14 @@ func (r *BetaManagedAgentsMCPToolsetDefaultConfig) UnmarshalJSON(data []byte) er
 
 // BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion contains all
 // possible properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
-// [BetaManagedAgentsAlwaysAskPolicy].
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
 //
 // Use the [BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion.AsAny]
 // method to switch on the variant.
 //
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 type BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion struct {
-	// Any of "always_allow", "always_ask".
+	// Any of "always_allow", "always_ask", "auto".
 	Type string `json:"type"`
 	JSON struct {
 		Type respjson.Field
@@ -1566,12 +3092,15 @@ func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsMCPToolsetDefault
 }
 func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion() {
 }
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion() {
+}
 
 // Use the following switch statement to find the correct variant
 //
 //	switch variant := BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion.AsAny().(type) {
 //	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
 //	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
 //	default:
 //	  fmt.Errorf("no variant present")
 //	}
@@ -1581,6 +3110,8 @@ func (u BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion) AsAny() a
 		return u.AsAlwaysAllow()
 	case "always_ask":
 		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
 	}
 	return nil
 }
@@ -1591,6 +3122,11 @@ func (u BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion) AsAlwaysA
 }
 
 func (u BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
 	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
@@ -1608,7 +3144,7 @@ func (r *BetaManagedAgentsMCPToolsetDefaultConfigPermissionPolicyUnion) Unmarsha
 type BetaManagedAgentsMCPToolsetDefaultConfigParams struct {
 	// Whether tools are enabled by default. Defaults to true if not specified.
 	Enabled param.Opt[bool] `json:"enabled,omitzero"`
-	// Permission policy for tool execution.
+	// Default permission policy for tools from this server.
 	PermissionPolicy BetaManagedAgentsMCPToolsetDefaultConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
 	paramObj
 }
@@ -1627,11 +3163,12 @@ func (r *BetaManagedAgentsMCPToolsetDefaultConfigParams) UnmarshalJSON(data []by
 type BetaManagedAgentsMCPToolsetDefaultConfigParamsPermissionPolicyUnion struct {
 	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
 	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
 	paramUnion
 }
 
 func (u BetaManagedAgentsMCPToolsetDefaultConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk)
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
 }
 func (u *BetaManagedAgentsMCPToolsetDefaultConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1642,6 +3179,8 @@ func (u *BetaManagedAgentsMCPToolsetDefaultConfigParamsPermissionPolicyUnion) as
 		return u.OfAlwaysAllow
 	} else if !param.IsOmitted(u.OfAlwaysAsk) {
 		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
 	}
 	return nil
 }
@@ -1652,6 +3191,8 @@ func (u BetaManagedAgentsMCPToolsetDefaultConfigParamsPermissionPolicyUnion) Get
 		return (*string)(&vt.Type)
 	} else if vt := u.OfAlwaysAsk; vt != nil {
 		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
 	}
 	return nil
 }
@@ -1661,6 +3202,7 @@ func init() {
 		"type",
 		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
 		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
 	)
 }
 
@@ -1675,7 +3217,7 @@ type BetaManagedAgentsMCPToolsetParams struct {
 	Type BetaManagedAgentsMCPToolsetParamsType `json:"type,omitzero" api:"required"`
 	// Per-tool configuration overrides.
 	Configs []BetaManagedAgentsMCPToolConfigParams `json:"configs,omitzero"`
-	// Default configuration for all tools from an MCP server.
+	// Default configuration for all tools from this server.
 	DefaultConfig BetaManagedAgentsMCPToolsetDefaultConfigParams `json:"default_config,omitzero"`
 	paramObj
 }
@@ -1701,17 +3243,49 @@ const (
 type BetaManagedAgentsModel = string
 
 const (
-	BetaManagedAgentsModelClaudeSonnet5            BetaManagedAgentsModel = "claude-sonnet-5"
-	BetaManagedAgentsModelClaudeFable5             BetaManagedAgentsModel = "claude-fable-5"
-	BetaManagedAgentsModelClaudeOpus4_8            BetaManagedAgentsModel = "claude-opus-4-8"
-	BetaManagedAgentsModelClaudeOpus4_7            BetaManagedAgentsModel = "claude-opus-4-7"
-	BetaManagedAgentsModelClaudeOpus4_6            BetaManagedAgentsModel = "claude-opus-4-6"
-	BetaManagedAgentsModelClaudeSonnet4_6          BetaManagedAgentsModel = "claude-sonnet-4-6"
-	BetaManagedAgentsModelClaudeHaiku4_5           BetaManagedAgentsModel = "claude-haiku-4-5"
-	BetaManagedAgentsModelClaudeHaiku4_5_20251001  BetaManagedAgentsModel = "claude-haiku-4-5-20251001"
-	BetaManagedAgentsModelClaudeOpus4_5            BetaManagedAgentsModel = "claude-opus-4-5"
-	BetaManagedAgentsModelClaudeOpus4_5_20251101   BetaManagedAgentsModel = "claude-opus-4-5-20251101"
-	BetaManagedAgentsModelClaudeSonnet4_5          BetaManagedAgentsModel = "claude-sonnet-4-5"
+	// Fastest model for high-volume, real-time tasks
+	BetaManagedAgentsModelClaudeHaiku5_5 BetaManagedAgentsModel = "claude-haiku-5-5"
+	// Efficient model for coding and agents
+	BetaManagedAgentsModelClaudeSonnet5_5 BetaManagedAgentsModel = "claude-sonnet-5-5"
+	// Powerful intelligence for coding, knowledge work, and long-running agents
+	BetaManagedAgentsModelClaudeOpus5_5 BetaManagedAgentsModel = "claude-opus-5-5"
+	// Frontier intelligence for ambitious tasks across coding, scientific discovery,
+	// and enterprise workflows
+	BetaManagedAgentsModelClaudeFable5_1 BetaManagedAgentsModel = "claude-fable-5-1"
+	// Efficient model for coding and agents
+	BetaManagedAgentsModelClaudeSonnet5 BetaManagedAgentsModel = "claude-sonnet-5"
+	// Next generation of intelligence for the hardest knowledge work and coding
+	// problems
+	BetaManagedAgentsModelClaudeFable5 BetaManagedAgentsModel = "claude-fable-5"
+	// Powerful intelligence for long-running agents and coding
+	BetaManagedAgentsModelClaudeOpus5 BetaManagedAgentsModel = "claude-opus-5"
+	// Powerful intelligence for long-running agents and coding
+	BetaManagedAgentsModelClaudeOpus4_8 BetaManagedAgentsModel = "claude-opus-4-8"
+	// Powerful intelligence for long-running agents and coding
+	BetaManagedAgentsModelClaudeOpus4_7 BetaManagedAgentsModel = "claude-opus-4-7"
+	// Powerful intelligence for long-running agents and coding
+	BetaManagedAgentsModelClaudeOpus4_6 BetaManagedAgentsModel = "claude-opus-4-6"
+	// Best combination of speed and intelligence
+	BetaManagedAgentsModelClaudeSonnet4_6         BetaManagedAgentsModel = "claude-sonnet-4-6"
+	BetaManagedAgentsModelClaudeHaiku4_5          BetaManagedAgentsModel = "claude-haiku-4-5"
+	BetaManagedAgentsModelClaudeHaiku4_5_20251001 BetaManagedAgentsModel = "claude-haiku-4-5-20251001"
+	// Powerful intelligence for long-running agents and coding
+	BetaManagedAgentsModelClaudeOpus4_5 BetaManagedAgentsModel = "claude-opus-4-5"
+	// Powerful intelligence for long-running agents and coding
+	BetaManagedAgentsModelClaudeOpus4_5_20251101 BetaManagedAgentsModel = "claude-opus-4-5-20251101"
+	// High-performance model for agents and coding
+	//
+	// Deprecated: Will reach end-of-life on November 30, 2026. Please migrate to
+	// claude-sonnet-5-5. Visit
+	// https://docs.anthropic.com/en/docs/resources/model-deprecations for more
+	// information.
+	BetaManagedAgentsModelClaudeSonnet4_5 BetaManagedAgentsModel = "claude-sonnet-4-5"
+	// High-performance model for agents and coding
+	//
+	// Deprecated: Will reach end-of-life on November 30, 2026. Please migrate to
+	// claude-sonnet-5-5. Visit
+	// https://docs.anthropic.com/en/docs/resources/model-deprecations for more
+	// information.
 	BetaManagedAgentsModelClaudeSonnet4_5_20250929 BetaManagedAgentsModel = "claude-sonnet-4-5-20250929"
 )
 
@@ -1722,18 +3296,27 @@ type BetaManagedAgentsModelConfig struct {
 	// See [models](https://docs.anthropic.com/en/docs/models-overview) for additional
 	// details and options.
 	ID BetaManagedAgentsModel `json:"id" api:"required"`
+	// How hard Claude works on each inference call. One of `low`, `medium`, `high`,
+	// `xhigh`, `max`. Always present; resolved to the per-model default at save time
+	// when not supplied.
+	Effort BetaManagedAgentsModelConfigEffortUnion `json:"effort"`
+	// Geographic region for model inference. When unset, requests fall through to the
+	// workspace's default_inference_geo.
+	InferenceGeo string `json:"inference_geo"`
 	// Inference speed mode. `fast` provides significantly faster output token
-	// generation at premium pricing. Not all models support `fast`; invalid
-	// combinations are rejected at create time.
+	// generation at premium pricing. Defaults to `standard`. Not all models support
+	// `fast`; invalid combinations are rejected at create time.
 	//
 	// Any of "standard", "fast".
 	Speed BetaManagedAgentsModelConfigSpeed `json:"speed"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
-		ID          respjson.Field
-		Speed       respjson.Field
-		ExtraFields map[string]respjson.Field
-		raw         string
+		ID           respjson.Field
+		Effort       respjson.Field
+		InferenceGeo respjson.Field
+		Speed        respjson.Field
+		ExtraFields  map[string]respjson.Field
+		raw          string
 	} `json:"-"`
 }
 
@@ -1743,9 +3326,99 @@ func (r *BetaManagedAgentsModelConfig) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
+// BetaManagedAgentsModelConfigEffortUnion contains all possible properties and
+// values from [BetaManagedAgentsEffortLow], [BetaManagedAgentsEffortMedium],
+// [BetaManagedAgentsEffortHigh], [BetaManagedAgentsEffortXhigh],
+// [BetaManagedAgentsEffortMax].
+//
+// Use the [BetaManagedAgentsModelConfigEffortUnion.AsAny] method to switch on the
+// variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsModelConfigEffortUnion struct {
+	// Any of "low", "medium", "high", "xhigh", "max".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsModelConfigEffort is implemented by each variant of
+// [BetaManagedAgentsModelConfigEffortUnion] to add type safety for the return type
+// of [BetaManagedAgentsModelConfigEffortUnion.AsAny]
+type anyBetaManagedAgentsModelConfigEffort interface {
+	implBetaManagedAgentsModelConfigEffortUnion()
+}
+
+func (BetaManagedAgentsEffortLow) implBetaManagedAgentsModelConfigEffortUnion()    {}
+func (BetaManagedAgentsEffortMedium) implBetaManagedAgentsModelConfigEffortUnion() {}
+func (BetaManagedAgentsEffortHigh) implBetaManagedAgentsModelConfigEffortUnion()   {}
+func (BetaManagedAgentsEffortXhigh) implBetaManagedAgentsModelConfigEffortUnion()  {}
+func (BetaManagedAgentsEffortMax) implBetaManagedAgentsModelConfigEffortUnion()    {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsModelConfigEffortUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsEffortLow:
+//	case anthropic.BetaManagedAgentsEffortMedium:
+//	case anthropic.BetaManagedAgentsEffortHigh:
+//	case anthropic.BetaManagedAgentsEffortXhigh:
+//	case anthropic.BetaManagedAgentsEffortMax:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsModelConfigEffortUnion) AsAny() anyBetaManagedAgentsModelConfigEffort {
+	switch u.Type {
+	case "low":
+		return u.AsLow()
+	case "medium":
+		return u.AsMedium()
+	case "high":
+		return u.AsHigh()
+	case "xhigh":
+		return u.AsXhigh()
+	case "max":
+		return u.AsMax()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsModelConfigEffortUnion) AsLow() (v BetaManagedAgentsEffortLow) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsModelConfigEffortUnion) AsMedium() (v BetaManagedAgentsEffortMedium) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsModelConfigEffortUnion) AsHigh() (v BetaManagedAgentsEffortHigh) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsModelConfigEffortUnion) AsXhigh() (v BetaManagedAgentsEffortXhigh) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsModelConfigEffortUnion) AsMax() (v BetaManagedAgentsEffortMax) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsModelConfigEffortUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsModelConfigEffortUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
 // Inference speed mode. `fast` provides significantly faster output token
-// generation at premium pricing. Not all models support `fast`; invalid
-// combinations are rejected at create time.
+// generation at premium pricing. Defaults to `standard`. Not all models support
+// `fast`; invalid combinations are rejected at create time.
 type BetaManagedAgentsModelConfigSpeed string
 
 const (
@@ -1762,9 +3435,15 @@ type BetaManagedAgentsModelConfigParams struct {
 	// See [models](https://docs.anthropic.com/en/docs/models-overview) for additional
 	// details and options.
 	ID BetaManagedAgentsModel `json:"id,omitzero" api:"required"`
-	// Inference speed mode. `fast` provides significantly faster output token
-	// generation at premium pricing. Not all models support `fast`; invalid
-	// combinations are rejected at create time.
+	// Geographic region for model inference. When unset, requests fall through to the
+	// workspace's default_inference_geo. On update, `model` is whole-object
+	// replacement — omitting inference_geo clears it.
+	InferenceGeo param.Opt[string] `json:"inference_geo,omitzero"`
+	// How hard Claude works on each inference call. Accepts a bare level string
+	// (`"high"`) or `{"type": "high"}`. On create, omitting it resolves the per-model
+	// default; on update, omitting it leaves the stored value unchanged.
+	Effort BetaManagedAgentsModelConfigParamsEffortUnion `json:"effort,omitzero"`
+	// Inference speed mode. Defaults to `standard`.
 	//
 	// Any of "standard", "fast".
 	Speed BetaManagedAgentsModelConfigParamsSpeed `json:"speed,omitzero"`
@@ -1779,15 +3458,677 @@ func (r *BetaManagedAgentsModelConfigParams) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// Inference speed mode. `fast` provides significantly faster output token
-// generation at premium pricing. Not all models support `fast`; invalid
-// combinations are rejected at create time.
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsModelConfigParamsEffortUnion struct {
+	// Check if union is this variant with
+	// !param.IsOmitted(union.OfBetaManagedAgentsModelConfigsEffortBetaManagedAgentsEffortLevel)
+	OfBetaManagedAgentsModelConfigsEffortBetaManagedAgentsEffortLevel param.Opt[string]                   `json:",omitzero,inline"`
+	OfBetaManagedAgentsEffortLow                                      *BetaManagedAgentsEffortLowParam    `json:",omitzero,inline"`
+	OfBetaManagedAgentsEffortMedium                                   *BetaManagedAgentsEffortMediumParam `json:",omitzero,inline"`
+	OfBetaManagedAgentsEffortHigh                                     *BetaManagedAgentsEffortHighParam   `json:",omitzero,inline"`
+	OfBetaManagedAgentsEffortXhigh                                    *BetaManagedAgentsEffortXhighParam  `json:",omitzero,inline"`
+	OfBetaManagedAgentsEffortMax                                      *BetaManagedAgentsEffortMaxParam    `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsModelConfigParamsEffortUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfBetaManagedAgentsModelConfigsEffortBetaManagedAgentsEffortLevel,
+		u.OfBetaManagedAgentsEffortLow,
+		u.OfBetaManagedAgentsEffortMedium,
+		u.OfBetaManagedAgentsEffortHigh,
+		u.OfBetaManagedAgentsEffortXhigh,
+		u.OfBetaManagedAgentsEffortMax)
+}
+func (u *BetaManagedAgentsModelConfigParamsEffortUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsModelConfigParamsEffortUnion) asAny() any {
+	if !param.IsOmitted(u.OfBetaManagedAgentsModelConfigsEffortBetaManagedAgentsEffortLevel) {
+		return &u.OfBetaManagedAgentsModelConfigsEffortBetaManagedAgentsEffortLevel
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsEffortLow) {
+		return u.OfBetaManagedAgentsEffortLow
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsEffortMedium) {
+		return u.OfBetaManagedAgentsEffortMedium
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsEffortHigh) {
+		return u.OfBetaManagedAgentsEffortHigh
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsEffortXhigh) {
+		return u.OfBetaManagedAgentsEffortXhigh
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsEffortMax) {
+		return u.OfBetaManagedAgentsEffortMax
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsModelConfigParamsEffortUnion) GetType() *string {
+	if vt := u.OfBetaManagedAgentsEffortLow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfBetaManagedAgentsEffortMedium; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfBetaManagedAgentsEffortHigh; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfBetaManagedAgentsEffortXhigh; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfBetaManagedAgentsEffortMax; vt != nil {
+		return (*string)(&vt.Type)
+	}
+	return nil
+}
+
+// How hard Claude works on each turn. Higher levels favor reasoning depth over
+// latency. Not all models accept every level; invalid combinations are rejected at
+// create time.
+type BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevel string
+
+const (
+	// Low effort. Favors latency over reasoning depth.
+	BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevelLow BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevel = "low"
+	// Medium effort. Balances latency and reasoning depth.
+	BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevelMedium BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevel = "medium"
+	// High effort. Favors reasoning depth.
+	BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevelHigh BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevel = "high"
+	// Extra-high effort. Not all models accept this level.
+	BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevelXhigh BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevel = "xhigh"
+	// Maximum effort. Favors reasoning depth over latency.
+	BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevelMax BetaManagedAgentsModelConfigParamsEffortBetaManagedAgentsEffortLevel = "max"
+)
+
+// Inference speed mode. Defaults to `standard`.
 type BetaManagedAgentsModelConfigParamsSpeed string
 
 const (
 	BetaManagedAgentsModelConfigParamsSpeedStandard BetaManagedAgentsModelConfigParamsSpeed = "standard"
 	BetaManagedAgentsModelConfigParamsSpeedFast     BetaManagedAgentsModelConfigParamsSpeed = "fast"
 )
+
+// BetaManagedAgentsMultiagentAdvisorUnion contains all possible properties and
+// values from [BetaManagedAgentsMultiagentAdvisorEnabled],
+// [BetaManagedAgentsMultiagentAdvisorDisabled].
+//
+// Use the [BetaManagedAgentsMultiagentAdvisorUnion.AsAny] method to switch on the
+// variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsMultiagentAdvisorUnion struct {
+	// This field is from variant [BetaManagedAgentsMultiagentAdvisorEnabled].
+	Model string `json:"model"`
+	// Any of "enabled", "disabled".
+	Type string `json:"type"`
+	JSON struct {
+		Model respjson.Field
+		Type  respjson.Field
+		raw   string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsMultiagentAdvisor is implemented by each variant of
+// [BetaManagedAgentsMultiagentAdvisorUnion] to add type safety for the return type
+// of [BetaManagedAgentsMultiagentAdvisorUnion.AsAny]
+type anyBetaManagedAgentsMultiagentAdvisor interface {
+	implBetaManagedAgentsMultiagentAdvisorUnion()
+}
+
+func (BetaManagedAgentsMultiagentAdvisorEnabled) implBetaManagedAgentsMultiagentAdvisorUnion()  {}
+func (BetaManagedAgentsMultiagentAdvisorDisabled) implBetaManagedAgentsMultiagentAdvisorUnion() {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsMultiagentAdvisorUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsMultiagentAdvisorEnabled:
+//	case anthropic.BetaManagedAgentsMultiagentAdvisorDisabled:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsMultiagentAdvisorUnion) AsAny() anyBetaManagedAgentsMultiagentAdvisor {
+	switch u.Type {
+	case "enabled":
+		return u.AsEnabled()
+	case "disabled":
+		return u.AsDisabled()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsMultiagentAdvisorUnion) AsEnabled() (v BetaManagedAgentsMultiagentAdvisorEnabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMultiagentAdvisorUnion) AsDisabled() (v BetaManagedAgentsMultiagentAdvisorDisabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsMultiagentAdvisorUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsMultiagentAdvisorUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent has no advisor.
+type BetaManagedAgentsMultiagentAdvisorDisabled struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentAdvisorDisabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentAdvisorDisabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func NewBetaManagedAgentsMultiagentAdvisorDisabledParams() BetaManagedAgentsMultiagentAdvisorDisabledParams {
+	return BetaManagedAgentsMultiagentAdvisorDisabledParams{
+		Type: "disabled",
+	}
+}
+
+// The agent has no advisor.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsMultiagentAdvisorDisabledParams].
+type BetaManagedAgentsMultiagentAdvisorDisabledParams struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentAdvisorDisabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentAdvisorDisabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentAdvisorDisabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The session's primary thread can consult `model` mid-turn.
+type BetaManagedAgentsMultiagentAdvisorEnabled struct {
+	// The advisor model id.
+	Model string           `json:"model" api:"required"`
+	Type  constant.Enabled `json:"type" default:"enabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Model       respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentAdvisorEnabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentAdvisorEnabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The session's primary thread can consult `model` mid-turn.
+//
+// The properties Model, Type are required.
+type BetaManagedAgentsMultiagentAdvisorEnabledParams struct {
+	// A Claude model id. The model must be permitted as an advisor for this agent's
+	// model.
+	Model string `json:"model" api:"required"`
+	// This field can be elided, and will marshal its zero value as "enabled".
+	Type constant.Enabled `json:"type" default:"enabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentAdvisorEnabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentAdvisorEnabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentAdvisorEnabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func BetaManagedAgentsMultiagentAdvisorParamsOfEnabled(model string) BetaManagedAgentsMultiagentAdvisorParamsUnion {
+	var enabled BetaManagedAgentsMultiagentAdvisorEnabledParams
+	enabled.Model = model
+	return BetaManagedAgentsMultiagentAdvisorParamsUnion{OfEnabled: &enabled}
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsMultiagentAdvisorParamsUnion struct {
+	OfEnabled  *BetaManagedAgentsMultiagentAdvisorEnabledParams  `json:",omitzero,inline"`
+	OfDisabled *BetaManagedAgentsMultiagentAdvisorDisabledParams `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsMultiagentAdvisorParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfEnabled, u.OfDisabled)
+}
+func (u *BetaManagedAgentsMultiagentAdvisorParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsMultiagentAdvisorParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfEnabled) {
+		return u.OfEnabled
+	} else if !param.IsOmitted(u.OfDisabled) {
+		return u.OfDisabled
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentAdvisorParamsUnion) GetModel() *string {
+	if vt := u.OfEnabled; vt != nil {
+		return &vt.Model
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentAdvisorParamsUnion) GetType() *string {
+	if vt := u.OfEnabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfDisabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsMultiagentAdvisorParamsUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsMultiagentAdvisorEnabledParams]("enabled"),
+		apijson.Discriminator[BetaManagedAgentsMultiagentAdvisorDisabledParams]("disabled"),
+	)
+}
+
+// Resolved coordinator topology with a concrete agent roster.
+type BetaManagedAgentsMultiagentCoordinator struct {
+	// Agents the coordinator may spawn as session threads, each resolved to a specific
+	// version.
+	Agents []BetaManagedAgentsMultiagentCoordinatorAgentUnion `json:"agents" api:"required"`
+	// Any of "coordinator".
+	Type BetaManagedAgentsMultiagentCoordinatorType `json:"type" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Agents      respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentCoordinator) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentCoordinator) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsMultiagentCoordinatorAgentUnion contains all possible
+// properties and values from [BetaManagedAgentsAgentReference],
+// [BetaManagedAgentsAdvisor].
+//
+// Use the [BetaManagedAgentsMultiagentCoordinatorAgentUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsMultiagentCoordinatorAgentUnion struct {
+	// This field is from variant [BetaManagedAgentsAgentReference].
+	ID string `json:"id"`
+	// Any of "agent", "advisor".
+	Type string `json:"type"`
+	// This field is from variant [BetaManagedAgentsAgentReference].
+	Version int64 `json:"version"`
+	// This field is from variant [BetaManagedAgentsAdvisor].
+	Model string `json:"model"`
+	JSON  struct {
+		ID      respjson.Field
+		Type    respjson.Field
+		Version respjson.Field
+		Model   respjson.Field
+		raw     string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsMultiagentCoordinatorAgent is implemented by each variant of
+// [BetaManagedAgentsMultiagentCoordinatorAgentUnion] to add type safety for the
+// return type of [BetaManagedAgentsMultiagentCoordinatorAgentUnion.AsAny]
+type anyBetaManagedAgentsMultiagentCoordinatorAgent interface {
+	implBetaManagedAgentsMultiagentCoordinatorAgentUnion()
+}
+
+func (BetaManagedAgentsAgentReference) implBetaManagedAgentsMultiagentCoordinatorAgentUnion() {}
+func (BetaManagedAgentsAdvisor) implBetaManagedAgentsMultiagentCoordinatorAgentUnion()        {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsMultiagentCoordinatorAgentUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAgentReference:
+//	case anthropic.BetaManagedAgentsAdvisor:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsMultiagentCoordinatorAgentUnion) AsAny() anyBetaManagedAgentsMultiagentCoordinatorAgent {
+	switch u.Type {
+	case "agent":
+		return u.AsAgent()
+	case "advisor":
+		return u.AsAdvisor()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsMultiagentCoordinatorAgentUnion) AsAgent() (v BetaManagedAgentsAgentReference) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMultiagentCoordinatorAgentUnion) AsAdvisor() (v BetaManagedAgentsAdvisor) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsMultiagentCoordinatorAgentUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsMultiagentCoordinatorAgentUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+type BetaManagedAgentsMultiagentCoordinatorType string
+
+const (
+	BetaManagedAgentsMultiagentCoordinatorTypeCoordinator BetaManagedAgentsMultiagentCoordinatorType = "coordinator"
+)
+
+// A coordinator topology: the session's primary thread orchestrates work by
+// spawning session threads, each running an agent drawn from the `agents` roster.
+//
+// The properties Agents, Type are required.
+type BetaManagedAgentsMultiagentCoordinatorParams struct {
+	// Agents the coordinator may spawn as session threads. 1–20 entries. Each entry is
+	// an agent ID string, a versioned `{"type":"agent","id","version"}` reference, or
+	// `{"type":"self"}` to allow recursive self-invocation. Entries must reference
+	// distinct agents (after resolving `self` and string forms); at most one `self`.
+	// Referenced agents must exist, must not be archived, and must not themselves have
+	// `multiagent` set (depth limit 1).
+	Agents []BetaManagedAgentsMultiagentRosterEntryParamsUnion `json:"agents,omitzero" api:"required"`
+	// Any of "coordinator".
+	Type BetaManagedAgentsMultiagentCoordinatorParamsType `json:"type,omitzero" api:"required"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentCoordinatorParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentCoordinatorParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentCoordinatorParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+type BetaManagedAgentsMultiagentCoordinatorParamsType string
+
+const (
+	BetaManagedAgentsMultiagentCoordinatorParamsTypeCoordinator BetaManagedAgentsMultiagentCoordinatorParamsType = "coordinator"
+)
+
+// BetaManagedAgentsMultiagentInlineAgentsUnion contains all possible properties
+// and values from [BetaManagedAgentsMultiagentInlineAgentsEnabled],
+// [BetaManagedAgentsMultiagentInlineAgentsDisabled].
+//
+// Use the [BetaManagedAgentsMultiagentInlineAgentsUnion.AsAny] method to switch on
+// the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsMultiagentInlineAgentsUnion struct {
+	// Any of "enabled", "disabled".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsMultiagentInlineAgents is implemented by each variant of
+// [BetaManagedAgentsMultiagentInlineAgentsUnion] to add type safety for the return
+// type of [BetaManagedAgentsMultiagentInlineAgentsUnion.AsAny]
+type anyBetaManagedAgentsMultiagentInlineAgents interface {
+	implBetaManagedAgentsMultiagentInlineAgentsUnion()
+}
+
+func (BetaManagedAgentsMultiagentInlineAgentsEnabled) implBetaManagedAgentsMultiagentInlineAgentsUnion() {
+}
+func (BetaManagedAgentsMultiagentInlineAgentsDisabled) implBetaManagedAgentsMultiagentInlineAgentsUnion() {
+}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsMultiagentInlineAgentsUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsMultiagentInlineAgentsEnabled:
+//	case anthropic.BetaManagedAgentsMultiagentInlineAgentsDisabled:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsMultiagentInlineAgentsUnion) AsAny() anyBetaManagedAgentsMultiagentInlineAgents {
+	switch u.Type {
+	case "enabled":
+		return u.AsEnabled()
+	case "disabled":
+		return u.AsDisabled()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsMultiagentInlineAgentsUnion) AsEnabled() (v BetaManagedAgentsMultiagentInlineAgentsEnabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMultiagentInlineAgentsUnion) AsDisabled() (v BetaManagedAgentsMultiagentInlineAgentsDisabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsMultiagentInlineAgentsUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsMultiagentInlineAgentsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent cannot define inline agents.
+type BetaManagedAgentsMultiagentInlineAgentsDisabled struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentInlineAgentsDisabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentInlineAgentsDisabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func NewBetaManagedAgentsMultiagentInlineAgentsDisabledParams() BetaManagedAgentsMultiagentInlineAgentsDisabledParams {
+	return BetaManagedAgentsMultiagentInlineAgentsDisabledParams{
+		Type: "disabled",
+	}
+}
+
+// The agent cannot define inline agents.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsMultiagentInlineAgentsDisabledParams].
+type BetaManagedAgentsMultiagentInlineAgentsDisabledParams struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentInlineAgentsDisabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentInlineAgentsDisabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentInlineAgentsDisabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent can define inline agents.
+type BetaManagedAgentsMultiagentInlineAgentsEnabled struct {
+	Type constant.Enabled `json:"type" default:"enabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentInlineAgentsEnabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentInlineAgentsEnabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func NewBetaManagedAgentsMultiagentInlineAgentsEnabledParams() BetaManagedAgentsMultiagentInlineAgentsEnabledParams {
+	return BetaManagedAgentsMultiagentInlineAgentsEnabledParams{
+		Type: "enabled",
+	}
+}
+
+// The agent can define inline agents.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsMultiagentInlineAgentsEnabledParams].
+type BetaManagedAgentsMultiagentInlineAgentsEnabledParams struct {
+	Type constant.Enabled `json:"type" default:"enabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentInlineAgentsEnabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentInlineAgentsEnabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentInlineAgentsEnabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsMultiagentInlineAgentsParamsUnion struct {
+	OfEnabled  *BetaManagedAgentsMultiagentInlineAgentsEnabledParams  `json:",omitzero,inline"`
+	OfDisabled *BetaManagedAgentsMultiagentInlineAgentsDisabledParams `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsMultiagentInlineAgentsParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfEnabled, u.OfDisabled)
+}
+func (u *BetaManagedAgentsMultiagentInlineAgentsParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsMultiagentInlineAgentsParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfEnabled) {
+		return u.OfEnabled
+	} else if !param.IsOmitted(u.OfDisabled) {
+		return u.OfDisabled
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentInlineAgentsParamsUnion) GetType() *string {
+	if vt := u.OfEnabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfDisabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsMultiagentInlineAgentsParamsUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsMultiagentInlineAgentsEnabledParams]("enabled"),
+		apijson.Discriminator[BetaManagedAgentsMultiagentInlineAgentsDisabledParams]("disabled"),
+	)
+}
+
+func BetaManagedAgentsMultiagentPredefinedAgentParamsOfBetaManagedAgentsAgents(id string, type_ BetaManagedAgentsAgentParamsType) BetaManagedAgentsMultiagentPredefinedAgentParamsUnion {
+	var variant BetaManagedAgentsAgentParams
+	variant.ID = id
+	variant.Type = type_
+	return BetaManagedAgentsMultiagentPredefinedAgentParamsUnion{OfBetaManagedAgentsAgents: &variant}
+}
+
+func BetaManagedAgentsMultiagentPredefinedAgentParamsOfBetaManagedAgentsMultiagentSelfs(type_ BetaManagedAgentsMultiagentSelfParamsType) BetaManagedAgentsMultiagentPredefinedAgentParamsUnion {
+	var variant BetaManagedAgentsMultiagentSelfParams
+	variant.Type = type_
+	return BetaManagedAgentsMultiagentPredefinedAgentParamsUnion{OfBetaManagedAgentsMultiagentSelfs: &variant}
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsMultiagentPredefinedAgentParamsUnion struct {
+	OfString                           param.Opt[string]                      `json:",omitzero,inline"`
+	OfBetaManagedAgentsAgents          *BetaManagedAgentsAgentParams          `json:",omitzero,inline"`
+	OfBetaManagedAgentsMultiagentSelfs *BetaManagedAgentsMultiagentSelfParams `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsMultiagentPredefinedAgentParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfString, u.OfBetaManagedAgentsAgents, u.OfBetaManagedAgentsMultiagentSelfs)
+}
+func (u *BetaManagedAgentsMultiagentPredefinedAgentParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsMultiagentPredefinedAgentParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfString) {
+		return &u.OfString.Value
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsAgents) {
+		return u.OfBetaManagedAgentsAgents
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsMultiagentSelfs) {
+		return u.OfBetaManagedAgentsMultiagentSelfs
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentPredefinedAgentParamsUnion) GetID() *string {
+	if vt := u.OfBetaManagedAgentsAgents; vt != nil {
+		return &vt.ID
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentPredefinedAgentParamsUnion) GetVersion() *int64 {
+	if vt := u.OfBetaManagedAgentsAgents; vt != nil && vt.Version.Valid() {
+		return &vt.Version.Value
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentPredefinedAgentParamsUnion) GetType() *string {
+	if vt := u.OfBetaManagedAgentsAgents; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfBetaManagedAgentsMultiagentSelfs; vt != nil {
+		return (*string)(&vt.Type)
+	}
+	return nil
+}
 
 // Sentinel roster entry meaning "the agent that owns this configuration". Resolved
 // server-side to a concrete agent reference.
@@ -1813,13 +4154,737 @@ const (
 	BetaManagedAgentsMultiagentSelfParamsTypeSelf BetaManagedAgentsMultiagentSelfParamsType = "self"
 )
 
+// BetaManagedAgentsMultiagentSubagentsUnion contains all possible properties and
+// values from [BetaManagedAgentsMultiagentSubagentsEnabled],
+// [BetaManagedAgentsMultiagentSubagentsDisabled].
+//
+// Use the [BetaManagedAgentsMultiagentSubagentsUnion.AsAny] method to switch on
+// the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsMultiagentSubagentsUnion struct {
+	// This field is from variant [BetaManagedAgentsMultiagentSubagentsEnabled].
+	InlineAgents BetaManagedAgentsMultiagentInlineAgentsUnion `json:"inline_agents"`
+	// This field is from variant [BetaManagedAgentsMultiagentSubagentsEnabled].
+	PredefinedAgents []BetaManagedAgentsAgentReference `json:"predefined_agents"`
+	// Any of "enabled", "disabled".
+	Type string `json:"type"`
+	JSON struct {
+		InlineAgents     respjson.Field
+		PredefinedAgents respjson.Field
+		Type             respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsMultiagentSubagents is implemented by each variant of
+// [BetaManagedAgentsMultiagentSubagentsUnion] to add type safety for the return
+// type of [BetaManagedAgentsMultiagentSubagentsUnion.AsAny]
+type anyBetaManagedAgentsMultiagentSubagents interface {
+	implBetaManagedAgentsMultiagentSubagentsUnion()
+}
+
+func (BetaManagedAgentsMultiagentSubagentsEnabled) implBetaManagedAgentsMultiagentSubagentsUnion()  {}
+func (BetaManagedAgentsMultiagentSubagentsDisabled) implBetaManagedAgentsMultiagentSubagentsUnion() {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsMultiagentSubagentsUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsMultiagentSubagentsEnabled:
+//	case anthropic.BetaManagedAgentsMultiagentSubagentsDisabled:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsMultiagentSubagentsUnion) AsAny() anyBetaManagedAgentsMultiagentSubagents {
+	switch u.Type {
+	case "enabled":
+		return u.AsEnabled()
+	case "disabled":
+		return u.AsDisabled()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsMultiagentSubagentsUnion) AsEnabled() (v BetaManagedAgentsMultiagentSubagentsEnabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMultiagentSubagentsUnion) AsDisabled() (v BetaManagedAgentsMultiagentSubagentsDisabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsMultiagentSubagentsUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsMultiagentSubagentsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent cannot spawn session threads.
+type BetaManagedAgentsMultiagentSubagentsDisabled struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentSubagentsDisabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentSubagentsDisabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func NewBetaManagedAgentsMultiagentSubagentsDisabledParams() BetaManagedAgentsMultiagentSubagentsDisabledParams {
+	return BetaManagedAgentsMultiagentSubagentsDisabledParams{
+		Type: "disabled",
+	}
+}
+
+// The agent cannot spawn session threads.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsMultiagentSubagentsDisabledParams].
+type BetaManagedAgentsMultiagentSubagentsDisabledParams struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentSubagentsDisabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentSubagentsDisabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentSubagentsDisabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent can spawn session threads.
+type BetaManagedAgentsMultiagentSubagentsEnabled struct {
+	// Whether the agent can define inline agents, which are not saved, when it spawns
+	// session threads.
+	InlineAgents BetaManagedAgentsMultiagentInlineAgentsUnion `json:"inline_agents" api:"required"`
+	// Predefined agents, which are saved agents that this agent can spawn as session
+	// threads, each resolved to a specific version.
+	PredefinedAgents []BetaManagedAgentsAgentReference `json:"predefined_agents" api:"required"`
+	Type             constant.Enabled                  `json:"type" default:"enabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		InlineAgents     respjson.Field
+		PredefinedAgents respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentSubagentsEnabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentSubagentsEnabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent can spawn session threads. Each thread runs a predefined agent, which
+// is a saved agent in `predefined_agents`, or an inline agent, which the agent
+// defines when it spawns the thread and which is not saved. If `inline_agents` is
+// disabled, `predefined_agents` must name at least one agent.
+//
+// The property Type is required.
+type BetaManagedAgentsMultiagentSubagentsEnabledParams struct {
+	// Predefined agents that this agent can spawn as session threads. At most 20.
+	// Defaults to null. Null and an empty list both mean no predefined agents. This
+	// list is separate from `workflows.predefined_agents`, and an agent in one list is
+	// not added to the other.
+	PredefinedAgents []BetaManagedAgentsMultiagentPredefinedAgentParamsUnion `json:"predefined_agents,omitzero"`
+	// Whether the agent can define inline agents when it spawns session threads.
+	// Defaults to enabled.
+	InlineAgents BetaManagedAgentsMultiagentInlineAgentsParamsUnion `json:"inline_agents,omitzero"`
+	// This field can be elided, and will marshal its zero value as "enabled".
+	Type constant.Enabled `json:"type" default:"enabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentSubagentsEnabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentSubagentsEnabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentSubagentsEnabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsMultiagentSubagentsParamsUnion struct {
+	OfEnabled  *BetaManagedAgentsMultiagentSubagentsEnabledParams  `json:",omitzero,inline"`
+	OfDisabled *BetaManagedAgentsMultiagentSubagentsDisabledParams `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsMultiagentSubagentsParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfEnabled, u.OfDisabled)
+}
+func (u *BetaManagedAgentsMultiagentSubagentsParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsMultiagentSubagentsParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfEnabled) {
+		return u.OfEnabled
+	} else if !param.IsOmitted(u.OfDisabled) {
+		return u.OfDisabled
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentSubagentsParamsUnion) GetInlineAgents() *BetaManagedAgentsMultiagentInlineAgentsParamsUnion {
+	if vt := u.OfEnabled; vt != nil {
+		return &vt.InlineAgents
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentSubagentsParamsUnion) GetPredefinedAgents() []BetaManagedAgentsMultiagentPredefinedAgentParamsUnion {
+	if vt := u.OfEnabled; vt != nil {
+		return vt.PredefinedAgents
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentSubagentsParamsUnion) GetType() *string {
+	if vt := u.OfEnabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfDisabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsMultiagentSubagentsParamsUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsMultiagentSubagentsEnabledParams]("enabled"),
+		apijson.Discriminator[BetaManagedAgentsMultiagentSubagentsDisabledParams]("disabled"),
+	)
+}
+
+// BetaManagedAgentsMultiagentWorkflowsUnion contains all possible properties and
+// values from [BetaManagedAgentsMultiagentWorkflowsEnabled],
+// [BetaManagedAgentsMultiagentWorkflowsDisabled].
+//
+// Use the [BetaManagedAgentsMultiagentWorkflowsUnion.AsAny] method to switch on
+// the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsMultiagentWorkflowsUnion struct {
+	// This field is from variant [BetaManagedAgentsMultiagentWorkflowsEnabled].
+	InlineAgents BetaManagedAgentsMultiagentInlineAgentsUnion `json:"inline_agents"`
+	// This field is from variant [BetaManagedAgentsMultiagentWorkflowsEnabled].
+	PredefinedAgents []BetaManagedAgentsAgentReference `json:"predefined_agents"`
+	// Any of "enabled", "disabled".
+	Type string `json:"type"`
+	JSON struct {
+		InlineAgents     respjson.Field
+		PredefinedAgents respjson.Field
+		Type             respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsMultiagentWorkflows is implemented by each variant of
+// [BetaManagedAgentsMultiagentWorkflowsUnion] to add type safety for the return
+// type of [BetaManagedAgentsMultiagentWorkflowsUnion.AsAny]
+type anyBetaManagedAgentsMultiagentWorkflows interface {
+	implBetaManagedAgentsMultiagentWorkflowsUnion()
+}
+
+func (BetaManagedAgentsMultiagentWorkflowsEnabled) implBetaManagedAgentsMultiagentWorkflowsUnion()  {}
+func (BetaManagedAgentsMultiagentWorkflowsDisabled) implBetaManagedAgentsMultiagentWorkflowsUnion() {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsMultiagentWorkflowsUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsMultiagentWorkflowsEnabled:
+//	case anthropic.BetaManagedAgentsMultiagentWorkflowsDisabled:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsMultiagentWorkflowsUnion) AsAny() anyBetaManagedAgentsMultiagentWorkflows {
+	switch u.Type {
+	case "enabled":
+		return u.AsEnabled()
+	case "disabled":
+		return u.AsDisabled()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsMultiagentWorkflowsUnion) AsEnabled() (v BetaManagedAgentsMultiagentWorkflowsEnabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsMultiagentWorkflowsUnion) AsDisabled() (v BetaManagedAgentsMultiagentWorkflowsDisabled) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsMultiagentWorkflowsUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsMultiagentWorkflowsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent cannot start workflow runs.
+type BetaManagedAgentsMultiagentWorkflowsDisabled struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentWorkflowsDisabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentWorkflowsDisabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func NewBetaManagedAgentsMultiagentWorkflowsDisabledParams() BetaManagedAgentsMultiagentWorkflowsDisabledParams {
+	return BetaManagedAgentsMultiagentWorkflowsDisabledParams{
+		Type: "disabled",
+	}
+}
+
+// The agent cannot start workflow runs.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsMultiagentWorkflowsDisabledParams].
+type BetaManagedAgentsMultiagentWorkflowsDisabledParams struct {
+	Type constant.Disabled `json:"type" default:"disabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentWorkflowsDisabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentWorkflowsDisabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentWorkflowsDisabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent can start workflow runs.
+type BetaManagedAgentsMultiagentWorkflowsEnabled struct {
+	// Whether a run's plan can define inline agents, which are not saved.
+	InlineAgents BetaManagedAgentsMultiagentInlineAgentsUnion `json:"inline_agents" api:"required"`
+	// Predefined agents, which are saved agents that a run's plan can use, each
+	// resolved to a specific version.
+	PredefinedAgents []BetaManagedAgentsAgentReference `json:"predefined_agents" api:"required"`
+	Type             constant.Enabled                  `json:"type" default:"enabled"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		InlineAgents     respjson.Field
+		PredefinedAgents respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagentWorkflowsEnabled) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagentWorkflowsEnabled) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The agent can start workflow runs. Each run follows a plan, a program that the
+// agent writes. A plan can use predefined agents, which are the saved agents in
+// `predefined_agents`, and inline agents, which it defines itself and which are
+// not saved. If `inline_agents` is disabled, `predefined_agents` must name at
+// least one agent.
+//
+// The property Type is required.
+type BetaManagedAgentsMultiagentWorkflowsEnabledParams struct {
+	// Predefined agents that a run's plan can use. At most 20. Defaults to null. Null
+	// and an empty list both mean no predefined agents. This list is separate from
+	// `subagents.predefined_agents`, and an agent in one list is not added to the
+	// other.
+	PredefinedAgents []BetaManagedAgentsMultiagentPredefinedAgentParamsUnion `json:"predefined_agents,omitzero"`
+	// Whether a run's plan can define inline agents. Defaults to enabled.
+	InlineAgents BetaManagedAgentsMultiagentInlineAgentsParamsUnion `json:"inline_agents,omitzero"`
+	// This field can be elided, and will marshal its zero value as "enabled".
+	Type constant.Enabled `json:"type" default:"enabled"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagentWorkflowsEnabledParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagentWorkflowsEnabledParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagentWorkflowsEnabledParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsMultiagentWorkflowsParamsUnion struct {
+	OfEnabled  *BetaManagedAgentsMultiagentWorkflowsEnabledParams  `json:",omitzero,inline"`
+	OfDisabled *BetaManagedAgentsMultiagentWorkflowsDisabledParams `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsMultiagentWorkflowsParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfEnabled, u.OfDisabled)
+}
+func (u *BetaManagedAgentsMultiagentWorkflowsParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsMultiagentWorkflowsParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfEnabled) {
+		return u.OfEnabled
+	} else if !param.IsOmitted(u.OfDisabled) {
+		return u.OfDisabled
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentWorkflowsParamsUnion) GetInlineAgents() *BetaManagedAgentsMultiagentInlineAgentsParamsUnion {
+	if vt := u.OfEnabled; vt != nil {
+		return &vt.InlineAgents
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentWorkflowsParamsUnion) GetPredefinedAgents() []BetaManagedAgentsMultiagentPredefinedAgentParamsUnion {
+	if vt := u.OfEnabled; vt != nil {
+		return vt.PredefinedAgents
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsMultiagentWorkflowsParamsUnion) GetType() *string {
+	if vt := u.OfEnabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfDisabled; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsMultiagentWorkflowsParamsUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsMultiagentWorkflowsEnabledParams]("enabled"),
+		apijson.Discriminator[BetaManagedAgentsMultiagentWorkflowsDisabledParams]("disabled"),
+	)
+}
+
+// Resolved multiagent configuration with three members, each enabled or disabled
+// on its own.
+type BetaManagedAgentsMultiagent20261001 struct {
+	// Whether the session's primary thread can consult an advisor model.
+	Advisor BetaManagedAgentsMultiagentAdvisorUnion `json:"advisor" api:"required"`
+	// Whether the agent can spawn session threads.
+	Subagents BetaManagedAgentsMultiagentSubagentsUnion `json:"subagents" api:"required"`
+	Type      constant.Multiagent20261001               `json:"type" default:"multiagent_20261001"`
+	// Whether the agent can start workflow runs.
+	Workflows BetaManagedAgentsMultiagentWorkflowsUnion `json:"workflows" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Advisor     respjson.Field
+		Subagents   respjson.Field
+		Type        respjson.Field
+		Workflows   respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsMultiagent20261001) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsMultiagent20261001) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Multiagent configuration with three members, each enabled or disabled on its
+// own. On an update, if the agent's stored `multiagent` also has type
+// `multiagent_20261001`, this configuration is merged into the stored one, level
+// by level, instead of replacing it. A key that the update omits keeps its stored
+// value. A key sent as null takes its default, on create as well, so
+// `"workflows": null` enables workflows. An object sent with a `type` other than
+// the stored one replaces the stored object, and the keys that it omits take their
+// defaults. A `predefined_agents` list that is sent replaces the stored list.
+// Every object that is sent needs its `type`, and an enabled `advisor` needs its
+// `model`. Other validation applies to the merged result.
+//
+// The property Type is required.
+type BetaManagedAgentsMultiagent20261001Params struct {
+	// Whether the session's primary thread can consult an advisor model. Defaults to
+	// disabled.
+	Advisor BetaManagedAgentsMultiagentAdvisorParamsUnion `json:"advisor,omitzero"`
+	// Whether the agent can spawn session threads. Defaults to enabled.
+	Subagents BetaManagedAgentsMultiagentSubagentsParamsUnion `json:"subagents,omitzero"`
+	// Whether the agent can start workflow runs. Defaults to enabled.
+	Workflows BetaManagedAgentsMultiagentWorkflowsParamsUnion `json:"workflows,omitzero"`
+	// This field can be elided, and will marshal its zero value as
+	// "multiagent_20261001".
+	Type constant.Multiagent20261001 `json:"type" default:"multiagent_20261001"`
+	paramObj
+}
+
+func (r BetaManagedAgentsMultiagent20261001Params) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsMultiagent20261001Params
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsMultiagent20261001Params) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration for the read tool.
+type BetaManagedAgentsReadToolConfig struct {
+	Enabled bool          `json:"enabled" api:"required"`
+	Name    constant.Read `json:"name" default:"read"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsReadToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.Read                                        `json:"type" default:"read"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsReadToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsReadToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsReadToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsReadToolConfigPermissionPolicyUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsReadToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsReadToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsReadToolConfigPermissionPolicyUnion] to add type
+// safety for the return type of
+// [BetaManagedAgentsReadToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsReadToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsReadToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsReadToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsReadToolConfigPermissionPolicyUnion() {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsReadToolConfigPermissionPolicyUnion()      {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsReadToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsReadToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsReadToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsReadToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsReadToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsReadToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsReadToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsReadToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the read tool.
+//
+// The property Name is required.
+type BetaManagedAgentsReadToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Any of "read".
+	Type BetaManagedAgentsReadToolConfigParamsType `json:"type,omitzero"`
+	// Must be "read".
+	//
+	// This field can be elided, and will marshal its zero value as "read".
+	Name constant.Read `json:"name" default:"read"`
+	paramObj
+}
+
+func (r BetaManagedAgentsReadToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsReadToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsReadToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsReadToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsReadToolConfigParamsType string
+
+const (
+	BetaManagedAgentsReadToolConfigParamsTypeRead BetaManagedAgentsReadToolConfigParamsType = "read"
+)
+
+// The Anthropic-managed service account as returned in API responses.
+type BetaManagedAgentsServiceAccountExecutionIdentity struct {
+	Type constant.ServiceAccount `json:"type" default:"service_account"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsServiceAccountExecutionIdentity) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsServiceAccountExecutionIdentity) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func NewBetaManagedAgentsServiceAccountExecutionIdentityParams() BetaManagedAgentsServiceAccountExecutionIdentityParams {
+	return BetaManagedAgentsServiceAccountExecutionIdentityParams{
+		Type: "service_account",
+	}
+}
+
+// The Anthropic-managed service account — the default execution principal. Carries
+// no identifier.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsServiceAccountExecutionIdentityParams].
+type BetaManagedAgentsServiceAccountExecutionIdentityParams struct {
+	Type constant.ServiceAccount `json:"type" default:"service_account"`
+	paramObj
+}
+
+func (r BetaManagedAgentsServiceAccountExecutionIdentityParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsServiceAccountExecutionIdentityParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsServiceAccountExecutionIdentityParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
 // Resolved `agent` definition for a single `session_thread`. Snapshot of the agent
 // at thread creation time. The multiagent roster is not repeated here; read it
 // from `Session.agent`.
 type BetaManagedAgentsSessionThreadAgent struct {
-	ID          string                                    `json:"id" api:"required"`
-	Description string                                    `json:"description" api:"required"`
-	MCPServers  []BetaManagedAgentsMCPServerURLDefinition `json:"mcp_servers" api:"required"`
+	ID          string `json:"id" api:"required"`
+	Description string `json:"description" api:"required"`
+	// Execution principal snapshotted from the agent at session creation. Always
+	// present; `{"type": "service_account"}` when runs carry no customer-named
+	// principal.
+	ExecutionIdentity BetaManagedAgentsExecutionIdentityUnion   `json:"execution_identity" api:"required"`
+	MCPServers        []BetaManagedAgentsMCPServerURLDefinition `json:"mcp_servers" api:"required"`
 	// Model identifier and configuration.
 	Model  BetaManagedAgentsModelConfig                    `json:"model" api:"required"`
 	Name   string                                          `json:"name" api:"required"`
@@ -1831,18 +4896,19 @@ type BetaManagedAgentsSessionThreadAgent struct {
 	Version int64                                   `json:"version" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
-		ID          respjson.Field
-		Description respjson.Field
-		MCPServers  respjson.Field
-		Model       respjson.Field
-		Name        respjson.Field
-		Skills      respjson.Field
-		System      respjson.Field
-		Tools       respjson.Field
-		Type        respjson.Field
-		Version     respjson.Field
-		ExtraFields map[string]respjson.Field
-		raw         string
+		ID                respjson.Field
+		Description       respjson.Field
+		ExecutionIdentity respjson.Field
+		MCPServers        respjson.Field
+		Model             respjson.Field
+		Name              respjson.Field
+		Skills            respjson.Field
+		System            respjson.Field
+		Tools             respjson.Field
+		Type              respjson.Field
+		Version           respjson.Field
+		ExtraFields       map[string]respjson.Field
+		raw               string
 	} `json:"-"`
 }
 
@@ -1927,7 +4993,7 @@ func (r *BetaManagedAgentsSessionThreadAgentSkillUnion) UnmarshalJSON(data []byt
 //
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 type BetaManagedAgentsSessionThreadAgentToolUnion struct {
-	// This field is a union of [[]BetaManagedAgentsAgentToolConfig],
+	// This field is a union of [[]BetaManagedAgentsAgentToolConfigUnion],
 	// [[]BetaManagedAgentsMCPToolConfig]
 	Configs BetaManagedAgentsSessionThreadAgentToolUnionConfigs `json:"configs"`
 	// This field is a union of [BetaManagedAgentsAgentToolsetDefaultConfig],
@@ -2022,8 +5088,8 @@ func (r *BetaManagedAgentsSessionThreadAgentToolUnion) UnmarshalJSON(data []byte
 // OfBetaManagedAgentsMCPToolConfigArray]
 type BetaManagedAgentsSessionThreadAgentToolUnionConfigs struct {
 	// This field will be present if the value is a
-	// [[]BetaManagedAgentsAgentToolConfig] instead of an object.
-	OfBetaManagedAgentsAgentToolConfigArray []BetaManagedAgentsAgentToolConfig `json:",inline"`
+	// [[]BetaManagedAgentsAgentToolConfigUnion] instead of an object.
+	OfBetaManagedAgentsAgentToolConfigArray []BetaManagedAgentsAgentToolConfigUnion `json:",inline"`
 	// This field will be present if the value is a [[]BetaManagedAgentsMCPToolConfig]
 	// instead of an object.
 	OfBetaManagedAgentsMCPToolConfigArray []BetaManagedAgentsMCPToolConfig `json:",inline"`
@@ -2090,12 +5156,14 @@ const (
 func BetaManagedAgentsSkillParamsOfAnthropic(skillID string) BetaManagedAgentsSkillParamsUnion {
 	var anthropic BetaManagedAgentsAnthropicSkillParams
 	anthropic.SkillID = skillID
+	anthropic.Type = BetaManagedAgentsAnthropicSkillParamsTypeAnthropic
 	return BetaManagedAgentsSkillParamsUnion{OfAnthropic: &anthropic}
 }
 
 func BetaManagedAgentsSkillParamsOfCustom(skillID string) BetaManagedAgentsSkillParamsUnion {
 	var custom BetaManagedAgentsCustomSkillParams
 	custom.SkillID = skillID
+	custom.Type = BetaManagedAgentsCustomSkillParamsTypeCustom
 	return BetaManagedAgentsSkillParamsUnion{OfCustom: &custom}
 }
 
@@ -2190,10 +5258,1358 @@ const (
 	BetaManagedAgentsURLMCPServerParamsTypeURL BetaManagedAgentsURLMCPServerParamsType = "url"
 )
 
+// Approximate user location for search result localization.
+type BetaManagedAgentsUserLocation struct {
+	// Location precision. Only "approximate" is supported.
+	Type constant.Approximate `json:"type" default:"approximate"`
+	// City name.
+	City string `json:"city" api:"nullable"`
+	// Two-letter ISO 3166-1 country code, uppercase.
+	Country string `json:"country" api:"nullable"`
+	// Region or state name.
+	Region string `json:"region" api:"nullable"`
+	// IANA timezone identifier, e.g. "America/Los_Angeles".
+	Timezone string `json:"timezone" api:"nullable"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		City        respjson.Field
+		Country     respjson.Field
+		Region      respjson.Field
+		Timezone    respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsUserLocation) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsUserLocation) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsUserLocation to a
+// BetaManagedAgentsUserLocationParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsUserLocationParam.Overrides()
+func (r BetaManagedAgentsUserLocation) ToParam() BetaManagedAgentsUserLocationParam {
+	return param.Override[BetaManagedAgentsUserLocationParam](json.RawMessage(r.RawJSON()))
+}
+
+// Approximate user location for search result localization.
+//
+// The property Type is required.
+type BetaManagedAgentsUserLocationParam struct {
+	// City name.
+	City param.Opt[string] `json:"city,omitzero"`
+	// Two-letter ISO 3166-1 country code, uppercase.
+	Country param.Opt[string] `json:"country,omitzero"`
+	// Region or state name.
+	Region param.Opt[string] `json:"region,omitzero"`
+	// IANA timezone identifier, e.g. "America/Los_Angeles".
+	Timezone param.Opt[string] `json:"timezone,omitzero"`
+	// Location precision. Only "approximate" is supported.
+	//
+	// This field can be elided, and will marshal its zero value as "approximate".
+	Type constant.Approximate `json:"type" default:"approximate"`
+	paramObj
+}
+
+func (r BetaManagedAgentsUserLocationParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsUserLocationParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsUserLocationParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration for the web_fetch tool.
+type BetaManagedAgentsWebFetchToolConfig struct {
+	Enabled bool              `json:"enabled" api:"required"`
+	Name    constant.WebFetch `json:"name" default:"web_fetch"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.WebFetch                                        `json:"type" default:"web_fetch"`
+	// Which sources contribute URLs the tool may fetch, always in the object form.
+	// Null when not set, which allows every source.
+	URLSources       BetaManagedAgentsWebFetchURLSources `json:"url_sources" api:"required"`
+	AllowedDomains   []string                            `json:"allowed_domains"`
+	BlockedDomains   []string                            `json:"blocked_domains"`
+	MaxContentTokens int64                               `json:"max_content_tokens" api:"nullable"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		URLSources       respjson.Field
+		AllowedDomains   respjson.Field
+		BlockedDomains   respjson.Field
+		MaxContentTokens respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion.AsAny] method
+// to switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsWebFetchToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion] to add
+// type safety for the return type of
+// [BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsWebFetchToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion() {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsWebFetchToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsWebFetchToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the web_fetch tool.
+//
+// The property Name is required.
+type BetaManagedAgentsWebFetchToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Maximum number of tokens of fetched text content to include in context per call.
+	// Does not apply to binary content such as PDFs.
+	MaxContentTokens param.Opt[int64] `json:"max_content_tokens,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Only fetch URLs whose host is one of these domains or a subdomain of one. Each
+	// entry is a plain hostname like "docs.example.com" (no scheme, port, or path). At
+	// most 64 entries; an empty list is rejected (omit the field instead). Cannot be
+	// combined with blocked_domains.
+	AllowedDomains []string `json:"allowed_domains,omitzero"`
+	// Never fetch URLs whose host is one of these domains or a subdomain of one. Each
+	// entry is a plain hostname like "ads.example.com" (no scheme, port, or path). At
+	// most 64 entries; an empty list is rejected (omit the field instead). Cannot be
+	// combined with allowed_domains.
+	BlockedDomains []string `json:"blocked_domains,omitzero"`
+	// Any of "web_fetch".
+	Type BetaManagedAgentsWebFetchToolConfigParamsType `json:"type,omitzero"`
+	// Which sources contribute URLs the tool may fetch. Omit to allow every source.
+	URLSources BetaManagedAgentsWebFetchURLSourcesParams `json:"url_sources,omitzero"`
+	// Must be "web_fetch".
+	//
+	// This field can be elided, and will marshal its zero value as "web_fetch".
+	Name constant.WebFetch `json:"name" default:"web_fetch"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsWebFetchToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsWebFetchToolConfigParamsType string
+
+const (
+	BetaManagedAgentsWebFetchToolConfigParamsTypeWebFetch BetaManagedAgentsWebFetchToolConfigParamsType = "web_fetch"
+)
+
+// Every URL from this source may be fetched. This is the default.
+type BetaManagedAgentsWebFetchURLSourceAll struct {
+	Type constant.All `json:"type" default:"all"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchURLSourceAll) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchURLSourceAll) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceAll to a
+// BetaManagedAgentsWebFetchURLSourceAllParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceAllParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceAll) ToParam() BetaManagedAgentsWebFetchURLSourceAllParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceAllParam](json.RawMessage(r.RawJSON()))
+}
+
+func NewBetaManagedAgentsWebFetchURLSourceAllParam() BetaManagedAgentsWebFetchURLSourceAllParam {
+	return BetaManagedAgentsWebFetchURLSourceAllParam{
+		Type: "all",
+	}
+}
+
+// Every URL from this source may be fetched. This is the default.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsWebFetchURLSourceAllParam].
+type BetaManagedAgentsWebFetchURLSourceAllParam struct {
+	Type constant.All `json:"type" default:"all"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchURLSourceAllParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchURLSourceAllParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchURLSourceAllParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Every tool's results contribute URLs that may be fetched, except the named
+// tools' results.
+type BetaManagedAgentsWebFetchURLSourceExcept struct {
+	// The tools whose results do not contribute. Between 1 and 128 entries, each with
+	// a different name. An empty list is rejected; use "all" to leave out no tool's
+	// results.
+	Tools []BetaManagedAgentsWebFetchURLSourceToolReference `json:"tools" api:"required"`
+	Type  constant.Except                                   `json:"type" default:"except"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Tools       respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchURLSourceExcept) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchURLSourceExcept) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceExcept to a
+// BetaManagedAgentsWebFetchURLSourceExceptParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceExceptParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceExcept) ToParam() BetaManagedAgentsWebFetchURLSourceExceptParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceExceptParam](json.RawMessage(r.RawJSON()))
+}
+
+// Every tool's results contribute URLs that may be fetched, except the named
+// tools' results.
+//
+// The properties Tools, Type are required.
+type BetaManagedAgentsWebFetchURLSourceExceptParam struct {
+	// The tools whose results do not contribute. Between 1 and 128 entries, each with
+	// a different name. An empty list is rejected; use "all" to leave out no tool's
+	// results.
+	Tools []BetaManagedAgentsWebFetchURLSourceToolReferenceParam `json:"tools,omitzero" api:"required"`
+	// This field can be elided, and will marshal its zero value as "except".
+	Type constant.Except `json:"type" default:"except"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchURLSourceExceptParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchURLSourceExceptParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchURLSourceExceptParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// This source contributes no URLs that may be fetched.
+type BetaManagedAgentsWebFetchURLSourceNone struct {
+	Type constant.None `json:"type" default:"none"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchURLSourceNone) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchURLSourceNone) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceNone to a
+// BetaManagedAgentsWebFetchURLSourceNoneParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceNoneParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceNone) ToParam() BetaManagedAgentsWebFetchURLSourceNoneParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceNoneParam](json.RawMessage(r.RawJSON()))
+}
+
+func NewBetaManagedAgentsWebFetchURLSourceNoneParam() BetaManagedAgentsWebFetchURLSourceNoneParam {
+	return BetaManagedAgentsWebFetchURLSourceNoneParam{
+		Type: "none",
+	}
+}
+
+// This source contributes no URLs that may be fetched.
+//
+// This struct has a constant value, construct it with
+// [NewBetaManagedAgentsWebFetchURLSourceNoneParam].
+type BetaManagedAgentsWebFetchURLSourceNoneParam struct {
+	Type constant.None `json:"type" default:"none"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchURLSourceNoneParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchURLSourceNoneParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchURLSourceNoneParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only the named tools' results contribute URLs that may be fetched.
+type BetaManagedAgentsWebFetchURLSourceOnly struct {
+	// The tools whose results contribute. Between 1 and 128 entries, each with a
+	// different name. An empty list is rejected; use "none" to allow no tool's
+	// results.
+	Tools []BetaManagedAgentsWebFetchURLSourceToolReference `json:"tools" api:"required"`
+	Type  constant.Only                                     `json:"type" default:"only"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Tools       respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchURLSourceOnly) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchURLSourceOnly) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceOnly to a
+// BetaManagedAgentsWebFetchURLSourceOnlyParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceOnlyParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceOnly) ToParam() BetaManagedAgentsWebFetchURLSourceOnlyParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceOnlyParam](json.RawMessage(r.RawJSON()))
+}
+
+// Only the named tools' results contribute URLs that may be fetched.
+//
+// The properties Tools, Type are required.
+type BetaManagedAgentsWebFetchURLSourceOnlyParam struct {
+	// The tools whose results contribute. Between 1 and 128 entries, each with a
+	// different name. An empty list is rejected; use "none" to allow no tool's
+	// results.
+	Tools []BetaManagedAgentsWebFetchURLSourceToolReferenceParam `json:"tools,omitzero" api:"required"`
+	// This field can be elided, and will marshal its zero value as "only".
+	Type constant.Only `json:"type" default:"only"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchURLSourceOnlyParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchURLSourceOnlyParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchURLSourceOnlyParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// String form of a url_sources value that has no field other than its type: "all"
+// means {"type": "all"} and "none" means {"type": "none"}.
+type BetaManagedAgentsWebFetchURLSourceShorthand string
+
+const (
+	BetaManagedAgentsWebFetchURLSourceShorthandAll  BetaManagedAgentsWebFetchURLSourceShorthand = "all"
+	BetaManagedAgentsWebFetchURLSourceShorthandNone BetaManagedAgentsWebFetchURLSourceShorthand = "none"
+)
+
+// BetaManagedAgentsWebFetchURLSourceToolFilterUnion contains all possible
+// properties and values from [BetaManagedAgentsWebFetchURLSourceAll],
+// [BetaManagedAgentsWebFetchURLSourceNone],
+// [BetaManagedAgentsWebFetchURLSourceOnly],
+// [BetaManagedAgentsWebFetchURLSourceExcept].
+//
+// Use the [BetaManagedAgentsWebFetchURLSourceToolFilterUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsWebFetchURLSourceToolFilterUnion struct {
+	// Any of "all", "none", "only", "except".
+	Type  string                                            `json:"type"`
+	Tools []BetaManagedAgentsWebFetchURLSourceToolReference `json:"tools"`
+	JSON  struct {
+		Type  respjson.Field
+		Tools respjson.Field
+		raw   string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsWebFetchURLSourceToolFilter is implemented by each variant
+// of [BetaManagedAgentsWebFetchURLSourceToolFilterUnion] to add type safety for
+// the return type of [BetaManagedAgentsWebFetchURLSourceToolFilterUnion.AsAny]
+type anyBetaManagedAgentsWebFetchURLSourceToolFilter interface {
+	implBetaManagedAgentsWebFetchURLSourceToolFilterUnion()
+}
+
+func (BetaManagedAgentsWebFetchURLSourceAll) implBetaManagedAgentsWebFetchURLSourceToolFilterUnion() {
+}
+func (BetaManagedAgentsWebFetchURLSourceNone) implBetaManagedAgentsWebFetchURLSourceToolFilterUnion() {
+}
+func (BetaManagedAgentsWebFetchURLSourceOnly) implBetaManagedAgentsWebFetchURLSourceToolFilterUnion() {
+}
+func (BetaManagedAgentsWebFetchURLSourceExcept) implBetaManagedAgentsWebFetchURLSourceToolFilterUnion() {
+}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsWebFetchURLSourceToolFilterUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsWebFetchURLSourceAll:
+//	case anthropic.BetaManagedAgentsWebFetchURLSourceNone:
+//	case anthropic.BetaManagedAgentsWebFetchURLSourceOnly:
+//	case anthropic.BetaManagedAgentsWebFetchURLSourceExcept:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnion) AsAny() anyBetaManagedAgentsWebFetchURLSourceToolFilter {
+	switch u.Type {
+	case "all":
+		return u.AsAll()
+	case "none":
+		return u.AsNone()
+	case "only":
+		return u.AsOnly()
+	case "except":
+		return u.AsExcept()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnion) AsAll() (v BetaManagedAgentsWebFetchURLSourceAll) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnion) AsNone() (v BetaManagedAgentsWebFetchURLSourceNone) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnion) AsOnly() (v BetaManagedAgentsWebFetchURLSourceOnly) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnion) AsExcept() (v BetaManagedAgentsWebFetchURLSourceExcept) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsWebFetchURLSourceToolFilterUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceToolFilterUnion to a
+// BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceToolFilterUnion) ToParam() BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam](json.RawMessage(r.RawJSON()))
+}
+
+func BetaManagedAgentsWebFetchURLSourceToolFilterParamOfOnly(tools []BetaManagedAgentsWebFetchURLSourceToolReferenceParam) BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam {
+	var only BetaManagedAgentsWebFetchURLSourceOnlyParam
+	only.Tools = tools
+	return BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam{OfOnly: &only}
+}
+
+func BetaManagedAgentsWebFetchURLSourceToolFilterParamOfExcept(tools []BetaManagedAgentsWebFetchURLSourceToolReferenceParam) BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam {
+	var except BetaManagedAgentsWebFetchURLSourceExceptParam
+	except.Tools = tools
+	return BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam{OfExcept: &except}
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam struct {
+	OfAll    *BetaManagedAgentsWebFetchURLSourceAllParam    `json:",omitzero,inline"`
+	OfNone   *BetaManagedAgentsWebFetchURLSourceNoneParam   `json:",omitzero,inline"`
+	OfOnly   *BetaManagedAgentsWebFetchURLSourceOnlyParam   `json:",omitzero,inline"`
+	OfExcept *BetaManagedAgentsWebFetchURLSourceExceptParam `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAll, u.OfNone, u.OfOnly, u.OfExcept)
+}
+func (u *BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam) asAny() any {
+	if !param.IsOmitted(u.OfAll) {
+		return u.OfAll
+	} else if !param.IsOmitted(u.OfNone) {
+		return u.OfNone
+	} else if !param.IsOmitted(u.OfOnly) {
+		return u.OfOnly
+	} else if !param.IsOmitted(u.OfExcept) {
+		return u.OfExcept
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam) GetType() *string {
+	if vt := u.OfAll; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfNone; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfOnly; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfExcept; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's Tools property, if present.
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam) GetTools() []BetaManagedAgentsWebFetchURLSourceToolReferenceParam {
+	if vt := u.OfOnly; vt != nil {
+		return vt.Tools
+	} else if vt := u.OfExcept; vt != nil {
+		return vt.Tools
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsWebFetchURLSourceAllParam]("all"),
+		apijson.Discriminator[BetaManagedAgentsWebFetchURLSourceNoneParam]("none"),
+		apijson.Discriminator[BetaManagedAgentsWebFetchURLSourceOnlyParam]("only"),
+		apijson.Discriminator[BetaManagedAgentsWebFetchURLSourceExceptParam]("except"),
+	)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion struct {
+	// Check if union is this variant with
+	// !param.IsOmitted(union.OfBetaManagedAgentsWebFetchURLSourceShorthand)
+	OfBetaManagedAgentsWebFetchURLSourceShorthand       param.Opt[BetaManagedAgentsWebFetchURLSourceShorthand]  `json:",omitzero,inline"`
+	OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion *BetaManagedAgentsWebFetchURLSourceToolFilterUnionParam `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfBetaManagedAgentsWebFetchURLSourceShorthand, u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion)
+}
+func (u *BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfBetaManagedAgentsWebFetchURLSourceShorthand) {
+		return &u.OfBetaManagedAgentsWebFetchURLSourceShorthand
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion) {
+		return u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion.asAny()
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion) GetType() *string {
+	if u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion != nil {
+		return u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion.GetType()
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's Tools property, if present.
+func (u BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion) GetTools() []BetaManagedAgentsWebFetchURLSourceToolReferenceParam {
+	if u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion != nil {
+		return u.OfBetaManagedAgentsWebFetchURLSourceToolFilterUnion.GetTools()
+	}
+	return nil
+}
+
+// Names one tool in an only or except list.
+type BetaManagedAgentsWebFetchURLSourceToolReference struct {
+	// Name of the tool. Compared exactly, so upper and lower case letters are
+	// different.
+	Name string `json:"name" api:"required"`
+	// Must be "tool_reference".
+	Type constant.ToolReference `json:"type" default:"tool_reference"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Name        respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchURLSourceToolReference) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchURLSourceToolReference) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceToolReference to a
+// BetaManagedAgentsWebFetchURLSourceToolReferenceParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceToolReferenceParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceToolReference) ToParam() BetaManagedAgentsWebFetchURLSourceToolReferenceParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceToolReferenceParam](json.RawMessage(r.RawJSON()))
+}
+
+// Names one tool in an only or except list.
+//
+// The properties Name, Type are required.
+type BetaManagedAgentsWebFetchURLSourceToolReferenceParam struct {
+	// Name of the tool. Compared exactly, so upper and lower case letters are
+	// different.
+	Name string `json:"name" api:"required"`
+	// Must be "tool_reference".
+	//
+	// This field can be elided, and will marshal its zero value as "tool_reference".
+	Type constant.ToolReference `json:"type" default:"tool_reference"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchURLSourceToolReferenceParam) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchURLSourceToolReferenceParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchURLSourceToolReferenceParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsWebFetchURLSourceUserInputUnion contains all possible
+// properties and values from [BetaManagedAgentsWebFetchURLSourceAll],
+// [BetaManagedAgentsWebFetchURLSourceNone].
+//
+// Use the [BetaManagedAgentsWebFetchURLSourceUserInputUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsWebFetchURLSourceUserInputUnion struct {
+	// Any of "all", "none".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsWebFetchURLSourceUserInput is implemented by each variant of
+// [BetaManagedAgentsWebFetchURLSourceUserInputUnion] to add type safety for the
+// return type of [BetaManagedAgentsWebFetchURLSourceUserInputUnion.AsAny]
+type anyBetaManagedAgentsWebFetchURLSourceUserInput interface {
+	implBetaManagedAgentsWebFetchURLSourceUserInputUnion()
+}
+
+func (BetaManagedAgentsWebFetchURLSourceAll) implBetaManagedAgentsWebFetchURLSourceUserInputUnion() {}
+func (BetaManagedAgentsWebFetchURLSourceNone) implBetaManagedAgentsWebFetchURLSourceUserInputUnion() {
+}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsWebFetchURLSourceUserInputUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsWebFetchURLSourceAll:
+//	case anthropic.BetaManagedAgentsWebFetchURLSourceNone:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsWebFetchURLSourceUserInputUnion) AsAny() anyBetaManagedAgentsWebFetchURLSourceUserInput {
+	switch u.Type {
+	case "all":
+		return u.AsAll()
+	case "none":
+		return u.AsNone()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceUserInputUnion) AsAll() (v BetaManagedAgentsWebFetchURLSourceAll) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceUserInputUnion) AsNone() (v BetaManagedAgentsWebFetchURLSourceNone) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsWebFetchURLSourceUserInputUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsWebFetchURLSourceUserInputUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this BetaManagedAgentsWebFetchURLSourceUserInputUnion to a
+// BetaManagedAgentsWebFetchURLSourceUserInputUnionParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// BetaManagedAgentsWebFetchURLSourceUserInputUnionParam.Overrides()
+func (r BetaManagedAgentsWebFetchURLSourceUserInputUnion) ToParam() BetaManagedAgentsWebFetchURLSourceUserInputUnionParam {
+	return param.Override[BetaManagedAgentsWebFetchURLSourceUserInputUnionParam](json.RawMessage(r.RawJSON()))
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWebFetchURLSourceUserInputUnionParam struct {
+	OfAll  *BetaManagedAgentsWebFetchURLSourceAllParam  `json:",omitzero,inline"`
+	OfNone *BetaManagedAgentsWebFetchURLSourceNoneParam `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceUserInputUnionParam) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAll, u.OfNone)
+}
+func (u *BetaManagedAgentsWebFetchURLSourceUserInputUnionParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWebFetchURLSourceUserInputUnionParam) asAny() any {
+	if !param.IsOmitted(u.OfAll) {
+		return u.OfAll
+	} else if !param.IsOmitted(u.OfNone) {
+		return u.OfNone
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWebFetchURLSourceUserInputUnionParam) GetType() *string {
+	if vt := u.OfAll; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	} else if vt := u.OfNone; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsWebFetchURLSourceUserInputUnionParam](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsWebFetchURLSourceAllParam]("all"),
+		apijson.Discriminator[BetaManagedAgentsWebFetchURLSourceNoneParam]("none"),
+	)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWebFetchURLSourceUserInputParamsUnion struct {
+	// Check if union is this variant with
+	// !param.IsOmitted(union.OfBetaManagedAgentsWebFetchURLSourceShorthand)
+	OfBetaManagedAgentsWebFetchURLSourceShorthand      param.Opt[BetaManagedAgentsWebFetchURLSourceShorthand] `json:",omitzero,inline"`
+	OfBetaManagedAgentsWebFetchURLSourceUserInputUnion *BetaManagedAgentsWebFetchURLSourceUserInputUnionParam `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWebFetchURLSourceUserInputParamsUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfBetaManagedAgentsWebFetchURLSourceShorthand, u.OfBetaManagedAgentsWebFetchURLSourceUserInputUnion)
+}
+func (u *BetaManagedAgentsWebFetchURLSourceUserInputParamsUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWebFetchURLSourceUserInputParamsUnion) asAny() any {
+	if !param.IsOmitted(u.OfBetaManagedAgentsWebFetchURLSourceShorthand) {
+		return &u.OfBetaManagedAgentsWebFetchURLSourceShorthand
+	} else if !param.IsOmitted(u.OfBetaManagedAgentsWebFetchURLSourceUserInputUnion) {
+		return u.OfBetaManagedAgentsWebFetchURLSourceUserInputUnion.asAny()
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWebFetchURLSourceUserInputParamsUnion) GetType() *string {
+	if u.OfBetaManagedAgentsWebFetchURLSourceUserInputUnion != nil {
+		return u.OfBetaManagedAgentsWebFetchURLSourceUserInputUnion.GetType()
+	}
+	return nil
+}
+
+// Which sources contribute URLs the web_fetch tool may fetch. A key that is null
+// was not set and allows every URL from that source.
+type BetaManagedAgentsWebFetchURLSources struct {
+	// Which custom tools' results contribute URLs that may be fetched. Null when not
+	// set, which allows every custom tool's results.
+	ClientToolResults BetaManagedAgentsWebFetchURLSourceToolFilterUnion `json:"client_tool_results" api:"required"`
+	// Which of the web_search and web_fetch tools' results contribute URLs that may be
+	// fetched. Null when not set, which allows both.
+	ServerToolResults BetaManagedAgentsWebFetchURLSourceToolFilterUnion `json:"server_tool_results" api:"required"`
+	// Whether URLs in the text of user messages may be fetched. Null when not set,
+	// which allows them.
+	UserInput BetaManagedAgentsWebFetchURLSourceUserInputUnion `json:"user_input" api:"required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		ClientToolResults respjson.Field
+		ServerToolResults respjson.Field
+		UserInput         respjson.Field
+		ExtraFields       map[string]respjson.Field
+		raw               string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebFetchURLSources) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebFetchURLSources) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Which sources contribute URLs the web_fetch tool may fetch. When web_fetch is
+// limited to URLs the conversation has already shown the model (in a user message,
+// a custom tool's result, or an earlier web_search or web_fetch result), each key
+// narrows one of those sources and defaults to "all". Setting all three keys to
+// "none" is rejected.
+type BetaManagedAgentsWebFetchURLSourcesParams struct {
+	// Which custom tools' results contribute URLs that may be fetched: "all" (the
+	// default), "none", or an only or except list. Each name in a list must be a
+	// custom tool in the same tools array.
+	ClientToolResults BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion `json:"client_tool_results,omitzero"`
+	// Which of the web_search and web_fetch tools' results contribute URLs that may be
+	// fetched: "all" (the default), "none", or an only or except list. Each name in a
+	// list must be "web_search" or "web_fetch".
+	ServerToolResults BetaManagedAgentsWebFetchURLSourceToolFilterParamsUnion `json:"server_tool_results,omitzero"`
+	// Whether URLs in the text of user messages may be fetched: "all" (the default) or
+	// "none".
+	UserInput BetaManagedAgentsWebFetchURLSourceUserInputParamsUnion `json:"user_input,omitzero"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebFetchURLSourcesParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebFetchURLSourcesParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebFetchURLSourcesParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration for the web_search tool.
+type BetaManagedAgentsWebSearchToolConfig struct {
+	Enabled bool               `json:"enabled" api:"required"`
+	Name    constant.WebSearch `json:"name" default:"web_search"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.WebSearch                                        `json:"type" default:"web_search"`
+	AllowedDomains   []string                                                  `json:"allowed_domains"`
+	BlockedDomains   []string                                                  `json:"blocked_domains"`
+	// Approximate user location for search result localization.
+	UserLocation BetaManagedAgentsUserLocation `json:"user_location" api:"nullable"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		AllowedDomains   respjson.Field
+		BlockedDomains   respjson.Field
+		UserLocation     respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWebSearchToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWebSearchToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion.AsAny] method
+// to switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsWebSearchToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion] to add
+// type safety for the return type of
+// [BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsWebSearchToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion() {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsWebSearchToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion) RawJSON() string {
+	return u.JSON.raw
+}
+
+func (r *BetaManagedAgentsWebSearchToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the web_search tool.
+//
+// The property Name is required.
+type BetaManagedAgentsWebSearchToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Only return search results whose host is one of these domains or a subdomain of
+	// one. Each entry is a plain hostname like "docs.example.com" (no scheme or port;
+	// an optional path suffix is accepted). At most 64 entries; an empty list is
+	// rejected (omit the field instead). Cannot be combined with blocked_domains.
+	AllowedDomains []string `json:"allowed_domains,omitzero"`
+	// Never return search results whose host is one of these domains or a subdomain of
+	// one. Each entry is a plain hostname like "ads.example.com" (no scheme or port;
+	// an optional path suffix is accepted). At most 64 entries; an empty list is
+	// rejected (omit the field instead). Cannot be combined with allowed_domains.
+	BlockedDomains []string `json:"blocked_domains,omitzero"`
+	// Any of "web_search".
+	Type BetaManagedAgentsWebSearchToolConfigParamsType `json:"type,omitzero"`
+	// Approximate user location for search result localization.
+	UserLocation BetaManagedAgentsUserLocationParam `json:"user_location,omitzero"`
+	// Must be "web_search".
+	//
+	// This field can be elided, and will marshal its zero value as "web_search".
+	Name constant.WebSearch `json:"name" default:"web_search"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWebSearchToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWebSearchToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWebSearchToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsWebSearchToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsWebSearchToolConfigParamsType string
+
+const (
+	BetaManagedAgentsWebSearchToolConfigParamsTypeWebSearch BetaManagedAgentsWebSearchToolConfigParamsType = "web_search"
+)
+
+// Configuration for the write tool.
+type BetaManagedAgentsWriteToolConfig struct {
+	Enabled bool           `json:"enabled" api:"required"`
+	Name    constant.Write `json:"name" default:"write"`
+	// Permission policy for tool execution.
+	PermissionPolicy BetaManagedAgentsWriteToolConfigPermissionPolicyUnion `json:"permission_policy" api:"required"`
+	Type             constant.Write                                        `json:"type" default:"write"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Enabled          respjson.Field
+		Name             respjson.Field
+		PermissionPolicy respjson.Field
+		Type             respjson.Field
+		ExtraFields      map[string]respjson.Field
+		raw              string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r BetaManagedAgentsWriteToolConfig) RawJSON() string { return r.JSON.raw }
+func (r *BetaManagedAgentsWriteToolConfig) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// BetaManagedAgentsWriteToolConfigPermissionPolicyUnion contains all possible
+// properties and values from [BetaManagedAgentsAlwaysAllowPolicy],
+// [BetaManagedAgentsAlwaysAskPolicy], [BetaManagedAgentsAutoPolicy].
+//
+// Use the [BetaManagedAgentsWriteToolConfigPermissionPolicyUnion.AsAny] method to
+// switch on the variant.
+//
+// Use the methods beginning with 'As' to cast the union to one of its variants.
+type BetaManagedAgentsWriteToolConfigPermissionPolicyUnion struct {
+	// Any of "always_allow", "always_ask", "auto".
+	Type string `json:"type"`
+	JSON struct {
+		Type respjson.Field
+		raw  string
+	} `json:"-"`
+}
+
+// anyBetaManagedAgentsWriteToolConfigPermissionPolicy is implemented by each
+// variant of [BetaManagedAgentsWriteToolConfigPermissionPolicyUnion] to add type
+// safety for the return type of
+// [BetaManagedAgentsWriteToolConfigPermissionPolicyUnion.AsAny]
+type anyBetaManagedAgentsWriteToolConfigPermissionPolicy interface {
+	implBetaManagedAgentsWriteToolConfigPermissionPolicyUnion()
+}
+
+func (BetaManagedAgentsAlwaysAllowPolicy) implBetaManagedAgentsWriteToolConfigPermissionPolicyUnion() {
+}
+func (BetaManagedAgentsAlwaysAskPolicy) implBetaManagedAgentsWriteToolConfigPermissionPolicyUnion() {}
+func (BetaManagedAgentsAutoPolicy) implBetaManagedAgentsWriteToolConfigPermissionPolicyUnion()      {}
+
+// Use the following switch statement to find the correct variant
+//
+//	switch variant := BetaManagedAgentsWriteToolConfigPermissionPolicyUnion.AsAny().(type) {
+//	case anthropic.BetaManagedAgentsAlwaysAllowPolicy:
+//	case anthropic.BetaManagedAgentsAlwaysAskPolicy:
+//	case anthropic.BetaManagedAgentsAutoPolicy:
+//	default:
+//	  fmt.Errorf("no variant present")
+//	}
+func (u BetaManagedAgentsWriteToolConfigPermissionPolicyUnion) AsAny() anyBetaManagedAgentsWriteToolConfigPermissionPolicy {
+	switch u.Type {
+	case "always_allow":
+		return u.AsAlwaysAllow()
+	case "always_ask":
+		return u.AsAlwaysAsk()
+	case "auto":
+		return u.AsAuto()
+	}
+	return nil
+}
+
+func (u BetaManagedAgentsWriteToolConfigPermissionPolicyUnion) AsAlwaysAllow() (v BetaManagedAgentsAlwaysAllowPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWriteToolConfigPermissionPolicyUnion) AsAlwaysAsk() (v BetaManagedAgentsAlwaysAskPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u BetaManagedAgentsWriteToolConfigPermissionPolicyUnion) AsAuto() (v BetaManagedAgentsAutoPolicy) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+// Returns the unmodified JSON received from the API
+func (u BetaManagedAgentsWriteToolConfigPermissionPolicyUnion) RawJSON() string { return u.JSON.raw }
+
+func (r *BetaManagedAgentsWriteToolConfigPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Configuration override for the write tool.
+//
+// The property Name is required.
+type BetaManagedAgentsWriteToolConfigParams struct {
+	// Whether this tool is enabled and available to Claude. Overrides the
+	// default_config setting.
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Permission policy for this tool. Controls whether tool calls are auto-approved
+	// or require confirmation.
+	PermissionPolicy BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion `json:"permission_policy,omitzero"`
+	// Any of "write".
+	Type BetaManagedAgentsWriteToolConfigParamsType `json:"type,omitzero"`
+	// Must be "write".
+	//
+	// This field can be elided, and will marshal its zero value as "write".
+	Name constant.Write `json:"name" default:"write"`
+	paramObj
+}
+
+func (r BetaManagedAgentsWriteToolConfigParams) MarshalJSON() (data []byte, err error) {
+	type shadow BetaManagedAgentsWriteToolConfigParams
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *BetaManagedAgentsWriteToolConfigParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion struct {
+	OfAlwaysAllow *BetaManagedAgentsAlwaysAllowPolicyParam `json:",omitzero,inline"`
+	OfAlwaysAsk   *BetaManagedAgentsAlwaysAskPolicyParam   `json:",omitzero,inline"`
+	OfAuto        *BetaManagedAgentsAutoPolicyParam        `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfAlwaysAllow, u.OfAlwaysAsk, u.OfAuto)
+}
+func (u *BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion) asAny() any {
+	if !param.IsOmitted(u.OfAlwaysAllow) {
+		return u.OfAlwaysAllow
+	} else if !param.IsOmitted(u.OfAlwaysAsk) {
+		return u.OfAlwaysAsk
+	} else if !param.IsOmitted(u.OfAuto) {
+		return u.OfAuto
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion) GetType() *string {
+	if vt := u.OfAlwaysAllow; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAlwaysAsk; vt != nil {
+		return (*string)(&vt.Type)
+	} else if vt := u.OfAuto; vt != nil {
+		return paramutil.AddrOrDefault(vt.Type)
+	}
+	return nil
+}
+
+func init() {
+	apijson.RegisterUnion[BetaManagedAgentsWriteToolConfigParamsPermissionPolicyUnion](
+		"type",
+		apijson.Discriminator[BetaManagedAgentsAlwaysAllowPolicyParam]("always_allow"),
+		apijson.Discriminator[BetaManagedAgentsAlwaysAskPolicyParam]("always_ask"),
+		apijson.Discriminator[BetaManagedAgentsAutoPolicyParam]("auto"),
+	)
+}
+
+type BetaManagedAgentsWriteToolConfigParamsType string
+
+const (
+	BetaManagedAgentsWriteToolConfigParamsTypeWrite BetaManagedAgentsWriteToolConfigParamsType = "write"
+)
+
 type BetaAgentNewParams struct {
 	// Model identifier. Accepts the
 	// [model string](https://platform.claude.com/docs/en/about-claude/models/overview#latest-models-comparison),
-	// e.g. `claude-opus-4-6`, or a `model_config` object for additional configuration
+	// e.g. `claude-opus-5-5`, or a `model_config` object for additional configuration
 	// control
 	Model BetaManagedAgentsModelConfigParams `json:"model,omitzero" api:"required"`
 	// Human-readable name for the agent.
@@ -2202,6 +6618,16 @@ type BetaAgentNewParams struct {
 	Description param.Opt[string] `json:"description,omitzero"`
 	// System prompt for the agent.
 	System param.Opt[string] `json:"system,omitzero"`
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// Execution principal for runs of this agent. Omitting it, sending null, or
+	// sending `{"type": "service_account"}` stores the default.
+	ExecutionIdentity BetaManagedAgentsExecutionIdentityParamsUnion `json:"execution_identity,omitzero"`
 	// MCP servers this agent connects to. Maximum 20. Names must be unique within the
 	// array. Every server must be referenced by an `mcp_toolset` in `tools`;
 	// unreferenced servers are rejected. See the
@@ -2210,15 +6636,15 @@ type BetaAgentNewParams struct {
 	// Arbitrary key-value metadata. Maximum 16 pairs, keys up to 64 chars, values up
 	// to 512 chars.
 	Metadata map[string]string `json:"metadata,omitzero"`
-	// A coordinator topology: the session's primary thread orchestrates work by
-	// spawning session threads, each running an agent drawn from the `agents` roster.
-	Multiagent BetaManagedAgentsMultiagentParams `json:"multiagent,omitzero"`
+	// Multiagent orchestration configuration.
+	Multiagent BetaManagedAgentsMultiagentParamsUnion `json:"multiagent,omitzero"`
 	// Skills available to the agent.
 	Skills []BetaManagedAgentsSkillParamsUnion `json:"skills,omitzero"`
-	// Tool configurations available to the agent. Maximum of 128 tools across all
+	// Tool configurations available to the agent. Maximum of 256 tools across all
 	// toolsets allowed.
 	Tools []BetaAgentNewParamsToolUnion `json:"tools,omitzero"`
-	// Optional header to specify the beta version(s) you want to use.
+	// This endpoint is in beta: requests must send `managed-agents-2026-04-01` in this
+	// header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -2315,14 +6741,14 @@ func (u BetaAgentNewParamsToolUnion) GetConfigs() (res betaAgentNewParamsToolUni
 	return
 }
 
-// Can have the runtime types [_[]BetaManagedAgentsAgentToolConfigParams],
+// Can have the runtime types [_[]BetaManagedAgentsAgentToolConfigParamsUnion],
 // [_[]BetaManagedAgentsMCPToolConfigParams]
 type betaAgentNewParamsToolUnionConfigs struct{ any }
 
 // Use the following switch statement to get the type of the union:
 //
 //	switch u.AsAny().(type) {
-//	case *[]anthropic.BetaManagedAgentsAgentToolConfigParams:
+//	case *[]anthropic.BetaManagedAgentsAgentToolConfigParamsUnion:
 //	case *[]anthropic.BetaManagedAgentsMCPToolConfigParams:
 //	default:
 //	    fmt.Errorf("not present")
@@ -2380,7 +6806,7 @@ func (u betaAgentNewParamsToolUnionDefaultConfig) GetPermissionPolicy() (res bet
 }
 
 // Can have the runtime types [*BetaManagedAgentsAlwaysAllowPolicyParam],
-// [*BetaManagedAgentsAlwaysAskPolicyParam]
+// [*BetaManagedAgentsAlwaysAskPolicyParam], [*BetaManagedAgentsAutoPolicyParam]
 type betaAgentNewParamsToolUnionDefaultConfigPermissionPolicy struct{ any }
 
 // Use the following switch statement to get the type of the union:
@@ -2388,6 +6814,7 @@ type betaAgentNewParamsToolUnionDefaultConfigPermissionPolicy struct{ any }
 //	switch u.AsAny().(type) {
 //	case *anthropic.BetaManagedAgentsAlwaysAllowPolicyParam:
 //	case *anthropic.BetaManagedAgentsAlwaysAskPolicyParam:
+//	case *anthropic.BetaManagedAgentsAutoPolicyParam:
 //	default:
 //	    fmt.Errorf("not present")
 //	}
@@ -2417,7 +6844,15 @@ type BetaAgentGetParams struct {
 	// Agent version. Omit for the most recent version. Must be at least 1 if
 	// specified.
 	Version param.Opt[int64] `query:"version,omitzero" json:"-"`
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `managed-agents-2026-04-01` in this
+	// header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -2431,16 +6866,24 @@ func (r BetaAgentGetParams) URLQuery() (v url.Values, err error) {
 }
 
 type BetaAgentUpdateParams struct {
-	// The agent's current version, used to prevent concurrent overwrites. Obtain this
-	// value from a create or retrieve response. The request fails if this does not
-	// match the server's current version.
-	Version int64 `json:"version" api:"required"`
 	// Description. Omit to preserve; send empty string or null to clear.
 	Description param.Opt[string] `json:"description,omitzero"`
 	// System prompt. Omit to preserve; send empty string or null to clear.
 	System param.Opt[string] `json:"system,omitzero"`
 	// Human-readable name. Must be non-empty. Omit to preserve. Cannot be cleared.
 	Name param.Opt[string] `json:"name,omitzero"`
+	// The agent's current version, used to prevent concurrent overwrites. Obtain this
+	// value from a create or retrieve response. Must be at least 1 if specified. When
+	// supplied, the request fails if it does not match the server's current version;
+	// omit to apply the update unconditionally.
+	Version param.Opt[int64] `json:"version,omitzero"`
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
 	// MCP servers. Full replacement. Omit to preserve; send empty array or `null` to
 	// clear. Names must be unique. Maximum 20. Every server must be referenced by an
 	// `mcp_toolset` in the agent's resulting `tools`; unreferenced servers are
@@ -2454,18 +6897,22 @@ type BetaAgentUpdateParams struct {
 	// Skills. Full replacement. Omit to preserve; send empty array or null to clear.
 	Skills []BetaManagedAgentsSkillParamsUnion `json:"skills,omitzero"`
 	// Tool configurations available to the agent. Full replacement. Omit to preserve;
-	// send empty array or null to clear. Maximum of 128 tools across all toolsets
+	// send empty array or null to clear. Maximum of 256 tools across all toolsets
 	// allowed.
 	Tools []BetaAgentUpdateParamsToolUnion `json:"tools,omitzero"`
+	// Execution principal for runs of this agent. Full replacement. Omit to preserve;
+	// send null or `{"type": "service_account"}` to restore the default.
+	ExecutionIdentity BetaManagedAgentsExecutionIdentityParamsUnion `json:"execution_identity,omitzero"`
 	// Model identifier. Accepts the
 	// [model string](https://platform.claude.com/docs/en/about-claude/models/overview#latest-models-comparison),
-	// e.g. `claude-opus-4-6`, or a `model_config` object for additional configuration
+	// e.g. `claude-opus-5-5`, or a `model_config` object for additional configuration
 	// control. Omit to preserve. Cannot be cleared.
 	Model BetaManagedAgentsModelConfigParams `json:"model,omitzero"`
-	// A coordinator topology: the session's primary thread orchestrates work by
-	// spawning session threads, each running an agent drawn from the `agents` roster.
-	Multiagent BetaManagedAgentsMultiagentParams `json:"multiagent,omitzero"`
-	// Optional header to specify the beta version(s) you want to use.
+	// Multiagent orchestration configuration. Full replacement. Omit to preserve; send
+	// null to clear.
+	Multiagent BetaManagedAgentsMultiagentParamsUnion `json:"multiagent,omitzero"`
+	// This endpoint is in beta: requests must send `managed-agents-2026-04-01` in this
+	// header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -2562,14 +7009,14 @@ func (u BetaAgentUpdateParamsToolUnion) GetConfigs() (res betaAgentUpdateParamsT
 	return
 }
 
-// Can have the runtime types [_[]BetaManagedAgentsAgentToolConfigParams],
+// Can have the runtime types [_[]BetaManagedAgentsAgentToolConfigParamsUnion],
 // [_[]BetaManagedAgentsMCPToolConfigParams]
 type betaAgentUpdateParamsToolUnionConfigs struct{ any }
 
 // Use the following switch statement to get the type of the union:
 //
 //	switch u.AsAny().(type) {
-//	case *[]anthropic.BetaManagedAgentsAgentToolConfigParams:
+//	case *[]anthropic.BetaManagedAgentsAgentToolConfigParamsUnion:
 //	case *[]anthropic.BetaManagedAgentsMCPToolConfigParams:
 //	default:
 //	    fmt.Errorf("not present")
@@ -2627,7 +7074,7 @@ func (u betaAgentUpdateParamsToolUnionDefaultConfig) GetPermissionPolicy() (res 
 }
 
 // Can have the runtime types [*BetaManagedAgentsAlwaysAllowPolicyParam],
-// [*BetaManagedAgentsAlwaysAskPolicyParam]
+// [*BetaManagedAgentsAlwaysAskPolicyParam], [*BetaManagedAgentsAutoPolicyParam]
 type betaAgentUpdateParamsToolUnionDefaultConfigPermissionPolicy struct{ any }
 
 // Use the following switch statement to get the type of the union:
@@ -2635,6 +7082,7 @@ type betaAgentUpdateParamsToolUnionDefaultConfigPermissionPolicy struct{ any }
 //	switch u.AsAny().(type) {
 //	case *anthropic.BetaManagedAgentsAlwaysAllowPolicyParam:
 //	case *anthropic.BetaManagedAgentsAlwaysAskPolicyParam:
+//	case *anthropic.BetaManagedAgentsAutoPolicyParam:
 //	default:
 //	    fmt.Errorf("not present")
 //	}
@@ -2671,7 +7119,15 @@ type BetaAgentListParams struct {
 	Limit param.Opt[int64] `query:"limit,omitzero" json:"-"`
 	// Opaque pagination cursor from a previous response.
 	Page param.Opt[string] `query:"page,omitzero" json:"-"`
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `managed-agents-2026-04-01` in this
+	// header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -2685,7 +7141,15 @@ func (r BetaAgentListParams) URLQuery() (v url.Values, err error) {
 }
 
 type BetaAgentArchiveParams struct {
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `managed-agents-2026-04-01` in this
+	// header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }

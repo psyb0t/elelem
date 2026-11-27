@@ -102,65 +102,231 @@ func toMessageParams(
 	return params, nil
 }
 
+// systemNoteOpen and systemNoteClose mark a mid-conversation system message
+// that has to ride inside a user turn, so the model can tell the instruction
+// apart from the user's own words.
+const (
+	systemNoteOpen  = "<system_note>\n"
+	systemNoteClose = "\n</system_note>"
+)
+
+// messageTranslator carries the state that crosses message boundaries while a
+// transcript is translated: the converted messages, the top-level system
+// blocks, the cache breakpoint budget, and whether the next user turn joins
+// the user message a system note was just placed in.
+type messageTranslator struct {
+	modelID       string
+	nativeSystem  bool
+	converted     []anthropicsdk.MessageParam
+	system        []anthropicsdk.TextBlockParam
+	breakpoints   int
+	mergeNextUser bool
+}
+
 func toAnthropicMessages(
 	ctx context.Context,
 	modelID string,
 	messages []elelem.Message,
 ) ([]anthropicsdk.MessageParam, []anthropicsdk.TextBlockParam, error) {
-	converted := make([]anthropicsdk.MessageParam, 0, len(messages))
+	translator := &messageTranslator{
+		modelID:      modelID,
+		nativeSystem: supportsMidConversationSystem(modelID),
+		converted:    make([]anthropicsdk.MessageParam, 0, len(messages)),
+	}
 
-	var system []anthropicsdk.TextBlockParam
+	index, err := translator.leadingSystem(messages)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	cacheBreakpoints := 0
-
-	for index := 0; index < len(messages); index++ {
-		message := messages[index]
-
-		if err := countCacheBreakpoint(message, &cacheBreakpoints); err != nil {
+	for index < len(messages) {
+		consumed, err := translator.translate(ctx, messages, index)
+		if err != nil {
 			return nil, nil, err
 		}
 
-		if index == 0 && message.Role == elelem.RoleSystem {
-			block := anthropicsdk.TextBlockParam{Text: message.Text()}
-			applyTextCacheHint(&block, message.CacheHint)
-			system = append(system, block)
-
-			continue
-		}
-
-		// EVERY tool_result answering one assistant turn must ride in the SAME
-		// user message. The engine emits one RoleTool per call and runs them in
-		// parallel, so consecutive results are coalesced here — splitting them
-		// across user messages leaves the later tool_use blocks unanswered and
-		// the provider rejects the request.
-		if message.Role == elelem.RoleTool {
-			results, consumed, err := toToolResultMessage(
-				messages[index:],
-				&cacheBreakpoints,
-			)
-			if err != nil {
-				return nil, nil, ctxerrors.Wrapf(
-					err,
-					"translate tool results at %d",
-					index,
-				)
-			}
-
-			converted = append(converted, results)
-			index += consumed - 1
-
-			continue
-		}
-
-		convertedMessage, err := toAnthropicMessage(ctx, modelID, message)
-		if err != nil {
-			return nil, nil, ctxerrors.Wrapf(err, "translate message %d", index)
-		}
-
-		converted = append(converted, convertedMessage)
+		index += consumed
 	}
 
-	return converted, system, nil
+	return translator.converted, translator.system, nil
+}
+
+// leadingSystem lifts the system messages that open the transcript into the
+// top-level `system` parameter and reports how many it consumed.
+func (t *messageTranslator) leadingSystem(
+	messages []elelem.Message,
+) (int, error) {
+	index := 0
+	for index < len(messages) && messages[index].Role == elelem.RoleSystem {
+		message := messages[index]
+		if err := countCacheBreakpoint(message, &t.breakpoints); err != nil {
+			return 0, err
+		}
+
+		block := anthropicsdk.TextBlockParam{Text: message.Text()}
+		applyTextCacheHint(&block, message.CacheHint)
+		t.system = append(t.system, block)
+		index++
+	}
+
+	return index, nil
+}
+
+// translate converts the message at index, plus any run that has to travel
+// with it, and reports how many messages it consumed.
+func (t *messageTranslator) translate(
+	ctx context.Context,
+	messages []elelem.Message,
+	index int,
+) (int, error) {
+	message := messages[index]
+
+	switch message.Role {
+	case elelem.RoleSystem:
+		consumed, err := t.laterSystem(messages[index:])
+		if err != nil {
+			return 0, ctxerrors.Wrapf(err, "translate system message %d", index)
+		}
+
+		return consumed, nil
+	case elelem.RoleTool:
+		// EVERY tool_result answering one assistant turn must ride in the
+		// SAME user message. The engine emits one RoleTool per call and runs
+		// them in parallel, so consecutive results are coalesced here —
+		// splitting them across user messages leaves the later tool_use
+		// blocks unanswered and the provider rejects the request.
+		if err := countCacheBreakpoint(message, &t.breakpoints); err != nil {
+			return 0, err
+		}
+
+		results, consumed, err := toToolResultMessage(
+			messages[index:],
+			&t.breakpoints,
+		)
+		if err != nil {
+			return 0, ctxerrors.Wrapf(
+				err,
+				"translate tool results at %d",
+				index,
+			)
+		}
+
+		t.converted = append(t.converted, results)
+		t.mergeNextUser = false
+
+		return consumed, nil
+	}
+
+	if err := countCacheBreakpoint(message, &t.breakpoints); err != nil {
+		return 0, err
+	}
+
+	convertedMessage, err := toAnthropicMessage(ctx, t.modelID, message)
+	if err != nil {
+		return 0, ctxerrors.Wrapf(err, "translate message %d", index)
+	}
+
+	if t.mergeNextUser && message.Role == elelem.RoleUser {
+		last := &t.converted[len(t.converted)-1]
+		last.Content = append(last.Content, convertedMessage.Content...)
+	} else {
+		t.converted = append(t.converted, convertedMessage)
+	}
+
+	t.mergeNextUser = false
+
+	return 1, nil
+}
+
+// laterSystem translates a run of system messages that comes after the
+// transcript has started, and reports how many it consumed.
+//
+// The Messages API takes a `role: "system"` message inside `messages` on the
+// models supportsMidConversationSystem lists, but only right after a user turn
+// (a tool_result turn counts) and only before an assistant turn or at the end
+// of the array; anywhere else is a 400. Where that holds, the run goes out
+// natively, one system message per elelem message: it keeps the instruction's
+// system authority and its position. Everywhere else, including every model
+// without the feature, each message becomes a user text block wrapped in
+// systemNoteOpen/systemNoteClose, appended to the user turn before it or
+// starting a new user turn that the next user message then joins, so user and
+// assistant turns still alternate.
+//
+// Neither form touches the top-level `system` parameter. Folding a later
+// instruction into it would change the start of the prompt every time one is
+// added and throw away the cached prefix; appending in place leaves every
+// earlier byte, and so every earlier cache breakpoint, as it was. Each block
+// carries its message's cache hint, so breakpoint placement and the budget
+// are the same as for any other message.
+func (t *messageTranslator) laterSystem(
+	messages []elelem.Message,
+) (int, error) {
+	run := 0
+	for run < len(messages) && messages[run].Role == elelem.RoleSystem {
+		err := countCacheBreakpoint(messages[run], &t.breakpoints)
+		if err != nil {
+			return 0, err
+		}
+
+		run++
+	}
+
+	nextIsAssistant := run == len(messages) ||
+		messages[run].Role == elelem.RoleAssistant
+	if t.nativeSystem && t.lastIsUser() && nextIsAssistant {
+		t.appendNativeSystem(messages[:run])
+	} else {
+		t.appendSystemNotes(messages[:run])
+	}
+
+	return run, nil
+}
+
+// appendNativeSystem sends each message as a `role: "system"` message.
+func (t *messageTranslator) appendNativeSystem(messages []elelem.Message) {
+	for _, message := range messages {
+		block := anthropicsdk.NewTextBlock(message.Text())
+		applyBlockCacheHint(&block, message.CacheHint)
+
+		t.converted = append(t.converted, anthropicsdk.MessageParam{
+			Role:    anthropicsdk.MessageParamRoleSystem,
+			Content: []anthropicsdk.ContentBlockParamUnion{block},
+		})
+	}
+
+	t.mergeNextUser = false
+}
+
+// appendSystemNotes sends each message as a marked note in a user turn: the
+// one just before it when there is one, otherwise a new one that the next
+// user message joins.
+func (t *messageTranslator) appendSystemNotes(messages []elelem.Message) {
+	notes := make([]anthropicsdk.ContentBlockParamUnion, 0, len(messages))
+	for _, message := range messages {
+		block := anthropicsdk.NewTextBlock(
+			systemNoteOpen + message.Text() + systemNoteClose,
+		)
+		applyBlockCacheHint(&block, message.CacheHint)
+		notes = append(notes, block)
+	}
+
+	if t.lastIsUser() {
+		last := &t.converted[len(t.converted)-1]
+		last.Content = append(last.Content, notes...)
+	} else {
+		t.converted = append(t.converted, anthropicsdk.NewUserMessage(notes...))
+	}
+
+	t.mergeNextUser = true
+}
+
+func (t *messageTranslator) lastIsUser() bool {
+	if len(t.converted) == 0 {
+		return false
+	}
+
+	return t.converted[len(t.converted)-1].Role ==
+		anthropicsdk.MessageParamRoleUser
 }
 
 // countCacheBreakpoint validates a message's cache hint and enforces the
@@ -272,24 +438,6 @@ func toToolResultBlock(
 	return block, nil
 }
 
-// toMidConvSystemMessage renders a mid-conversation system message.
-//
-// This is NOT model-gated, deliberately. `role: "system"` is a first-class
-// message role in the Messages API and mid_conv_system is documented as the
-// general alternative to the top-level `system` parameter — there is no model
-// table to consult. Gating it would silently downgrade tool-driven system
-// injection, which is this path's primary producer.
-func toMidConvSystemMessage(message elelem.Message) anthropicsdk.MessageParam {
-	system := []anthropicsdk.TextBlockParam{{Text: message.Text()}}
-	block := anthropicsdk.NewMidConvSystemBlock(system)
-	applyBlockCacheHint(&block, message.CacheHint)
-
-	return anthropicsdk.MessageParam{
-		Role:    anthropicsdk.MessageParamRoleSystem,
-		Content: []anthropicsdk.ContentBlockParamUnion{block},
-	}
-}
-
 func toAnthropicMessage(
 	ctx context.Context,
 	modelID string,
@@ -330,7 +478,13 @@ func toAnthropicMessage(
 			message.ToolCallID,
 		)
 	case elelem.RoleSystem:
-		return toMidConvSystemMessage(message), nil
+		// Unreachable: toAnthropicMessages lifts leading system messages into
+		// the top-level parameter and places later ones by position, which a
+		// single-message translation cannot see.
+		return anthropicsdk.MessageParam{}, ctxerrors.Wrap(
+			elelem.ErrInvalidTranscript,
+			"system message must be placed by position, not translated alone",
+		)
 	default:
 		return anthropicsdk.MessageParam{}, ctxerrors.Wrapf(
 			elelem.ErrInvalidTranscript,
@@ -1176,8 +1330,6 @@ func applyBlockCacheHint(
 		block.OfToolUse.CacheControl = control
 	case block.OfToolResult != nil:
 		block.OfToolResult.CacheControl = control
-	case block.OfMidConvSystem != nil:
-		block.OfMidConvSystem.CacheControl = control
 	}
 }
 

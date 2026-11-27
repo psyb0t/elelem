@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 package openai
 
@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/openai/openai-go/v3/internal/apijson"
+	"github.com/openai/openai-go/v3/internal/requestconfig"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/respjson"
 )
@@ -27,7 +28,7 @@ type BetaChatKitService struct {
 // there is one), and before any request-specific options.
 func NewBetaChatKitService(opts ...option.RequestOption) (r BetaChatKitService) {
 	r = BetaChatKitService{}
-	r.Options = opts
+	r.Options = requestconfig.InheritedOptions(opts...)
 	r.Sessions = NewBetaChatKitSessionService(opts...)
 	r.Threads = NewBetaChatKitThreadService(opts...)
 	return
@@ -63,21 +64,24 @@ func (r *ChatKitWorkflow) UnmarshalJSON(data []byte) error {
 }
 
 // ChatKitWorkflowStateVariableUnion contains all possible properties and values
-// from [string], [bool], [float64].
+// from [string], [int64], [bool], [float64].
 //
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 //
 // If the underlying value is not a json object, one of the following properties
-// will be valid: OfString OfBool OfFloat]
+// will be valid: OfString OfInt OfBool OfFloat]
 type ChatKitWorkflowStateVariableUnion struct {
 	// This field will be present if the value is a [string] instead of an object.
 	OfString string `json:",inline"`
+	// This field will be present if the value is a [int64] instead of an object.
+	OfInt int64 `json:",inline"`
 	// This field will be present if the value is a [bool] instead of an object.
 	OfBool bool `json:",inline"`
 	// This field will be present if the value is a [float64] instead of an object.
 	OfFloat float64 `json:",inline"`
 	JSON    struct {
 		OfString respjson.Field
+		OfInt    respjson.Field
 		OfBool   respjson.Field
 		OfFloat  respjson.Field
 		raw      string
@@ -85,17 +89,22 @@ type ChatKitWorkflowStateVariableUnion struct {
 }
 
 func (u ChatKitWorkflowStateVariableUnion) AsString() (v string) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u ChatKitWorkflowStateVariableUnion) AsInt() (v int64) {
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u ChatKitWorkflowStateVariableUnion) AsBool() (v bool) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u ChatKitWorkflowStateVariableUnion) AsFloat() (v float64) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 

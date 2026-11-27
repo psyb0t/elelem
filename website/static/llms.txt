@@ -1,0 +1,19 @@
+# elelem
+
+> A Go library for LLM requests on OpenAI-compatible, Anthropic and Z.ai Coding models, with streaming, tool loops, history budgets, retries and typed replies.
+
+- [Home](https://psyb0t.github.io/elelem/): Install the module, run a first request, and find the reference pages.
+- [Requests](https://psyb0t.github.io/elelem/requests/): Every request builder method, terminal calls, streaming, the tool loop, queued input, bounds and Response.
+- [Prompts](https://psyb0t.github.io/elelem/prompts/): The immutable Prompt, history and origins, and image, audio and file content parts.
+- [Callbacks](https://psyb0t.github.io/elelem/callbacks/): The sixteen callbacks, their ordering guarantees and error behavior.
+- [Tools](https://psyb0t.github.io/elelem/tools/): Tool handlers, images in results, the hook lifecycle, message injection and denial.
+- [MCP client](https://psyb0t.github.io/elelem/mcp/): MCP servers over stdio or Streamable HTTP, their tools, resources, prompts, completion, elicitation and progress.
+- [History](https://psyb0t.github.io/elelem/history/): Token budgets, transcript units, limiting handlers and counting.
+- [Retries](https://psyb0t.github.io/elelem/retries/): The retry decorator, failure classification, backoff and sentinels.
+- [Structured output](https://psyb0t.github.io/elelem/structured-output/): RunInto, JSON schema and JSON mode, validation and repair.
+- [Drivers](https://psyb0t.github.io/elelem/drivers/): The OpenAI-compatible, Anthropic and Z.ai Coding drivers and the Driver contract.
+- [Security](https://psyb0t.github.io/elelem/security/): Untrusted inputs, the bounds elelem applies, and the ones you must set.
+- [Logging](https://psyb0t.github.io/elelem/logging/): Log levels, scope attributes and the stable LogReason values.
+- [Testing](https://psyb0t.github.io/elelem/testing/): ScriptedDriver, MockDriver and the driver conformance suite.
+- [Development](https://psyb0t.github.io/elelem/development/): Package layout, Make targets, CI and documentation builds.
+- [Go API reference](https://pkg.go.dev/github.com/psyb0t/elelem): Exported Go types and functions.

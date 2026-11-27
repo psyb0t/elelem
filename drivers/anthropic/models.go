@@ -186,6 +186,40 @@ func supportsSamplingParams(id string) bool {
 	return !slices.Contains(samplingRestrictedModelIDs(), canonicalModelID(id))
 }
 
+// midConversationSystemModelIDs lists the model families that accept a
+// `role: "system"` message inside `messages`, from the availability table of
+// the Claude docs page "Mid-conversation system messages and tool changes"
+// (build-with-claude/mid-conversation-system-messages). An entry matches
+// itself and any id that extends it with "-", so claude-opus-5 also covers
+// claude-opus-5-5. Claude Sonnet 5 is absent on purpose: the docs say it does
+// not have the feature.
+func midConversationSystemModelIDs() []string {
+	return []string{
+		modelOpus48,
+		modelOpus5,
+		modelFable5,
+		modelMythos5,
+		"claude-sonnet-5-5",
+		"claude-haiku-5-5",
+	}
+}
+
+// supportsMidConversationSystem reports whether the model accepts a system
+// message after the conversation has started.
+//
+// DENIES unlisted ids. The fallback, a marked note inside a user turn, works
+// on every model, while a system message sent to a model without the feature
+// is a 400 for the whole request.
+func supportsMidConversationSystem(id string) bool {
+	for _, known := range midConversationSystemModelIDs() {
+		if id == known || strings.HasPrefix(id, known+"-") {
+			return true
+		}
+	}
+
+	return false
+}
+
 // supportsStructuredOutput reports whether the model accepts native structured
 // output (output_config.format) and strict tool arguments.
 //

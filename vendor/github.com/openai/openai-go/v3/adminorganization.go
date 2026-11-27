@@ -1,8 +1,9 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 package openai
 
 import (
+	"github.com/openai/openai-go/v3/internal/requestconfig"
 	"github.com/openai/openai-go/v3/option"
 )
 
@@ -15,17 +16,21 @@ import (
 type AdminOrganizationService struct {
 	Options []option.RequestOption
 	// List user actions and configuration changes within this organization.
-	AuditLogs     AdminOrganizationAuditLogService
-	AdminAPIKeys  AdminOrganizationAdminAPIKeyService
-	Usage         AdminOrganizationUsageService
-	Invites       AdminOrganizationInviteService
-	Users         AdminOrganizationUserService
-	Groups        AdminOrganizationGroupService
-	Roles         AdminOrganizationRoleService
-	DataRetention AdminOrganizationDataRetentionService
-	SpendAlerts   AdminOrganizationSpendAlertService
-	Certificates  AdminOrganizationCertificateService
-	Projects      AdminOrganizationProjectService
+	AuditLogs                 AdminOrganizationAuditLogService
+	AdminAPIKeys              AdminOrganizationAdminAPIKeyService
+	Usage                     AdminOrganizationUsageService
+	Invites                   AdminOrganizationInviteService
+	Users                     AdminOrganizationUserService
+	Groups                    AdminOrganizationGroupService
+	Roles                     AdminOrganizationRoleService
+	DataRetention             AdminOrganizationDataRetentionService
+	WorkloadIdentityProviders AdminOrganizationWorkloadIdentityProviderService
+	ExternalStorage           AdminOrganizationExternalStorageService
+	SpendLimit                AdminOrganizationSpendLimitService
+	SpendAlerts               AdminOrganizationSpendAlertService
+	Certificates              AdminOrganizationCertificateService
+	Projects                  AdminOrganizationProjectService
+	ExternalKeys              AdminOrganizationExternalKeyService
 }
 
 // NewAdminOrganizationService generates a new service that applies the given
@@ -33,7 +38,7 @@ type AdminOrganizationService struct {
 // options (if there is one), and before any request-specific options.
 func NewAdminOrganizationService(opts ...option.RequestOption) (r AdminOrganizationService) {
 	r = AdminOrganizationService{}
-	r.Options = opts
+	r.Options = requestconfig.InheritedOptions(opts...)
 	r.AuditLogs = NewAdminOrganizationAuditLogService(opts...)
 	r.AdminAPIKeys = NewAdminOrganizationAdminAPIKeyService(opts...)
 	r.Usage = NewAdminOrganizationUsageService(opts...)
@@ -42,8 +47,12 @@ func NewAdminOrganizationService(opts ...option.RequestOption) (r AdminOrganizat
 	r.Groups = NewAdminOrganizationGroupService(opts...)
 	r.Roles = NewAdminOrganizationRoleService(opts...)
 	r.DataRetention = NewAdminOrganizationDataRetentionService(opts...)
+	r.WorkloadIdentityProviders = NewAdminOrganizationWorkloadIdentityProviderService(opts...)
+	r.ExternalStorage = NewAdminOrganizationExternalStorageService(opts...)
+	r.SpendLimit = NewAdminOrganizationSpendLimitService(opts...)
 	r.SpendAlerts = NewAdminOrganizationSpendAlertService(opts...)
 	r.Certificates = NewAdminOrganizationCertificateService(opts...)
 	r.Projects = NewAdminOrganizationProjectService(opts...)
+	r.ExternalKeys = NewAdminOrganizationExternalKeyService(opts...)
 	return
 }

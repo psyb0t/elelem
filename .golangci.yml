@@ -50,7 +50,7 @@ linters:
     - godox
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - gosmopolitan
@@ -114,6 +114,19 @@ linters:
         - stdlib
         - generic
         - github.com/psyb0t/elelem\.(Driver|TokenCounter)
+    staticcheck:
+      # golangci-lint's default set, named so SA1019 (use of an API marked
+      # Deprecated:) stays on. The MCP SDK marks roots, sampling, and
+      # logging deprecated, and elelem must not call them.
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - SA1019
     wsl_v5:
       allow-first-in-block: true
       allow-whole-block: false
@@ -153,11 +166,14 @@ linters:
       - builtin$
       - examples$
     rules:
+      # Table cases repeat their literals on purpose; goconst checks test
+      # files since golangci-lint v2.13.
       - path: _test\.go
         linters:
           - cyclop
           - funlen
           - gocognit
+          - goconst
           - maintidx
           - wrapcheck
 formatters:

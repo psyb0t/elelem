@@ -14,10 +14,15 @@ type EnforceSwitchStyleRule struct {
 	allowDefaultNotLast bool // allow default, if present, not being the last case
 }
 
+var _ lint.ConfigurableRule = (*EnforceSwitchStyleRule)(nil)
+
 // Configure validates the rule configuration, and configures the rule accordingly.
 //
 // Configuration implements the [lint.ConfigurableRule] interface.
 func (r *EnforceSwitchStyleRule) Configure(arguments lint.Arguments) error {
+	r.allowNoDefault = false
+	r.allowDefaultNotLast = false
+
 	if len(arguments) < 1 {
 		return nil
 	}
@@ -45,12 +50,20 @@ func (r *EnforceSwitchStyleRule) Apply(file *lint.File, _ lint.Arguments) []lint
 	var failures []lint.Failure
 	astFile := file.AST
 	ast.Inspect(astFile, func(n ast.Node) bool {
-		switchNode, ok := n.(*ast.SwitchStmt)
-		if !ok {
+		var body *ast.BlockStmt
+		var node ast.Node
+		switch s := n.(type) {
+		case *ast.SwitchStmt:
+			body = s.Body
+			node = s
+		case *ast.TypeSwitchStmt:
+			body = s.Body
+			node = s
+		default:
 			return true // not a switch statement
 		}
 
-		defaultClause, isLast := r.seekDefaultCase(switchNode.Body)
+		defaultClause, isLast := r.seekDefaultCase(body)
 		hasDefault := defaultClause != nil
 
 		if !hasDefault && r.allowNoDefault {
@@ -59,10 +72,10 @@ func (r *EnforceSwitchStyleRule) Apply(file *lint.File, _ lint.Arguments) []lint
 
 		if !hasDefault && !r.allowNoDefault {
 			// switch without default
-			if !r.allBranchesEndWithJumpStmt(switchNode) {
+			if !r.allBranchesEndWithJumpStmt(body) {
 				failures = append(failures, lint.Failure{
 					Confidence: 1,
-					Node:       switchNode,
+					Node:       node,
 					Category:   lint.FailureCategoryStyle,
 					Failure:    "switch must have a default case clause",
 				})
@@ -103,8 +116,8 @@ func (*EnforceSwitchStyleRule) seekDefaultCase(body *ast.BlockStmt) (defaultClau
 	return defaultClause, defaultClause == last
 }
 
-func (*EnforceSwitchStyleRule) allBranchesEndWithJumpStmt(switchStmt *ast.SwitchStmt) bool {
-	for _, stmt := range switchStmt.Body.List {
+func (*EnforceSwitchStyleRule) allBranchesEndWithJumpStmt(body *ast.BlockStmt) bool {
+	for _, stmt := range body.List {
 		caseClause := stmt.(*ast.CaseClause) // safe to assume stmt is a case clause
 
 		caseBody := caseClause.Body

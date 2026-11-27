@@ -1,0 +1,41 @@
+title = "aichteeteapee secret scanning"
+
+[extend]
+useDefault = true
+
+# gitleaks' `dir` mode walks the working tree and does NOT honour .gitignore, so
+# every gitignored local path is named again here. Nothing gitignored is tracked
+# by git. The committed Go vendor/ tree is intentionally NOT listed: it ships to
+# consumers, so it gets scanned. Verify with `git check-ignore <path>` before
+# adding a line; an entry for a committed source path silences real leaks.
+#
+# Fake secrets in tracked _test.go fixtures are handled separately: an inline
+# `//gitleaks:allow` in bearer_auth_test.go, and `.gitleaksignore` fingerprints
+# for server_test.go. A global allowlist here only reaches the default rules
+# pulled in by `useDefault` when it names them in `targetRules`.
+[[allowlists]]
+description = "Gitignored local scratch, caches, and scan artifacts"
+paths = [
+  '''(^|/)\.env$''',
+  '''(^|/)\.vscode(?:/|$)''',
+  '''(^|/)\.telemetry(?:/|$)''',
+  '''(^|/)\.research_files(?:/|$)''',
+  '''(^|/)__pycache__(?:/|$)''',
+  '''(^|/)sec\.sarif$''',
+  '''(^|/)coverage-percent\.txt$''',
+  '''(^|/)git-update\.sh$''',
+  '''(^|/)\.testing(?:/|$)''',
+]
+
+# CI checks out one commit (fetch-depth 1), so `gitleaks git` reports every
+# tracked line under the current HEAD sha. The commit-bound fingerprints in
+# .gitleaksignore cannot match a sha that changes on every push, so the two
+# request-id fixtures in recovery_test.go are allowed here by rule, path, and
+# exact value. All three must match.
+[[allowlists]]
+description = "Request-id fixtures in recovery_test.go (shallow-clone scan)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^serbewr/middleware/recovery_test\.go$''']
+regexTarget = "match"
+regexes = ['''"panic-req-456"''', '''"panic-test-789"''']

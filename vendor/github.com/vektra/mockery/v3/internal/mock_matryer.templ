@@ -16,9 +16,17 @@ package {{.PkgName}}
 	{{- $_ := .Registry.AddImport "sync" "sync" }}
 {{- end }}
 
+{{- range .Interfaces }}
+	{{- range (index .TemplateData "add-import") }}
+		{{- $_ := $.Registry.AddImportWithAlias .name .pkgPath }}
+	{{- end }}
+{{- end }}
+
 {{$srcPkgQualifier := $.SrcPkgQualifier}}
-{{- if not (index .TemplateData "skip-ensure") }}
-	{{- $_ := $.Registry.AddImport $.Registry.SrcPkgName $.Registry.SrcPkg.PkgPath }}
+{{- range .Interfaces }}
+	{{- if not (index .TemplateData "skip-ensure") }}
+		{{- $_ := $.Registry.AddImport $.Registry.SrcPkgName $.Registry.SrcPkg.PkgPath }}
+	{{- end }}
 {{- end }}
 
 import (
@@ -36,22 +44,13 @@ import (
 {{- if not (index $mock.TemplateData "skip-ensure") -}}
 // Ensure that {{.StructName}} does implement {{$srcPkgQualifier}}{{.Name}}.
 // If this is not the case, regenerate this file with mockery.
-var _ {{$srcPkgQualifier}}{{.Name -}}
-	{{- if .TypeParams }}[
-		{{- range $index, $param := .TypeParams}}
-			{{- if $index}}, {{end -}}
-			{{if $param.Constraint}}{{$param.Constraint.String}}{{else}}{{$param.TypeString}}{{end}}
-		{{- end -}}
-		]
-	{{- end }} = &{{.StructName}}
-	 {{- if .TypeParams }}[
-		{{- range $index, $param := .TypeParams}}
-			{{- if $index}}, {{end -}}
-			{{if $param.Constraint}}{{$param.Constraint.String}}{{else}}{{$param.TypeString}}{{end}}
-		{{- end -}}
-		]
-	{{- end -}}
-{}
+{{- if .TypeParams }}
+func _{{ $mock.TypeConstraint }}() {
+	var _ {{$srcPkgQualifier}}{{.Name}}{{ $mock.TypeInstantiation }} = &{{.StructName}}{{ $mock.TypeInstantiation }}{}
+}
+{{- else }}
+var _ {{$srcPkgQualifier}}{{.Name}} = &{{.StructName}}{}
+{{- end }}
 {{- end}}
 
 // {{.StructName}} is a mock implementation of {{$srcPkgQualifier}}{{.Name}}.
@@ -77,6 +76,9 @@ type {{.StructName}}
 			{{- if $index}}, {{end}}{{$param.Name | exported}} {{$param.TypeString}}
 	{{- end -}}]
 {{- end }} struct {
+{{- with (index .TemplateData "struct-preamble") }}
+	{{ . }}
+{{- end }}
 {{- range .Methods}}
 	// {{.Name}}Func mocks the {{.Name}} method.
 	{{.Name}}Func func({{.ArgList}}) {{.ReturnArgTypeList}}
@@ -98,14 +100,16 @@ type {{.StructName}}
 {{- end}}
 }
 {{range .Methods}}
+{{- $recv := .Scope.AllocateName "mock" }}
+{{- $callInfo := .Scope.AllocateName "callInfo" }}
 // {{.Name}} calls {{.Name}}Func.
-func (mock *{{$mock.StructName}}{{ $mock.TypeInstantiation }}) {{.Name}}({{.ArgList}}) {{.ReturnArgTypeList}} {
+func ({{$recv}} *{{$mock.StructName}}{{ $mock.TypeInstantiation }}) {{.Name}}({{.ArgList}}) {{.ReturnArgTypeList}} {
 {{- if not (index $mock.TemplateData "stub-impl") }}
-	if mock.{{.Name}}Func == nil {
+	if {{$recv}}.{{.Name}}Func == nil {
 		panic("{{$mock.StructName}}.{{.Name}}Func: method is nil but {{$mock.Name}}.{{.Name}} was just called")
 	}
 {{- end}}
-	callInfo := struct {
+	{{$callInfo}} := struct {
 		{{- range .Params}}
 		{{.Name | exported}} {{.TypeString}}
 		{{- end}}
@@ -114,12 +118,12 @@ func (mock *{{$mock.StructName}}{{ $mock.TypeInstantiation }}) {{.Name}}({{.ArgL
 		{{.Name | exported}}: {{.Name}},
 		{{- end}}
 	}
-	mock.lock{{.Name}}.Lock()
-	mock.calls.{{.Name}} = append(mock.calls.{{.Name}}, callInfo)
-	mock.lock{{.Name}}.Unlock()
+	{{$recv}}.lock{{.Name}}.Lock()
+	{{$recv}}.calls.{{.Name}} = append({{$recv}}.calls.{{.Name}}, {{$callInfo}})
+	{{$recv}}.lock{{.Name}}.Unlock()
 {{- if .Returns}}
 	{{- if (index $mock.TemplateData "stub-impl") }}
-	if mock.{{.Name}}Func == nil {
+	if {{$recv}}.{{.Name}}Func == nil {
 		var (
 		{{- range .Returns}}
 			{{.Name}} {{.TypeString}}
@@ -128,14 +132,14 @@ func (mock *{{$mock.StructName}}{{ $mock.TypeInstantiation }}) {{.Name}}({{.ArgL
 		return {{.ReturnArgNameList}}
 	}
 	{{- end}}
-	return mock.{{.Name}}Func({{.ArgCallList}})
+	return {{$recv}}.{{.Name}}Func({{.ArgCallList}})
 {{- else}}
 	{{- if (index $mock.TemplateData "stub-impl") }}
-	if mock.{{.Name}}Func == nil {
+	if {{$recv}}.{{.Name}}Func == nil {
 		return
 	}
 	{{- end}}
-	mock.{{.Name}}Func({{.ArgCallList}})
+	{{$recv}}.{{.Name}}Func({{.ArgCallList}})
 {{- end}}
 }
 

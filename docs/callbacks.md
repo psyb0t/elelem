@@ -1,7 +1,6 @@
 ---
 title: "Callbacks"
 description: "The sixteen elelem callbacks for run, round, text, reasoning, tool calls, retries and token limits, with ordering guarantees and error behavior."
-nav_order: 4
 ---
 
 # Callbacks

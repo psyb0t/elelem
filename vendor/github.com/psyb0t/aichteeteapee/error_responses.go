@@ -50,6 +50,16 @@ var (
 		Message: "Gone",
 	}
 
+	ErrorResponsePayloadTooLarge = ErrorResponse{
+		Code:    ErrorCodePayloadTooLarge,
+		Message: "Payload too large",
+	}
+
+	ErrorResponseMisdirectedRequest = ErrorResponse{
+		Code:    ErrorCodeMisdirectedRequest,
+		Message: "Misdirected request",
+	}
+
 	ErrorResponseUnprocessableEntity = ErrorResponse{
 		Code:    ErrorCodeUnprocessableEntity,
 		Message: "Unprocessable entity",

@@ -178,7 +178,7 @@ var Analyzer = &lint.Analyzer{
 		Doc:        "Unused code",
 		Run:        run,
 		Requires:   []*analysis.Analyzer{generated.Analyzer, directives.Analyzer},
-		ResultType: reflect.TypeOf(Result{}),
+		ResultType: reflect.TypeFor[Result](),
 	},
 }
 
@@ -551,8 +551,7 @@ func (g *graph) entry() {
 	}
 	processMethodSet := func(named *types.TypeName, ms *types.MethodSet) {
 		if g.opts.ExportedIsUsed {
-			for i := 0; i < ms.Len(); i++ {
-				m := ms.At(i)
+			for m := range ms.Methods() {
 				if token.IsExported(m.Obj().Name()) {
 					// (2.1) named types use exported methods
 					// (6.4) structs use embedded fields that have exported methods
@@ -650,13 +649,13 @@ func (g *graph) entry() {
 						}
 					}
 					if typ, ok := types.Unalias(obj.Type()).(*types.Named); ok {
-						for i := 0; i < typ.NumMethods(); i++ {
-							g.use(typ.Method(i), nil)
+						for method := range typ.Methods() {
+							g.use(method, nil)
 						}
 					}
 					if typ, ok := obj.Type().Underlying().(*types.Struct); ok {
-						for i := 0; i < typ.NumFields(); i++ {
-							g.use(typ.Field(i), nil)
+						for field := range typ.Fields() {
+							g.use(field, nil)
 						}
 					}
 				}
@@ -734,8 +733,8 @@ func (g *graph) read(node ast.Node, by types.Object) {
 			if g.opts.FieldWritesAreUses && unkeyed {
 				// Untagged struct literal that specifies all fields. We have to manually use the fields in the type,
 				// because the unkeyd literal doesn't contain any nodes referring to the fields.
-				for i := 0; i < typ.NumFields(); i++ {
-					g.use(typ.Field(i), by)
+				for field := range typ.Fields() {
+					g.use(field, by)
 				}
 			}
 			if g.opts.FieldWritesAreUses || unkeyed {
@@ -747,6 +746,20 @@ func (g *graph) read(node ast.Node, by types.Object) {
 					kv := elt.(*ast.KeyValueExpr)
 					g.write(kv.Key, by)
 					g.read(kv.Value, by)
+				}
+			}
+			if g.opts.FieldWritesAreUses && !unkeyed {
+				for _, elt := range node.Elts {
+					kv := elt.(*ast.KeyValueExpr)
+					fname := kv.Key.(*ast.Ident).Name
+					_, index, _ := types.LookupFieldOrMethod(typ, true, g.pkg, fname)
+
+					cur := typ
+					for _, step := range index[:len(index)-1] {
+						field := cur.Field(step)
+						g.use(field, by)
+						cur = typeutil.CoreType(field.Type()).(*types.Struct)
+					}
 				}
 			}
 		} else {
@@ -932,8 +945,7 @@ func (g *graph) read(node ast.Node, by types.Object) {
 func (g *graph) useAllFieldsRecursively(typ types.Type, by types.Object) {
 	switch typ := typ.Underlying().(type) {
 	case *types.Struct:
-		for i := 0; i < typ.NumFields(); i++ {
-			field := typ.Field(i)
+		for field := range typ.Fields() {
 			g.use(field, by)
 			g.useAllFieldsRecursively(field.Type(), by)
 		}
@@ -1342,7 +1354,7 @@ func (g *graph) stmt(stmt ast.Stmt, by types.Object) {
 				g.read(comm.Chan, by)
 				g.read(comm.Value, by)
 			case *ast.ExprStmt:
-				g.read(astutil.Unparen(comm.X).(*ast.UnaryExpr).X, by)
+				g.read(ast.Unparen(comm.X).(*ast.UnaryExpr).X, by)
 			case *ast.AssignStmt:
 				for _, lhs := range comm.Lhs {
 					g.write(lhs, by)
@@ -1514,8 +1526,7 @@ func (g *graph) namedType(typ *types.TypeName, spec ast.Expr) {
 					return false
 				}
 				seen[t] = struct{}{}
-				for i := 0; i < t.NumFields(); i++ {
-					field := t.Field(i)
+				for field := range t.Fields() {
 					if field.Exported() {
 						return true
 					}

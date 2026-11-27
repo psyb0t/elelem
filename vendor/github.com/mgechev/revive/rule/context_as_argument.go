@@ -9,7 +9,7 @@ import (
 	"github.com/mgechev/revive/lint"
 )
 
-// ContextAsArgumentRule suggests that `context.Context` should be the first argument of a function.
+// ContextAsArgumentRule suggests that [context.Context] should be the first argument of a function.
 type ContextAsArgumentRule struct {
 	allowTypes map[string]struct{}
 }
@@ -54,6 +54,8 @@ func (r *ContextAsArgumentRule) Apply(file *lint.File, _ lint.Arguments) []lint.
 func (*ContextAsArgumentRule) Name() string {
 	return "context-as-argument"
 }
+
+var _ lint.ConfigurableRule = (*ContextAsArgumentRule)(nil)
 
 // Configure validates the rule configuration, and configures the rule accordingly.
 //

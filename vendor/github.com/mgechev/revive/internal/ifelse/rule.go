@@ -15,7 +15,7 @@ type CheckFunc func(Chain) (string, bool)
 // Apply evaluates the given Rule on if-else chains found within the given AST,
 // and returns the failures.
 //
-// Note that in if-else chain with multiple "if" blocks, only the *last* one is checked,
+// Note that in if-else chain with multiple "if" blocks, only the "last" one is checked,
 // that is to say, given:
 //
 //	if foo {
@@ -129,6 +129,7 @@ func (v *visitor) checkRule(ifStmt *ast.IfStmt, chain Chain) {
 		msg += " (move short variable declaration to its own line if necessary)"
 	}
 	v.failures = append(v.failures, lint.Failure{
+		Category:   lint.FailureCategoryStyle,
 		Confidence: 1,
 		Node:       v.target.node(ifStmt),
 		Failure:    msg,

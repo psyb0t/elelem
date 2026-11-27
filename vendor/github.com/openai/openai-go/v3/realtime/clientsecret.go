@@ -1,4 +1,4 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 package realtime
 
@@ -32,7 +32,7 @@ type ClientSecretService struct {
 // there is one), and before any request-specific options.
 func NewClientSecretService(opts ...option.RequestOption) (r ClientSecretService) {
 	r = ClientSecretService{}
-	r.Options = opts
+	r.Options = requestconfig.InheritedOptions(opts...)
 	return
 }
 
@@ -47,7 +47,7 @@ func NewClientSecretService(opts ...option.RequestOption) (r ClientSecretService
 // will be applied to any sessions created using that client secret, but these can
 // also be overridden by the client connection.
 //
-// [Learn more about authentication with client secrets over WebRTC](https://platform.openai.com/docs/guides/realtime-webrtc).
+// [Learn more about authentication with client secrets over WebRTC](https://developers.openai.com/api/docs/guides/realtime-webrtc).
 //
 // Returns the created client secret and the effective session object. The client
 // secret is a string that looks like `ek_1234`.
@@ -104,7 +104,7 @@ type RealtimeSessionCreateResponse struct {
 	// Any of "text", "audio".
 	OutputModalities []string `json:"output_modalities"`
 	// Reference to a prompt template and its variables.
-	// [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+	// [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
 	Prompt responses.ResponsePrompt `json:"prompt" api:"nullable"`
 	// Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
 	Reasoning RealtimeReasoning `json:"reasoning"`
@@ -238,6 +238,10 @@ func (r *RealtimeSessionCreateResponseAudioInput) UnmarshalJSON(data []byte) err
 // detection accuracy (reducing false positives) and model performance by improving
 // perception of the input audio.
 type RealtimeSessionCreateResponseAudioInputNoiseReduction struct {
+	// Input noise suppression strength. Higher values apply more suppression. Defaults
+	// to 1 when noise reduction is first enabled. Omitting strength from a session
+	// update preserves the current strength.
+	Strength float64 `json:"strength"`
 	// Type of noise reduction. `near_field` is for close-talking microphones such as
 	// headphones, `far_field` is for far-field microphones such as laptop or
 	// conference room microphones.
@@ -246,6 +250,7 @@ type RealtimeSessionCreateResponseAudioInputNoiseReduction struct {
 	Type NoiseReductionType `json:"type"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
+		Strength    respjson.Field
 		Type        respjson.Field
 		ExtraFields map[string]respjson.Field
 		raw         string
@@ -332,12 +337,12 @@ func (u RealtimeSessionCreateResponseAudioInputTurnDetectionUnion) AsAny() anyRe
 }
 
 func (u RealtimeSessionCreateResponseAudioInputTurnDetectionUnion) AsServerVad() (v RealtimeSessionCreateResponseAudioInputTurnDetectionServerVad) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseAudioInputTurnDetectionUnion) AsSemanticVad() (v RealtimeSessionCreateResponseAudioInputTurnDetectionSemanticVad) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -507,12 +512,12 @@ type RealtimeSessionCreateResponseMaxOutputTokensUnion struct {
 }
 
 func (u RealtimeSessionCreateResponseMaxOutputTokensUnion) AsInt() (v int64) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseMaxOutputTokensUnion) AsInf() (v constant.Inf) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -527,11 +532,17 @@ func (r *RealtimeSessionCreateResponseMaxOutputTokensUnion) UnmarshalJSON(data [
 type RealtimeSessionCreateResponseModel string
 
 const (
-	RealtimeSessionCreateResponseModelGPTRealtime                        RealtimeSessionCreateResponseModel = "gpt-realtime"
-	RealtimeSessionCreateResponseModelGPTRealtime1_5                     RealtimeSessionCreateResponseModel = "gpt-realtime-1.5"
-	RealtimeSessionCreateResponseModelGPTRealtime2                       RealtimeSessionCreateResponseModel = "gpt-realtime-2"
-	RealtimeSessionCreateResponseModelGPTRealtime2_1                     RealtimeSessionCreateResponseModel = "gpt-realtime-2.1"
-	RealtimeSessionCreateResponseModelGPTRealtime2_1Mini                 RealtimeSessionCreateResponseModel = "gpt-realtime-2.1-mini"
+	// Deprecated: Announced shutdown date: 2027-01-20. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	RealtimeSessionCreateResponseModelGPTRealtime        RealtimeSessionCreateResponseModel = "gpt-realtime"
+	RealtimeSessionCreateResponseModelGPTRealtime1_5     RealtimeSessionCreateResponseModel = "gpt-realtime-1.5"
+	RealtimeSessionCreateResponseModelGPTRealtime2       RealtimeSessionCreateResponseModel = "gpt-realtime-2"
+	RealtimeSessionCreateResponseModelGPTRealtime2_1     RealtimeSessionCreateResponseModel = "gpt-realtime-2.1"
+	RealtimeSessionCreateResponseModelGPTRealtime2_1Mini RealtimeSessionCreateResponseModel = "gpt-realtime-2.1-mini"
+	// Deprecated: Announced shutdown date: 2027-01-20. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
 	RealtimeSessionCreateResponseModelGPTRealtime2025_08_28              RealtimeSessionCreateResponseModel = "gpt-realtime-2025-08-28"
 	RealtimeSessionCreateResponseModelGPT4oRealtimePreview               RealtimeSessionCreateResponseModel = "gpt-4o-realtime-preview"
 	RealtimeSessionCreateResponseModelGPT4oRealtimePreview2024_10_01     RealtimeSessionCreateResponseModel = "gpt-4o-realtime-preview-2024-10-01"
@@ -539,13 +550,25 @@ const (
 	RealtimeSessionCreateResponseModelGPT4oRealtimePreview2025_06_03     RealtimeSessionCreateResponseModel = "gpt-4o-realtime-preview-2025-06-03"
 	RealtimeSessionCreateResponseModelGPT4oMiniRealtimePreview           RealtimeSessionCreateResponseModel = "gpt-4o-mini-realtime-preview"
 	RealtimeSessionCreateResponseModelGPT4oMiniRealtimePreview2024_12_17 RealtimeSessionCreateResponseModel = "gpt-4o-mini-realtime-preview-2024-12-17"
-	RealtimeSessionCreateResponseModelGPTRealtimeMini                    RealtimeSessionCreateResponseModel = "gpt-realtime-mini"
-	RealtimeSessionCreateResponseModelGPTRealtimeMini2025_10_06          RealtimeSessionCreateResponseModel = "gpt-realtime-mini-2025-10-06"
-	RealtimeSessionCreateResponseModelGPTRealtimeMini2025_12_15          RealtimeSessionCreateResponseModel = "gpt-realtime-mini-2025-12-15"
-	RealtimeSessionCreateResponseModelGPTAudio1_5                        RealtimeSessionCreateResponseModel = "gpt-audio-1.5"
-	RealtimeSessionCreateResponseModelGPTAudioMini                       RealtimeSessionCreateResponseModel = "gpt-audio-mini"
-	RealtimeSessionCreateResponseModelGPTAudioMini2025_10_06             RealtimeSessionCreateResponseModel = "gpt-audio-mini-2025-10-06"
-	RealtimeSessionCreateResponseModelGPTAudioMini2025_12_15             RealtimeSessionCreateResponseModel = "gpt-audio-mini-2025-12-15"
+	// Deprecated: Announced shutdown date: 2027-01-20. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	RealtimeSessionCreateResponseModelGPTRealtimeMini           RealtimeSessionCreateResponseModel = "gpt-realtime-mini"
+	RealtimeSessionCreateResponseModelGPTRealtimeMini2025_10_06 RealtimeSessionCreateResponseModel = "gpt-realtime-mini-2025-10-06"
+	// Deprecated: Announced shutdown date: 2027-01-20. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	RealtimeSessionCreateResponseModelGPTRealtimeMini2025_12_15 RealtimeSessionCreateResponseModel = "gpt-realtime-mini-2025-12-15"
+	RealtimeSessionCreateResponseModelGPTAudio1_5               RealtimeSessionCreateResponseModel = "gpt-audio-1.5"
+	// Deprecated: Announced shutdown date: 2027-01-20. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	RealtimeSessionCreateResponseModelGPTAudioMini           RealtimeSessionCreateResponseModel = "gpt-audio-mini"
+	RealtimeSessionCreateResponseModelGPTAudioMini2025_10_06 RealtimeSessionCreateResponseModel = "gpt-audio-mini-2025-10-06"
+	// Deprecated: Announced shutdown date: 2027-01-20. See
+	// https://developers.openai.com/api/docs/deprecations for details and recommended
+	// replacements.
+	RealtimeSessionCreateResponseModelGPTAudioMini2025_12_15 RealtimeSessionCreateResponseModel = "gpt-audio-mini-2025-12-15"
 )
 
 // RealtimeSessionCreateResponseToolChoiceUnion contains all possible properties
@@ -574,17 +597,17 @@ type RealtimeSessionCreateResponseToolChoiceUnion struct {
 }
 
 func (u RealtimeSessionCreateResponseToolChoiceUnion) AsToolChoiceMode() (v responses.ToolChoiceOptions) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseToolChoiceUnion) AsFunctionTool() (v responses.ToolChoiceFunction) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseToolChoiceUnion) AsMcpTool() (v responses.ToolChoiceMcp) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -650,12 +673,12 @@ type RealtimeSessionCreateResponseToolUnion struct {
 }
 
 func (u RealtimeSessionCreateResponseToolUnion) AsFunctionTool() (v RealtimeFunctionTool) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseToolUnion) AsMcpTool() (v RealtimeSessionCreateResponseToolMcpTool) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -668,7 +691,7 @@ func (r *RealtimeSessionCreateResponseToolUnion) UnmarshalJSON(data []byte) erro
 
 // Give the model access to additional tools via remote Model Context Protocol
 // (MCP) servers.
-// [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+// [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
 type RealtimeSessionCreateResponseToolMcpTool struct {
 	// A label for this MCP server, used to identify it in tool calls.
 	ServerLabel string `json:"server_label" api:"required"`
@@ -687,7 +710,11 @@ type RealtimeSessionCreateResponseToolMcpTool struct {
 	// Identifier for service connectors, like those available in ChatGPT. One of
 	// `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
 	// service connectors
-	// [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+	// [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+	//
+	// This field is deprecated for models released after September 1, 2026. Use
+	// `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+	// through a Secure MCP Tunnel.
 	//
 	// Currently supported `connector_id` values are:
 	//
@@ -703,6 +730,8 @@ type RealtimeSessionCreateResponseToolMcpTool struct {
 	// Any of "connector_dropbox", "connector_gmail", "connector_googlecalendar",
 	// "connector_googledrive", "connector_microsoftteams",
 	// "connector_outlookcalendar", "connector_outlookemail", "connector_sharepoint".
+	//
+	// Deprecated: deprecated
 	ConnectorID string `json:"connector_id"`
 	// Whether this MCP tool is deferred and discovered via tool search.
 	DeferLoading bool `json:"defer_loading"`
@@ -770,12 +799,12 @@ type RealtimeSessionCreateResponseToolMcpToolAllowedToolsUnion struct {
 }
 
 func (u RealtimeSessionCreateResponseToolMcpToolAllowedToolsUnion) AsMcpAllowedTools() (v []string) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseToolMcpToolAllowedToolsUnion) AsMcpToolFilter() (v RealtimeSessionCreateResponseToolMcpToolAllowedToolsMcpToolFilter) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -841,12 +870,12 @@ type RealtimeSessionCreateResponseToolMcpToolRequireApprovalUnion struct {
 }
 
 func (u RealtimeSessionCreateResponseToolMcpToolRequireApprovalUnion) AsMcpToolApprovalFilter() (v RealtimeSessionCreateResponseToolMcpToolRequireApprovalMcpToolApprovalFilter) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseToolMcpToolRequireApprovalUnion) AsMcpToolApprovalSetting() (v string) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -976,12 +1005,12 @@ type RealtimeSessionCreateResponseTracingUnion struct {
 }
 
 func (u RealtimeSessionCreateResponseTracingUnion) AsAuto() (v constant.Auto) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u RealtimeSessionCreateResponseTracingUnion) AsTracingConfiguration() (v RealtimeSessionCreateResponseTracingTracingConfiguration) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -1104,6 +1133,10 @@ func (r *RealtimeTranscriptionSessionCreateResponseAudioInput) UnmarshalJSON(dat
 
 // Configuration for input audio noise reduction.
 type RealtimeTranscriptionSessionCreateResponseAudioInputNoiseReduction struct {
+	// Input noise suppression strength. Higher values apply more suppression. Defaults
+	// to 1 when noise reduction is first enabled. Omitting strength from a session
+	// update preserves the current strength.
+	Strength float64 `json:"strength"`
 	// Type of noise reduction. `near_field` is for close-talking microphones such as
 	// headphones, `far_field` is for far-field microphones such as laptop or
 	// conference room microphones.
@@ -1112,6 +1145,7 @@ type RealtimeTranscriptionSessionCreateResponseAudioInputNoiseReduction struct {
 	Type NoiseReductionType `json:"type"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
+		Strength    respjson.Field
 		Type        respjson.Field
 		ExtraFields map[string]respjson.Field
 		raw         string
@@ -1273,12 +1307,12 @@ func (u ClientSecretNewResponseSessionUnion) AsAny() anyClientSecretNewResponseS
 }
 
 func (u ClientSecretNewResponseSessionUnion) AsRealtime() (v RealtimeSessionCreateResponse) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
 func (u ClientSecretNewResponseSessionUnion) AsTranscription() (v RealtimeTranscriptionSessionCreateResponse) {
-	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	_ = apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
 
@@ -1353,12 +1387,14 @@ func (r *ClientSecretNewResponseSessionUnionAudioInput) UnmarshalJSON(data []byt
 // For type safety it is recommended to directly use a variant of the
 // [ClientSecretNewResponseSessionUnion].
 type ClientSecretNewResponseSessionUnionAudioInputNoiseReduction struct {
+	Strength float64 `json:"strength"`
 	// This field is from variant
 	// [RealtimeSessionCreateResponseAudioInputNoiseReduction].
 	Type NoiseReductionType `json:"type"`
 	JSON struct {
-		Type respjson.Field
-		raw  string
+		Strength respjson.Field
+		Type     respjson.Field
+		raw      string
 	} `json:"-"`
 }
 
@@ -1469,15 +1505,6 @@ func (u ClientSecretNewParamsSessionUnion) MarshalJSON() ([]byte, error) {
 }
 func (u *ClientSecretNewParamsSessionUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
-}
-
-func (u *ClientSecretNewParamsSessionUnion) asAny() any {
-	if !param.IsOmitted(u.OfRealtime) {
-		return u.OfRealtime
-	} else if !param.IsOmitted(u.OfTranscription) {
-		return u.OfTranscription
-	}
-	return nil
 }
 
 // Returns a pointer to the underlying variant's property, if present.
@@ -1679,6 +1706,21 @@ type clientSecretNewParamsSessionUnionAudioInputNoiseReduction struct{ any }
 func (u clientSecretNewParamsSessionUnionAudioInputNoiseReduction) AsAny() any { return u.any }
 
 // Returns a pointer to the underlying variant's property, if present.
+func (u clientSecretNewParamsSessionUnionAudioInputNoiseReduction) GetStrength() *float64 {
+	switch vt := u.any.(type) {
+	case *RealtimeAudioConfigInputNoiseReductionParam:
+		if vt.Strength.Valid() {
+			return &vt.Strength.Value
+		}
+	case *RealtimeTranscriptionSessionAudioInputNoiseReductionParam:
+		if vt.Strength.Valid() {
+			return &vt.Strength.Value
+		}
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputNoiseReduction) GetType() *string {
 	switch vt := u.any.(type) {
 	case *RealtimeAudioConfigInputNoiseReductionParam:
@@ -1714,19 +1756,15 @@ func (u clientSecretNewParamsSessionUnionAudioInput) GetTurnDetection() (res cli
 	return res
 }
 
-// Can have the runtime types [*RealtimeAudioInputTurnDetectionServerVadParam],
-// [*RealtimeAudioInputTurnDetectionSemanticVadParam],
-// [*RealtimeTranscriptionSessionAudioInputTurnDetectionServerVadParam],
-// [*RealtimeTranscriptionSessionAudioInputTurnDetectionSemanticVadParam]
+// Can have the runtime types [RealtimeAudioInputTurnDetectionUnionParam],
+// [RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam]
 type clientSecretNewParamsSessionUnionAudioInputTurnDetection struct{ any }
 
 // Use the following switch statement to get the type of the union:
 //
 //	switch u.AsAny().(type) {
-//	case *realtime.RealtimeAudioInputTurnDetectionServerVadParam:
-//	case *realtime.RealtimeAudioInputTurnDetectionSemanticVadParam:
-//	case *realtime.RealtimeTranscriptionSessionAudioInputTurnDetectionServerVadParam:
-//	case *realtime.RealtimeTranscriptionSessionAudioInputTurnDetectionSemanticVadParam:
+//	case realtime.RealtimeAudioInputTurnDetectionUnionParam:
+//	case realtime.RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 //	default:
 //	    fmt.Errorf("not present")
 //	}
@@ -1735,9 +1773,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) AsAny() any { 
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetType() *string {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetType()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetType()
 	}
 	return nil
@@ -1746,9 +1784,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetType() *str
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetCreateResponse() *bool {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetCreateResponse()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetCreateResponse()
 	}
 	return nil
@@ -1757,9 +1795,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetCreateRespo
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetIdleTimeoutMs() *int64 {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetIdleTimeoutMs()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetIdleTimeoutMs()
 	}
 	return nil
@@ -1768,9 +1806,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetIdleTimeout
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetInterruptResponse() *bool {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetInterruptResponse()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetInterruptResponse()
 	}
 	return nil
@@ -1779,9 +1817,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetInterruptRe
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetPrefixPaddingMs() *int64 {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetPrefixPaddingMs()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetPrefixPaddingMs()
 	}
 	return nil
@@ -1790,9 +1828,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetPrefixPaddi
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetSilenceDurationMs() *int64 {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetSilenceDurationMs()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetSilenceDurationMs()
 	}
 	return nil
@@ -1801,9 +1839,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetSilenceDura
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetThreshold() *float64 {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetThreshold()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetThreshold()
 	}
 	return nil
@@ -1812,9 +1850,9 @@ func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetThreshold()
 // Returns a pointer to the underlying variant's property, if present.
 func (u clientSecretNewParamsSessionUnionAudioInputTurnDetection) GetEagerness() *string {
 	switch vt := u.any.(type) {
-	case *RealtimeAudioInputTurnDetectionUnionParam:
+	case RealtimeAudioInputTurnDetectionUnionParam:
 		return vt.GetEagerness()
-	case *RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
+	case RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam:
 		return vt.GetEagerness()
 	}
 	return nil

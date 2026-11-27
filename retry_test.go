@@ -272,7 +272,7 @@ func TestSanitizeBaseURL(t *testing.T) {
 		want    string
 		wantHad bool
 	}{
-		{
+		{ //nolint:gosec // G101: a fake credential the test strips.
 			name:    "password is removed",
 			in:      "https://user:secret@api.example.com/v1",
 			want:    "https://api.example.com/v1",

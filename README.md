@@ -113,6 +113,7 @@ Every knob these examples don't show is on the
 | **[Requests](https://psyb0t.github.io/elelem/requests/)** | `Client` + `Request` + the round loop. One chained builder for streaming, tools, queued user turns, history budgets, generation parameters, and per-provider escape hatches. Nothing here knows which vendor answers. |
 | **[Prompts](https://psyb0t.github.io/elelem/prompts/)** | An immutable `Prompt` carrying the system message, the history and this turn. Build it once, run it against several models from several goroutines. Images, audio and documents are content parts on a user message, and content the model can't read gets refused locally instead of by the provider a round trip later. |
 | **[Tools](https://psyb0t.github.io/elelem/tools/)** | Bounded concurrency, per-tool timeouts, a `PreRun → Handler → OnSuccess\|OnError → PostRun` lifecycle, panic recovery that becomes a tool error instead of taking your process down with it, per-call denial, and tools that inject messages. |
+| **[MCP client](https://psyb0t.github.io/elelem/mcp/)** | `mcp.Connect` reaches a stdio or Streamable HTTP server on MCP 2026-07-28, falling back to 2025-11-25. Its tools become `elelem.Tool` values, and the connection exposes the server's instructions, resources, prompts, argument completion, change notifications, progress and elicitation, with size limits on what an untrusted server can hand back. Roots, sampling and logging stay off. |
 | **[Callbacks](https://psyb0t.github.io/elelem/callbacks/)** | Sixteen observation points: run and round lifecycle, text and reasoning deltas, tool-call start/fragment/result, retries, token limits. Delivery stays ordered even when tools run concurrently. |
 | **[History](https://psyb0t.github.io/elelem/history/)** | Counts the transcript, drops whole units oldest-first, never orphans a tool result. Replace the default sliding window with your own compaction in one call. |
 | **[Retries](https://psyb0t.github.io/elelem/retries/)** | A decorator around any `Driver`. Classifies failures, honors `Retry-After`, stops the instant output starts streaming, and keeps a ledger of what the failed attempts cost you. |
@@ -158,7 +159,7 @@ The full documentation lives at **[https://psyb0t.github.io/elelem/](https://psy
 | [Prompts](https://psyb0t.github.io/elelem/prompts/) | The `Prompt` builder, history and origins, images, audio and documents, and which provider takes what. |
 | [Callbacks](https://psyb0t.github.io/elelem/callbacks/) | The sixteen observation points, their ordering guarantees, and a worked example. |
 | [Tools](https://psyb0t.github.io/elelem/tools/) | Tools, images in tool results, the hook lifecycle, message injection, denial, and the bounds that keep a tool loop honest. |
-| [MCP tools](https://psyb0t.github.io/elelem/mcp/) | Turning an MCP server's tools into elelem tools, over stdio or Streamable HTTP. |
+| [MCP client](https://psyb0t.github.io/elelem/mcp/) | An MCP server over stdio or Streamable HTTP: its tools as elelem tools, plus instructions, resources, prompts, completion, elicitation and progress. |
 | [History](https://psyb0t.github.io/elelem/history/) | Token budgets, transcript units, limiting handlers, counting, and what to persist. |
 | [Retries](https://psyb0t.github.io/elelem/retries/) | The retry decorator, failure classification, and the sentinel taxonomy. |
 | [Structured output](https://psyb0t.github.io/elelem/structured-output/) | `RunInto`, JSON mode, JSON schema, validation and repair. |
@@ -173,8 +174,8 @@ Generated API reference on
 
 ## Development
 
-Every development and CI target runs in `Dockerfile.dev`. The host needs
-Docker and Make only.
+Every Go development and CI target runs in `Dockerfile.dev`, and the docs
+targets in a pinned Node image. The host needs Docker and Make only.
 
 ```bash
 make dev-image      # build the pinned development and CI image
@@ -185,7 +186,7 @@ make lint-fix       # lint + auto-fix
 make test           # go test -race ./...
 make test-coverage  # coverage with minimum threshold
 make sec            # govulncheck + semgrep, writes sec.sarif
-make docs           # build the documentation site into .testing/docs-site
+make docs           # build the Docusaurus documentation site into website/build
 make shell          # shell in the development image
 make help           # every target
 ```

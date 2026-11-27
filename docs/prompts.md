@@ -1,7 +1,6 @@
 ---
 title: "Prompts"
 description: "The immutable elelem Prompt: system message, history and origins, content parts for images, audio and files, and what each provider accepts."
-nav_order: 3
 ---
 
 # Prompts and content

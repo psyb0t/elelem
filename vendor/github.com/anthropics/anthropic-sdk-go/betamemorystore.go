@@ -1,5 +1,3 @@
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
 package anthropic
 
 import (
@@ -9,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/internal/apijson"
@@ -43,22 +42,43 @@ func NewBetaMemoryStoreService(opts ...option.RequestOption) (r BetaMemoryStoreS
 	return
 }
 
-// Create a memory store
+// Create a Memory Store
 func (r *BetaMemoryStoreService) New(ctx context.Context, params BetaMemoryStoreNewParams, opts ...option.RequestOption) (res *BetaManagedAgentsMemoryStore, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
 	path := "v1/memory_stores?beta=true"
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.create", "/v1/memory_stores"), requestconfig.WithSpanCreatedID("gen_ai.memory.store.id", &res, func(created *BetaManagedAgentsMemoryStore) string { return created.ID }))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, params, &res, opts...)
 	return res, err
 }
 
-// Retrieve a memory store
+// Retrieve a Memory Store
 func (r *BetaMemoryStoreService) Get(ctx context.Context, memoryStoreID string, query BetaMemoryStoreGetParams, opts ...option.RequestOption) (res *BetaManagedAgentsMemoryStore, err error) {
-	for _, v := range query.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(query.Betas) > 0 {
+		headerValues := make([]string, len(query.Betas))
+		for i, v := range query.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(query.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", query.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
@@ -66,15 +86,26 @@ func (r *BetaMemoryStoreService) Get(ctx context.Context, memoryStoreID string, 
 		err = errors.New("missing required memory_store_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s?beta=true", memoryStoreID)
+	path := fmt.Sprintf("v1/memory_stores/%s?beta=true", url.PathEscape(memoryStoreID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.retrieve", "/v1/memory_stores/{memory_store_id}"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", memoryStoreID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
 	return res, err
 }
 
-// Update a memory store
+// Update a Memory Store
 func (r *BetaMemoryStoreService) Update(ctx context.Context, memoryStoreID string, params BetaMemoryStoreUpdateParams, opts ...option.RequestOption) (res *BetaManagedAgentsMemoryStore, err error) {
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
@@ -82,20 +113,32 @@ func (r *BetaMemoryStoreService) Update(ctx context.Context, memoryStoreID strin
 		err = errors.New("missing required memory_store_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s?beta=true", memoryStoreID)
+	path := fmt.Sprintf("v1/memory_stores/%s?beta=true", url.PathEscape(memoryStoreID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.update", "/v1/memory_stores/{memory_store_id}"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", memoryStoreID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, params, &res, opts...)
 	return res, err
 }
 
-// List memory stores
+// List Memory Stores
 func (r *BetaMemoryStoreService) List(ctx context.Context, params BetaMemoryStoreListParams, opts ...option.RequestOption) (res *pagination.PageCursor[BetaManagedAgentsMemoryStore], err error) {
 	var raw *http.Response
-	for _, v := range params.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(params.Betas) > 0 {
+		headerValues := make([]string, len(params.Betas))
+		for i, v := range params.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(params.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", params.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22"), option.WithResponseInto(&raw)}, opts...)
 	path := "v1/memory_stores?beta=true"
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.list", "/v1/memory_stores", "created_at[gte]", "created_at[lte]", "include_archived", "limit", "page"))
 	cfg, err := requestconfig.NewRequestConfig(ctx, http.MethodGet, path, params, &res, opts...)
 	if err != nil {
 		return nil, err
@@ -108,15 +151,25 @@ func (r *BetaMemoryStoreService) List(ctx context.Context, params BetaMemoryStor
 	return res, nil
 }
 
-// List memory stores
+// List Memory Stores
 func (r *BetaMemoryStoreService) ListAutoPaging(ctx context.Context, params BetaMemoryStoreListParams, opts ...option.RequestOption) *pagination.PageCursorAutoPager[BetaManagedAgentsMemoryStore] {
 	return pagination.NewPageCursorAutoPager(r.List(ctx, params, opts...))
 }
 
-// Delete a memory store
+// Delete a Memory Store
 func (r *BetaMemoryStoreService) Delete(ctx context.Context, memoryStoreID string, body BetaMemoryStoreDeleteParams, opts ...option.RequestOption) (res *BetaManagedAgentsDeletedMemoryStore, err error) {
-	for _, v := range body.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(body.Betas) > 0 {
+		headerValues := make([]string, len(body.Betas))
+		for i, v := range body.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(body.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", body.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
@@ -124,15 +177,26 @@ func (r *BetaMemoryStoreService) Delete(ctx context.Context, memoryStoreID strin
 		err = errors.New("missing required memory_store_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s?beta=true", memoryStoreID)
+	path := fmt.Sprintf("v1/memory_stores/%s?beta=true", url.PathEscape(memoryStoreID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.delete", "/v1/memory_stores/{memory_store_id}"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", memoryStoreID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodDelete, path, nil, &res, opts...)
 	return res, err
 }
 
-// Archive a memory store
+// Archive a Memory Store
 func (r *BetaMemoryStoreService) Archive(ctx context.Context, memoryStoreID string, body BetaMemoryStoreArchiveParams, opts ...option.RequestOption) (res *BetaManagedAgentsMemoryStore, err error) {
-	for _, v := range body.Betas {
-		opts = append(opts, option.WithHeaderAdd("anthropic-beta", fmt.Sprintf("%v", v)))
+	if len(body.Betas) > 0 {
+		headerValues := make([]string, len(body.Betas))
+		for i, v := range body.Betas {
+			headerValues[i] = fmt.Sprintf("%v", v)
+		}
+		opts = append(opts, requestconfig.RequestOptionFunc(func(cfg *requestconfig.RequestConfig) error {
+			cfg.Request.Header.Set("anthropic-beta", strings.Join(append(headerValues, cfg.Request.Header.Values("anthropic-beta")...), ","))
+			return nil
+		}))
+	}
+	if !param.IsOmitted(body.WorkspaceID) {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", fmt.Sprintf("%v", body.WorkspaceID.Value)))
 	}
 	opts = slices.Concat(r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("anthropic-beta", "agent-memory-2026-07-22")}, opts...)
@@ -140,7 +204,8 @@ func (r *BetaMemoryStoreService) Archive(ctx context.Context, memoryStoreID stri
 		err = errors.New("missing required memory_store_id parameter")
 		return nil, err
 	}
-	path := fmt.Sprintf("v1/memory_stores/%s/archive?beta=true", memoryStoreID)
+	path := fmt.Sprintf("v1/memory_stores/%s/archive?beta=true", url.PathEscape(memoryStoreID))
+	opts = append(opts, requestconfig.WithSpan("anthropic.memory_stores.archive", "/v1/memory_stores/{memory_store_id}/archive"), requestconfig.WithSpanAttribute("gen_ai.memory.store.id", memoryStoreID))
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
 	return res, err
 }
@@ -177,39 +242,51 @@ const (
 // Attach a store to a session via `resources[]` to mount it as a directory the
 // agent can read and write.
 type BetaManagedAgentsMemoryStore struct {
-	// Unique identifier for the memory store (a `memstore_...` tagged ID). Use this
-	// when attaching the store to a session, or in the `{memory_store_id}` path
-	// parameter of subsequent calls.
+	// The unique ID of the memory store (`memstore_...`). Use it to attach the store
+	// to a session.
 	ID string `json:"id" api:"required"`
-	// A timestamp in RFC 3339 format
+	// When the memory store was archived, in RFC 3339, or `null` if it hasn't been.
+	//
+	// Archiving can't be undone. An archived store can't be attached to new sessions.
+	// You can't create or update its memories or update the store. You can still read
+	// and delete its memories, redact their versions, and delete the store.
+	//
+	// See the
+	// [memory guide](https://platform.claude.com/docs/en/managed-agents/memory#archive-a-store)
+	// to learn more about archiving.
+	ArchivedAt time.Time `json:"archived_at" api:"required" format:"date-time"`
+	// When the memory store was created, in RFC 3339.
 	CreatedAt time.Time `json:"created_at" api:"required" format:"date-time"`
+	// Free-text description of what the store contains, up to 1,024 characters.
+	// Included in the agent's system prompt when the store is attached, so word it to
+	// be useful to the agent. Empty string when unset.
+	Description string `json:"description" api:"required"`
+	// Key-value pairs for your own use, such as the end user that the store belongs
+	// to.
+	//
+	// A store has at most 16 pairs. Keys are 1 to 64 characters long and values at
+	// most 512 characters. You can't filter lists by metadata.
+	Metadata map[string]string `json:"metadata" api:"required"`
 	// Human-readable name for the store. 1–255 characters. The store's mount-path slug
 	// under `/mnt/memory/` is derived from this name.
 	Name string `json:"name" api:"required"`
 	// Any of "memory_store".
 	Type BetaManagedAgentsMemoryStoreType `json:"type" api:"required"`
-	// A timestamp in RFC 3339 format
+	// When the memory store was last changed, in RFC 3339.
+	//
+	// Changing its `name`, `description`, or `metadata` updates it. Archiving the
+	// store does too. Changes to the store's memories don't.
 	UpdatedAt time.Time `json:"updated_at" api:"required" format:"date-time"`
-	// A timestamp in RFC 3339 format
-	ArchivedAt time.Time `json:"archived_at" api:"nullable" format:"date-time"`
-	// Free-text description of what the store contains, up to 1024 characters.
-	// Included in the agent's system prompt when the store is attached, so word it to
-	// be useful to the agent. Empty string when unset.
-	Description string `json:"description"`
-	// Arbitrary key-value tags for your own bookkeeping (such as the end user a store
-	// belongs to). Up to 16 pairs; keys 1–64 characters; values up to 512 characters.
-	// Returned on retrieve/list but not filterable.
-	Metadata map[string]string `json:"metadata"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		ID          respjson.Field
+		ArchivedAt  respjson.Field
 		CreatedAt   respjson.Field
+		Description respjson.Field
+		Metadata    respjson.Field
 		Name        respjson.Field
 		Type        respjson.Field
 		UpdatedAt   respjson.Field
-		ArchivedAt  respjson.Field
-		Description respjson.Field
-		Metadata    respjson.Field
 		ExtraFields map[string]respjson.Field
 		raw         string
 	} `json:"-"`
@@ -228,20 +305,37 @@ const (
 )
 
 type BetaMemoryStoreNewParams struct {
-	// Human-readable name for the store. Required; 1–255 characters; no control
-	// characters. The mount-path slug under `/mnt/memory/` is derived from this name
-	// (lowercased, non-alphanumeric runs collapsed to a hyphen). Names need not be
-	// unique within a workspace.
+	// The name of the memory store, 1 to 255 characters long, without control
+	// characters. Names don't have to be unique in a workspace.
+	//
+	// In a session, the store's directory under `/mnt/memory/` is based on this name.
+	// The name is lowercased and every run of characters other than ASCII letters and
+	// digits becomes one hyphen. The session's memory store resource gives the exact
+	// path in `mount_path`.
+	//
+	// See the
+	// [memory guide](https://platform.claude.com/docs/en/managed-agents/memory#how-the-agent-accesses-memory)
+	// to learn more about how agents access memory stores.
 	Name string `json:"name" api:"required"`
-	// Free-text description of what the store contains, up to 1024 characters.
+	// Free-text description of what the store contains, up to 1,024 characters.
 	// Included in the agent's system prompt when the store is attached, so word it to
 	// be useful to the agent.
 	Description param.Opt[string] `json:"description,omitzero"`
-	// Arbitrary key-value tags for your own bookkeeping (such as the end user a store
-	// belongs to). Up to 16 pairs; keys 1–64 characters; values up to 512 characters.
-	// Not visible to the agent.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// Key-value pairs for your own use, such as the end user that the store belongs
+	// to. The agent doesn't see them.
+	//
+	// A store has at most 16 pairs. Keys are 1 to 64 characters long and values at
+	// most 512 characters.
 	Metadata map[string]string `json:"metadata,omitzero"`
-	// Optional header to specify the beta version(s) you want to use.
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -255,24 +349,45 @@ func (r *BetaMemoryStoreNewParams) UnmarshalJSON(data []byte) error {
 }
 
 type BetaMemoryStoreGetParams struct {
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
 
 type BetaMemoryStoreUpdateParams struct {
-	// New description for the store, up to 1024 characters. Pass an empty string to
+	// New description for the store, up to 1,024 characters. Pass an empty string to
 	// clear it.
 	Description param.Opt[string] `json:"description,omitzero"`
-	// New human-readable name for the store. 1–255 characters; no control characters.
-	// Renaming changes the slug used for the store's `mount_path` in sessions created
-	// after the update.
+	// The new name of the memory store, 1 to 255 characters long, without control
+	// characters.
+	//
+	// Sessions created after the change use the new name for the store's directory
+	// under `/mnt/memory/`.
 	Name param.Opt[string] `json:"name,omitzero"`
-	// Metadata patch. Set a key to a string to upsert it, or to null to delete it.
-	// Omit the field to preserve. The stored bag is limited to 16 keys (up to 64 chars
-	// each) with values up to 512 chars.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// Changes to apply to the memory store's metadata. Keys you leave out keep their
+	// values.
+	//
+	// Set a key to a string to add or replace it, or to `null` to remove it. After the
+	// change, the metadata can hold at most 16 key-value pairs. Keys are 1 to 64
+	// characters long and values at most 512 characters.
 	Metadata map[string]string `json:"metadata,omitzero"`
-	// Optional header to specify the beta version(s) you want to use.
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -286,11 +401,9 @@ func (r *BetaMemoryStoreUpdateParams) UnmarshalJSON(data []byte) error {
 }
 
 type BetaMemoryStoreListParams struct {
-	// Return only stores whose `created_at` is at or after this time (inclusive). Sent
-	// on the wire as `created_at[gte]`.
+	// Return only memory stores created at or after this time (inclusive).
 	CreatedAtGte param.Opt[time.Time] `query:"created_at[gte],omitzero" format:"date-time" json:"-"`
-	// Return only stores whose `created_at` is at or before this time (inclusive).
-	// Sent on the wire as `created_at[lte]`.
+	// Return only memory stores created at or before this time (inclusive).
 	CreatedAtLte param.Opt[time.Time] `query:"created_at[lte],omitzero" format:"date-time" json:"-"`
 	// When `true`, archived stores are included in the results. Defaults to `false`
 	// (archived stores are excluded).
@@ -298,10 +411,18 @@ type BetaMemoryStoreListParams struct {
 	// Maximum number of stores to return per page. Must be between 1 and 100. Defaults
 	// to 20 when omitted.
 	Limit param.Opt[int64] `query:"limit,omitzero" json:"-"`
-	// Opaque pagination cursor (a `page_...` value). Pass the `next_page` value from a
-	// previous response to fetch the next page; omit for the first page.
+	// The `next_page` value from a previous response, to get the next page. Omit it to
+	// get the first page.
 	Page param.Opt[string] `query:"page,omitzero" json:"-"`
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
@@ -316,13 +437,29 @@ func (r BetaMemoryStoreListParams) URLQuery() (v url.Values, err error) {
 }
 
 type BetaMemoryStoreDeleteParams struct {
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }
 
 type BetaMemoryStoreArchiveParams struct {
-	// Optional header to specify the beta version(s) you want to use.
+	// Optional header to select the Workspace for this request. The value is a
+	// Workspace ID (for example, `wrkspc_011CZkZaBF1tNoB5wlCeusgy`).
+	//
+	// Only needed for credentials that can act on more than one Workspace. A
+	// credential that belongs to a specific Workspace may omit it; if sent, it must
+	// match that Workspace.
+	WorkspaceID param.Opt[string] `header:"anthropic-workspace-id,omitzero" json:"-"`
+	// This endpoint is in beta: requests must send `agent-memory-2026-07-22` or
+	// `managed-agents-2026-04-01` in this header.
 	Betas []AnthropicBeta `header:"anthropic-beta,omitzero" json:"-"`
 	paramObj
 }

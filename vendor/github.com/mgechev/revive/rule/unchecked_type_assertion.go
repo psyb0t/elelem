@@ -19,10 +19,14 @@ type UncheckedTypeAssertionRule struct {
 	acceptIgnoredAssertionResult bool
 }
 
+var _ lint.ConfigurableRule = (*UncheckedTypeAssertionRule)(nil)
+
 // Configure validates the rule configuration, and configures the rule accordingly.
 //
 // Configuration implements the [lint.ConfigurableRule] interface.
 func (r *UncheckedTypeAssertionRule) Configure(arguments lint.Arguments) error {
+	r.acceptIgnoredAssertionResult = false
+
 	if len(arguments) == 0 {
 		return nil
 	}
@@ -136,7 +140,8 @@ func (w *lintUncheckedTypeAssertion) handleAssignment(n *ast.AssignStmt) {
 	}
 }
 
-// handles "return foo(.*bar)" - one of them is enough to fail as golang does not forward the type cast tuples in return statements.
+// handleReturn handles "return foo(.*bar)" - one of them is enough to fail
+// as Go does not forward the type cast tuples in return statements.
 func (w *lintUncheckedTypeAssertion) handleReturn(n *ast.ReturnStmt) {
 	for _, r := range n.Results {
 		w.requireNoTypeAssert(r)

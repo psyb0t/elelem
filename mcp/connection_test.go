@@ -135,8 +135,11 @@ func TestConnectOverHTTPListsAndCallsTools(t *testing.T) {
 
 	slices.Sort(names)
 	assert.Equal(t, []string{
-		"mcp__remote__echo", "mcp__remote__exit", "mcp__remote__fail",
-		"mcp__remote__mixed", "mcp__remote__shot", "mcp__remote__structured",
+		"mcp__remote__ask", "mcp__remote__askURL", "mcp__remote__echo",
+		"mcp__remote__exit", "mcp__remote__fail", "mcp__remote__finish",
+		"mcp__remote__grow", "mcp__remote__mixed", "mcp__remote__progress",
+		"mcp__remote__shot", "mcp__remote__signIn",
+		"mcp__remote__structured", "mcp__remote__touch",
 	}, names)
 
 	echo := toolNamed(t, connection, "mcp__remote__echo")
@@ -176,15 +179,34 @@ func TestToolResultsMapOntoElelem(t *testing.T) {
 			want: elelem.ToolResult{Content: "it broke", IsError: true},
 		},
 		{
-			name: "parts elelem cannot carry",
+			name: "resources, links, and parts elelem cannot carry",
 			tool: testToolMixed,
-			want: elelem.ToolResult{Content: strings.Join([]string{
-				"[audio content (audio/wav) is not supported]",
-				"[resource link: file:///notes.txt]",
-				"embedded text",
-				"[embedded binary resource file:///b.bin " +
-					"(application/zip) is not supported]",
-			}, "\n")},
+			want: elelem.ToolResult{
+				Content: strings.Join([]string{
+					"[audio content (audio/wav) is not supported]",
+					`[resource link: file:///notes.txt name="notes" ` +
+						`title="Notes" mimeType="text/plain" size=17]`,
+					`[resource link: file:///archive.zip name="archive"]`,
+					"[embedded resource file:///a.txt (text/plain)]",
+					"embedded text",
+					"[embedded resource file:///pixel.png (image/png)]",
+					"[embedded resource file:///b.bin " +
+						"(application/zip, 3 bytes) is not shown]",
+					"[embedded resource file:///c.bin " +
+						"(unknown type, 4 bytes) is not shown]",
+				}, "\n"),
+				Images: []elelem.ImageSource{{
+					Data: testPNG(), MediaType: elelem.MediaTypePNG,
+				}},
+				Metadata: map[string]any{MetadataResourceLinks: []ResourceLink{
+					{
+						URI: testNotesURI, Name: "notes", Title: "Notes",
+						Description: "Shopping notes.", MIMEType: "text/plain",
+						Size: int64(len(testNotesText)),
+					},
+					{URI: testArchiveURI, Name: "archive"},
+				}},
+			},
 		},
 		{
 			name: "structured content",

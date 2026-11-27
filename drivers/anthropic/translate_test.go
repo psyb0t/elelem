@@ -3,6 +3,8 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"slices"
+	"strings"
 	"testing"
 
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
@@ -837,18 +839,496 @@ func TestReasoningCapabilitiesMatchAnthropicModelMatrix(t *testing.T) {
 	}
 }
 
-// Mid-conversation system messages are the wire form of tool-driven system
-// injection. They are deliberately NOT model-gated, so the only thing standing
-// between "a tool injected a system message" and "the model never saw it" is
-// this translation emitting the system role.
-func TestToMidConvSystemMessage(t *testing.T) {
+const (
+	nativeSystemModel   = "claude-opus-4-8"
+	fallbackSystemModel = "claude-sonnet-5"
+)
+
+type wireCacheControl struct {
+	Type string `json:"type"`
+	TTL  string `json:"ttl"`
+}
+
+//nolint:tagliatelle // Provider wire field names are snake_case.
+type wireBlock struct {
+	Type         string            `json:"type"`
+	Text         string            `json:"text"`
+	CacheControl *wireCacheControl `json:"cache_control"`
+}
+
+type wireMessage struct {
+	Role    string      `json:"role"`
+	Content []wireBlock `json:"content"`
+}
+
+// wireMessages decodes params.Messages from the JSON the SDK sends, so the
+// assertions see the request body rather than SDK structs.
+func wireMessages(
+	t *testing.T,
+	params anthropicsdk.MessageNewParams,
+) []wireMessage {
+	t.Helper()
+
+	encoded, err := json.Marshal(params.Messages)
+	require.NoError(t, err, "marshal messages")
+
+	var decoded []wireMessage
+	require.NoError(t, json.Unmarshal(encoded, &decoded), "decode messages")
+
+	return decoded
+}
+
+// wireShape renders each message as "role:block+block", with a system note
+// shown as "note" so the expected layouts read at a glance.
+func wireShape(messages []wireMessage) []string {
+	shape := make([]string, 0, len(messages))
+
+	for _, message := range messages {
+		kinds := make([]string, 0, len(message.Content))
+		for _, block := range message.Content {
+			kind := block.Type
+			if block.Type == "text" &&
+				strings.HasPrefix(block.Text, systemNoteOpen) {
+				kind = "note"
+			}
+
+			kinds = append(kinds, kind)
+		}
+
+		shape = append(shape, message.Role+":"+strings.Join(kinds, "+"))
+	}
+
+	return shape
+}
+
+// assertWireAlternates checks the placement rules the Messages API enforces:
+// user and assistant turns alternate once system messages are set aside, and
+// a system message follows a user turn and precedes an assistant turn or ends
+// the array.
+func assertWireAlternates(t *testing.T, messages []wireMessage) {
+	t.Helper()
+
+	previousTurn := ""
+
+	for index, message := range messages {
+		if message.Role == "system" {
+			require.Positive(t, index, "a system message opens messages")
+			assert.Contains(
+				t,
+				[]string{"user", "system"},
+				messages[index-1].Role,
+				"system message %d must follow a user turn",
+				index,
+			)
+
+			if index+1 < len(messages) {
+				assert.Contains(
+					t,
+					[]string{"assistant", "system"},
+					messages[index+1].Role,
+					"system message %d must precede an assistant turn",
+					index,
+				)
+			}
+
+			continue
+		}
+
+		assert.NotEqual(
+			t,
+			previousTurn,
+			message.Role,
+			"message %d repeats the %s role",
+			index,
+			message.Role,
+		)
+
+		previousTurn = message.Role
+	}
+}
+
+func systemMessage(text string) elelem.Message {
+	return elelem.Message{Role: elelem.RoleSystem, Content: elelem.Text(text)}
+}
+
+func userMessage(text string) elelem.Message {
+	return elelem.Message{Role: elelem.RoleUser, Content: elelem.Text(text)}
+}
+
+func assistantMessage(text string) elelem.Message {
+	return elelem.Message{
+		Role:    elelem.RoleAssistant,
+		Content: elelem.Text(text),
+	}
+}
+
+func toolResult(callID, text string) elelem.Message {
+	return elelem.Message{
+		Role:       elelem.RoleTool,
+		ToolCallID: callID,
+		Content:    elelem.Text(text),
+	}
+}
+
+func toolCallTurn() []elelem.Message {
+	return []elelem.Message{
+		{
+			Role: elelem.RoleAssistant,
+			ToolCalls: []elelem.ToolCall{
+				{ID: "call-1", Name: "logs", Arguments: json.RawMessage(`{}`)},
+				{ID: "call-2", Name: "logs", Arguments: json.RawMessage(`{}`)},
+			},
+		},
+		toolResult("call-1", "a"),
+		toolResult("call-2", "b"),
+	}
+}
+
+func TestSystemMessagePlacement(t *testing.T) {
 	t.Parallel()
 
-	message := toMidConvSystemMessage(elelem.Message{
-		Role:    elelem.RoleSystem,
-		Content: elelem.Text("you are now in maintenance mode"),
-	})
+	toolsThenSystem := append(
+		[]elelem.Message{userMessage("check")},
+		append(toolCallTurn(), systemMessage("data is stale"))...,
+	)
+	toolsSystemUser := append(
+		[]elelem.Message{userMessage("check")},
+		append(
+			toolCallTurn(),
+			systemMessage("data is stale"),
+			userMessage("also this"),
+		)...,
+	)
 
-	assert.Equal(t, anthropicsdk.MessageParamRoleSystem, message.Role)
-	require.Len(t, message.Content, 1)
+	testCases := []struct {
+		name      string
+		model     string
+		messages  []elelem.Message
+		topLevel  []string
+		wantShape []string
+	}{
+		{
+			name:  "leading system messages go top-level",
+			model: nativeSystemModel,
+			messages: []elelem.Message{
+				systemMessage("rules"),
+				systemMessage("more rules"),
+				userMessage("hi"),
+			},
+			topLevel:  []string{"rules", "more rules"},
+			wantShape: []string{"user:text"},
+		},
+		{
+			name:  "between user and assistant, native",
+			model: nativeSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				systemMessage("be brief"),
+				assistantMessage("ok"),
+				userMessage("next"),
+			},
+			wantShape: []string{
+				"user:text", "system:text", "assistant:text", "user:text",
+			},
+		},
+		{
+			name:  "between user and assistant, model without the feature",
+			model: fallbackSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				systemMessage("be brief"),
+				assistantMessage("ok"),
+			},
+			wantShape: []string{"user:text+note", "assistant:text"},
+		},
+		{
+			name:  "unknown model falls back",
+			model: "some-proxy-model",
+			messages: []elelem.Message{
+				userMessage("hi"),
+				systemMessage("be brief"),
+			},
+			wantShape: []string{"user:text+note"},
+		},
+		{
+			name:  "consecutive system messages at the end, native",
+			model: nativeSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				systemMessage("one"),
+				systemMessage("two"),
+			},
+			wantShape: []string{"user:text", "system:text", "system:text"},
+		},
+		{
+			name:  "consecutive system messages, model without the feature",
+			model: fallbackSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				systemMessage("one"),
+				systemMessage("two"),
+				assistantMessage("ok"),
+			},
+			wantShape: []string{"user:text+note+note", "assistant:text"},
+		},
+		{
+			name:     "right after a tool result, native",
+			model:    nativeSystemModel,
+			messages: toolsThenSystem,
+			wantShape: []string{
+				"user:text",
+				"assistant:tool_use+tool_use",
+				"user:tool_result+tool_result",
+				"system:text",
+			},
+		},
+		{
+			name:     "after a tool result and before a user turn",
+			model:    nativeSystemModel,
+			messages: toolsSystemUser,
+			wantShape: []string{
+				"user:text",
+				"assistant:tool_use+tool_use",
+				"user:tool_result+tool_result+note+text",
+			},
+		},
+		{
+			name:  "after an assistant turn and before a user turn",
+			model: nativeSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				assistantMessage("ok"),
+				systemMessage("switch topic"),
+				userMessage("next"),
+			},
+			wantShape: []string{
+				"user:text", "assistant:text", "user:note+text",
+			},
+		},
+		{
+			name:  "after an assistant turn at the end",
+			model: nativeSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				assistantMessage("ok"),
+				systemMessage("wrap up"),
+			},
+			wantShape: []string{"user:text", "assistant:text", "user:note"},
+		},
+		{
+			name:  "between two assistant turns",
+			model: nativeSystemModel,
+			messages: []elelem.Message{
+				userMessage("hi"),
+				assistantMessage("ok"),
+				systemMessage("continue"),
+				assistantMessage("more"),
+			},
+			wantShape: []string{
+				"user:text", "assistant:text", "user:note", "assistant:text",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			params, err := toMessageParams(t.Context(), elelem.DriverRequest{
+				Model:    elelem.Model{ID: tc.model},
+				Messages: tc.messages,
+			})
+			require.NoError(t, err, "translate")
+
+			topLevel := make([]string, 0, len(params.System))
+			for _, block := range params.System {
+				topLevel = append(topLevel, block.Text)
+			}
+
+			if tc.topLevel == nil {
+				tc.topLevel = []string{}
+			}
+
+			assert.Equal(t, tc.topLevel, topLevel, "top-level system")
+
+			messages := wireMessages(t, params)
+			assert.Equal(t, tc.wantShape, wireShape(messages), "wire shape")
+			assertWireAlternates(t, messages)
+		})
+	}
+}
+
+func TestSystemNoteKeepsText(t *testing.T) {
+	t.Parallel()
+
+	params, err := toMessageParams(t.Context(), elelem.DriverRequest{
+		Model: elelem.Model{ID: fallbackSystemModel},
+		Messages: []elelem.Message{
+			userMessage("hi"),
+			systemMessage("be brief"),
+		},
+	})
+	require.NoError(t, err, "translate")
+
+	messages := wireMessages(t, params)
+	require.Len(t, messages, 1, "one user turn")
+	require.Len(t, messages[0].Content, 2, "user text and note")
+	assert.Equal(
+		t,
+		"<system_note>\nbe brief\n</system_note>",
+		messages[0].Content[1].Text,
+		"note text",
+	)
+}
+
+// A system message added after a cache breakpoint must leave every byte up to
+// that breakpoint as it was, or the cached prefix is lost on the next round.
+func TestLaterSystemKeepsCachedPrefix(t *testing.T) {
+	t.Parallel()
+
+	for _, model := range []string{nativeSystemModel, fallbackSystemModel} {
+		t.Run(model, func(t *testing.T) {
+			t.Parallel()
+
+			base := []elelem.Message{
+				{
+					Role:      elelem.RoleSystem,
+					Content:   elelem.Text("rules"),
+					CacheHint: elelem.CacheHintLong,
+				},
+				userMessage("first"),
+				assistantMessage("answer"),
+				{
+					Role:      elelem.RoleUser,
+					Content:   elelem.Text("second"),
+					CacheHint: elelem.CacheHintShort,
+				},
+			}
+
+			before, err := toMessageParams(t.Context(), elelem.DriverRequest{
+				Model:    elelem.Model{ID: model},
+				Messages: base,
+			})
+			require.NoError(t, err, "translate base")
+
+			grown := append(
+				slices.Clone(base),
+				elelem.Message{
+					Role:      elelem.RoleSystem,
+					Content:   elelem.Text("now be brief"),
+					CacheHint: elelem.CacheHintShort,
+				},
+			)
+
+			after, err := toMessageParams(t.Context(), elelem.DriverRequest{
+				Model:    elelem.Model{ID: model},
+				Messages: grown,
+			})
+			require.NoError(t, err, "translate grown")
+
+			beforeSystem, err := json.Marshal(before.System)
+			require.NoError(t, err, "marshal system before")
+
+			afterSystem, err := json.Marshal(after.System)
+			require.NoError(t, err, "marshal system after")
+
+			assert.JSONEq(
+				t,
+				string(beforeSystem),
+				string(afterSystem),
+				"top-level system unchanged",
+			)
+
+			beforeMessages := wireMessages(t, before)
+			afterMessages := wireMessages(t, after)
+
+			require.GreaterOrEqual(t, len(afterMessages), len(beforeMessages))
+
+			for index, message := range beforeMessages {
+				got := afterMessages[index]
+				assert.Equal(t, message.Role, got.Role, "role %d", index)
+				require.GreaterOrEqual(
+					t,
+					len(got.Content),
+					len(message.Content),
+					"message %d lost blocks",
+					index,
+				)
+				assert.Equal(
+					t,
+					message.Content,
+					got.Content[:len(message.Content)],
+					"message %d blocks before the new system message",
+					index,
+				)
+			}
+
+			last := beforeMessages[len(beforeMessages)-1]
+			breakpoint := last.Content[len(last.Content)-1].CacheControl
+			require.NotNil(t, breakpoint, "user breakpoint kept")
+			assert.Equal(t, "ephemeral", breakpoint.Type)
+
+			lastAfter := afterMessages[len(afterMessages)-1]
+			added := lastAfter.Content[len(lastAfter.Content)-1]
+			require.NotNil(t, added.CacheControl, "system hint kept")
+			assert.Equal(t, "ephemeral", added.CacheControl.Type)
+		})
+	}
+}
+
+func TestLaterSystemCountsCacheBreakpoints(t *testing.T) {
+	t.Parallel()
+
+	hinted := func(message elelem.Message) elelem.Message {
+		message.CacheHint = elelem.CacheHintShort
+
+		return message
+	}
+
+	_, err := toMessageParams(t.Context(), elelem.DriverRequest{
+		Model: elelem.Model{ID: nativeSystemModel},
+		Messages: []elelem.Message{
+			hinted(systemMessage("rules")),
+			hinted(userMessage("hi")),
+			hinted(systemMessage("one")),
+			hinted(systemMessage("two")),
+			hinted(systemMessage("three")),
+		},
+	})
+	require.ErrorIs(t, err, elelem.ErrInvalidTranscript, "fifth breakpoint")
+}
+
+func TestSystemMessageNotTranslatedAlone(t *testing.T) {
+	t.Parallel()
+
+	_, err := toAnthropicMessage(
+		t.Context(),
+		nativeSystemModel,
+		systemMessage("rules"),
+	)
+	require.ErrorIs(t, err, elelem.ErrInvalidTranscript)
+}
+
+func TestSupportsMidConversationSystem(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]bool{
+		"claude-opus-4-8":          true,
+		"claude-opus-5":            true,
+		"claude-opus-5-5":          true,
+		"claude-fable-5-2":         true,
+		"claude-mythos-5-1":        true,
+		"claude-sonnet-5-5":        true,
+		"claude-haiku-5-5":         true,
+		"claude-sonnet-5":          false,
+		"claude-opus-4-7":          false,
+		"claude-sonnet-4-6":        false,
+		"claude-haiku-4-5":         false,
+		"claude-opus-4-80":         false,
+		"openrouter/claude-opus-5": false,
+	}
+
+	for id, want := range testCases {
+		assert.Equal(t, want, supportsMidConversationSystem(id), id)
+	}
 }

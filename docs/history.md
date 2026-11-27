@@ -1,7 +1,6 @@
 ---
 title: "History"
 description: "How elelem resolves a token budget, drops whole transcript units oldest first, runs limiting handlers, counts tokens and persists conversations."
-nav_order: 6
 ---
 
 # History and token budgets

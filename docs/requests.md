@@ -1,7 +1,6 @@
 ---
 title: "Requests"
 description: "Every elelem request builder method: terminal calls, streaming, prompt, model, generation parameters, the tool loop, queued input, bounds and Response."
-nav_order: 2
 ---
 
 # Requests

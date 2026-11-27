@@ -53,4 +53,5 @@ const (
 	FieldStatus    = "status"
 	FieldDuration  = "duration"
 	FieldQuery     = "query"
+	FieldReason    = "reason"
 )

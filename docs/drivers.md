@@ -1,7 +1,6 @@
 ---
 title: "Drivers"
 description: "The OpenAI-compatible, Anthropic and Z.ai Coding drivers, their options and capabilities, and the Driver contract for writing a new one."
-nav_order: 9
 ---
 
 # Drivers
@@ -14,6 +13,7 @@ The engine is provider-neutral; drivers are where the vendor lives. elelem ships
 - [The interface](#the-interface)
 - [The one rule](#the-one-rule)
 - [Reasoning on compatible endpoints](#reasoning-on-compatible-endpoints)
+- [System messages on Anthropic](#system-messages-on-anthropic)
 - [Z.ai Coding](#zai-coding)
 - [Capabilities are a promise](#capabilities-are-a-promise)
 - [Errors](#errors)
@@ -110,6 +110,16 @@ Persist `ProviderReasoning` unchanged alongside the message. Its envelope binds 
 
 Each driver's counter budgets only the reasoning its translator replays. These counts remain local estimates, not provider billing. See [history counting](history.md#counting).
 
+## System messages on Anthropic
+
+The Anthropic driver sends system messages according to where they sit in the transcript:
+
+- **System messages at the start** (the `Prompt` system message, and any system messages before the first other message) go in the top-level `system` parameter, in order, each with its own cache hint.
+- **A later system message**, such as a [tool injection](tools.md#message-injection), goes out as a `role: "system"` message in `messages`, at its position, when the model supports [mid-conversation system messages](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages) and the API's placement rule holds: it follows a user turn (tool results count) and comes before an assistant turn or at the end. The supported models are Claude Opus 4.8, the Opus 5, Fable 5 and Mythos 5 families, Claude Sonnet 5.5 and Claude Haiku 5.5. Consecutive system messages are judged together.
+- **Anywhere else**, and on every other model, including unknown model IDs, each later system message becomes a text block in a user turn, wrapped as `<system_note>` ... `</system_note>`. It is appended to the user turn just before it, or it starts a user turn that the next user message joins, so user and assistant turns still alternate. On this path the model reads the instruction with a user turn's authority, not the system prompt's.
+
+Neither path changes the top-level `system` parameter, so an instruction added mid-conversation leaves the earlier prompt byte for byte as it was and a cache breakpoint set before it still hits. A message's cache hint stays on its own block and counts toward the four-breakpoint limit as before. One case moves bytes: a system message that went out natively at the end of one request becomes a note when the next request adds a user message straight after it, because the API refuses a system message before a user turn. The cache is read up to that point and written again after it.
+
 ## Z.ai Coding
 
 `drivers/zaicoding` is the provider-specific choice for Z.ai Coding's
@@ -194,7 +204,6 @@ case. See [retries.md](retries.md#how-failures-are-classified).
 `elelemtest/conformance.Run` is aimed at you, and all shipped drivers run it,
 so it's a live contract, not a document that drifted.
 
-<!-- {% raw %} -->
 ```go
 func TestDriverConformance(t *testing.T) {
 	server := httptest.NewServer(/* a fake provider endpoint */)
@@ -218,7 +227,6 @@ func TestDriverConformance(t *testing.T) {
 	)
 }
 ```
-<!-- {% endraw %} -->
 
 What it checks:
 

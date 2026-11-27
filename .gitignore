@@ -40,3 +40,6 @@ pyrightconfig.json
 !scripts/test-coverage.sh
 
 .testing/
+/website/.docusaurus/
+/website/build/
+/website/node_modules/

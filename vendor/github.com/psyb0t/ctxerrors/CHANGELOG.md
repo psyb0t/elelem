@@ -4,6 +4,59 @@ All notable changes per release. Versions follow [semver](https://semver.org)
 pre-1.0 conventions: minor bumps may include breaking API changes (called out
 explicitly), patch bumps are docs / build / fixes only.
 
+## v0.9.2 (2026-11-09)
+
+Fixes to the v0.9.1 docs and CI. No code changed.
+
+- CI runs lint, tests and govulncheck on pushes to every branch again, as it did before v0.9.1, so Dependabot and other branches get checked before they merge. Badges still publish only from `main`, and tags still release from the `main` run.
+- The tangled-closure and chain-of-doom examples on the Error output page are back to the full v0.9.0 code, including `processPermissions` and the comments v0.9.1 dropped. The chain-of-doom trace was taken from that code, so its line numbers did not match the shortened copy. The tangled-closure trace now shows the line the full code reports.
+- The development guide says a tag must follow its `main` run within a day for the badges job to find the coverage artifact.
+- Smaller doc fixes: `Unwrap` and `Original` on a `Join` result return the `errors.Join` value; the nil-wrap log line starts with a timestamp under the default handler; the file path in a trace is absolute unless you build with `-trimpath`; the unwrapping example names where `startServer` comes from; the error-mapping example declares `user`.
+- `.gitignore` covers `*.local.json` files and the local docs build output (both added in v0.9.1).
+
+## v0.9.1 (2026-11-09)
+
+Documentation site, a reworked CI pipeline and funding links. No code changed.
+
+- The full documentation now lives at https://psyb0t.github.io/ctxerrors/, built by GitHub Pages from `docs/`: wrapping, error output, error mapping, every `commerr` sentinel, an API reference and a development guide. The README is now a short summary that links to it.
+- Doc fixes found while moving the README. `New`, `Wrap`, `Wrapf` and `Join` return a plain `error` holding a `*CTXError`, not a `*CTXError`. `Wrap(nil)` and `Wrapf(nil)` return nil and log the call site through `log/slog`. The example traces show real output with fully qualified function names instead of invented short ones. When more than one error map entry matches, which one wins is undefined.
+- CI runs lint, tests and govulncheck only on pushes to `main`, the weekly schedule and manual runs. A `v*` tag waits for the `main` run of the same commit to pass, then cuts the GitHub release from the tag message and refreshes the badges with that run's coverage. Every job declares its own permissions.
+- The issue-pull workflow runs at hours of its own instead of the hours every repository shared.
+- Added `.github/FUNDING.yml` and a Sponsor section in the README.
+
+## v0.9.0 (2026-10-19)
+
+`Error()` shows the error map's translation again, and the original error is available on request.
+
+- **Behavior change.** When `Wrap`/`Wrapf` match an error map entry, `Error()`
+  prints the mapped sentinel instead of the original message, as it did before
+  v0.8.0. Driver and library error text no longer reaches logs or responses
+  through a translated error.
+- New `CTXError.Original()` returns the error passed to `Wrap`, before
+  translation, and `CTXError.Mapped()` returns the translation, or nil when no
+  entry matched. Get the `*CTXError` with `errors.As` to call them.
+- Unchanged from v0.8.0: `errors.Is` and `errors.As` match both the mapped
+  sentinel and the original chain, and `errors.Unwrap` returns the original
+  error.
+
+## v0.8.0 (2026-10-19)
+
+The error map adds its translation instead of replacing the wrapped error.
+
+- **Behavior change.** When `Wrap`/`Wrapf` match an error map entry, the
+  `*CTXError` keeps the original error and records the mapped one beside it.
+  `errors.Is(err, mapped)` holds as before. `errors.Is(err, original)` now also
+  holds, where it used to be false.
+- `errors.As` finds typed errors in the original chain again. Before, a typed
+  application error that wrapped a mapped foreign error was dropped: an
+  `*ErrNotFound` around `sql.ErrNoRows`, wrapped while `sql.ErrNoRows` was
+  mapped, stopped matching `errors.As`, so an HTTP layer keyed on that type
+  answered 500 instead of 404.
+- `errors.As` also finds a typed mapping target, through the new
+  `CTXError.As`; `CTXError.Is` checks the mapped sentinel the same way.
+- `errors.Unwrap` returns the original error, and `Error()` prints the
+  original message instead of the mapped sentinel's.
+
 ## v0.7.1 — 2026-08-11
 
 Rewrites the `commerr` package doc comment. No code changed.

@@ -17,10 +17,19 @@ func NewMockDriver(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockDriver {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockDriver{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -62,7 +71,7 @@ type MockDriver_Capabilities_Call struct {
 
 // Capabilities is a helper method to define mock.On call
 //   - model elelem.Model
-func (_e *MockDriver_Expecter) Capabilities(model interface{}) *MockDriver_Capabilities_Call {
+func (_e *MockDriver_Expecter) Capabilities(model any) *MockDriver_Capabilities_Call {
 	return &MockDriver_Capabilities_Call{Call: _e.mock.On("Capabilities", model)}
 }
 
@@ -124,7 +133,7 @@ type MockDriver_Complete_Call struct {
 //   - context1 context.Context
 //   - driverRequest elelem.DriverRequest
 //   - fn func(elelem.Delta) error
-func (_e *MockDriver_Expecter) Complete(context1 interface{}, driverRequest interface{}, fn interface{}) *MockDriver_Complete_Call {
+func (_e *MockDriver_Expecter) Complete(context1 any, driverRequest any, fn any) *MockDriver_Complete_Call {
 	return &MockDriver_Complete_Call{Call: _e.mock.On("Complete", context1, driverRequest, fn)}
 }
 
@@ -196,7 +205,7 @@ type MockDriver_ListModels_Call struct {
 
 // ListModels is a helper method to define mock.On call
 //   - context1 context.Context
-func (_e *MockDriver_Expecter) ListModels(context1 interface{}) *MockDriver_ListModels_Call {
+func (_e *MockDriver_Expecter) ListModels(context1 any) *MockDriver_ListModels_Call {
 	return &MockDriver_ListModels_Call{Call: _e.mock.On("ListModels", context1)}
 }
 
@@ -258,7 +267,7 @@ type MockDriver_Stream_Call struct {
 //   - context1 context.Context
 //   - driverRequest elelem.DriverRequest
 //   - fn func(elelem.Delta) error
-func (_e *MockDriver_Expecter) Stream(context1 interface{}, driverRequest interface{}, fn interface{}) *MockDriver_Stream_Call {
+func (_e *MockDriver_Expecter) Stream(context1 any, driverRequest any, fn any) *MockDriver_Stream_Call {
 	return &MockDriver_Stream_Call{Call: _e.mock.On("Stream", context1, driverRequest, fn)}
 }
 

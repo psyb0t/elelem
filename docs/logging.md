@@ -1,7 +1,6 @@
 ---
 title: "Logging"
 description: "elelem logs through log/slog via ctxscope: what DEBUG, INFO, WARN and ERROR carry, scope attributes, and the stable LogReason values to alert on."
-nav_order: 11
 ---
 
 # Logging

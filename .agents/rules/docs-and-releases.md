@@ -1,10 +1,10 @@
 # Docs and releases
 
-- **DR1:** The documentation site is `docs/`, published by GitHub Pages from `main` at https://psyb0t.github.io/elelem/ with the Just the Docs theme (`remote_theme` pinned in `docs/_config.yml`, colors in `docs/_sass/`, the shared visitor tracker in `docs/_includes/head_custom.html`). The site title equals the README H1.
-- **DR2:** Every page has front matter with `title`, a 50 to 170 character `description` and `nav_order`. A child page sets `parent` to the parent's exact title.
+- **DR1:** The documentation site is built by Docusaurus from `docs/` and deployed to GitHub Pages at https://psyb0t.github.io/elelem/ by `.github/workflows/docs.yml`. `website/` holds the site: `docusaurus.config.mjs` (base URL `/elelem/`, the shared visitor tracker under `scripts`, local search), `sidebars.mjs`, `src/css/theme.css` and `static/llms.txt`. The site title equals the README H1.
+- **DR2:** Pages are plain CommonMark that reads on GitHub: no MDX, no Liquid, no HTML wrappers. Front matter is `title` and a 50 to 170 character `description`; only `index.md` adds `sidebar_label` and `slug: /`. A page's URL is its file name, so never rename a page. A new page gets an entry in `website/sidebars.mjs` and a line in `website/static/llms.txt`.
 - **DR3:** Links from `docs/` to files outside it use full `https://github.com/psyb0t/elelem/blob/main/<path>` URLs (`tree/` for directories). README links to the site use full `https://psyb0t.github.io/elelem/...` URLs.
-- **DR4:** Wrap code blocks containing `{{` or `{%` in `<!-- {% raw %} -->` and `<!-- {% endraw %} -->`.
-- **DR5:** After a docs change, run `make docs` and check the built site in `.testing/docs-site`.
+- **DR4:** `website/package.json` pins every package exactly. Change a version there, then run `make docs-lock` and `make docs-audit`. `website/pnpm-workspace.yaml` holds the seven-day release age and the overrides; each override has a comment saying why. Never hand-edit `pnpm-lock.yaml`.
+- **DR5:** After a docs change, run `make docs`, which fails on a broken link or anchor, and check `website/build` under the `/elelem/` base path.
 - **DR6:** A public API or behavior change updates the matching docs page in the same change.
 - **DR7:** Versions follow semver pre-1.0: a minor bump may break the API and says so; a patch is docs, build or fixes only. Commit subjects use conventional prefixes (`feat:`, `fix:`, `docs:`, `ci:`), with `!` for a breaking change.
 - **DR8:** `CHANGELOG.md` entries are `## vX.Y.Z (YYYY-MM-DD)`, a one-line summary that states whether migration is needed, then bullets starting with "Adds", "Changes", "Fixes" or "Removes".

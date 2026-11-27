@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
+	"regexp"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
@@ -62,7 +62,7 @@ func NewMigrateCmd() *cobra.Command {
 		},
 	}
 	flags := cmd.PersistentFlags()
-	flags.String("outfile", ".mockery_v3.yml", "Location of the ouptut v3 file.")
+	flags.String("outfile", ".mockery_v3.yml", "Location of the output v3 file.")
 
 	return cmd
 }
@@ -272,15 +272,50 @@ func checkDeprecatedTemplateVariables(
 				message: "InterfaceNameLower template variable has been deleted. Use \"{{ .InterfaceName | lower }}\" instead",
 			},
 			{
+				name:    "MockName",
+				message: "MockName template variable has been deleted. Use \"{{ .StructName }}\" instead",
+			},
+			{
 				name:    "PackageName",
 				message: "PackageName template variable has been deleted. Use \"{{ .SrcPackageName }}\" instead",
 			},
+			{
+				name:    "PackagePath",
+				message: "PackagePath template variable has been deleted. Use \"{{ .SrcPackagePath }}\" instead",
+			},
 		} {
-			if strings.Contains(fieldAsString, deprecatedVariable.name) {
+			// Match the whole field reference, so that `.InterfaceNameLowerCamel`
+			// is not also reported as `.InterfaceNameLower`, nor the v3
+			// `.SrcPackageName` as `.PackageName`.
+			if regexp.MustCompile(`\.` + deprecatedVariable.name + `\b`).MatchString(fieldAsString) {
 				tbl.Append("template-variable", deprecatedVariable.message)
 			}
 		}
 	}
+}
+
+// renamedTemplateVariables maps v2 template variables to the v3 variables
+// that replaced them with the same value, so they can be rewritten directly.
+var renamedTemplateVariables = []struct {
+	old *regexp.Regexp
+	new string
+}{
+	{old: regexp.MustCompile(`\.MockName\b`), new: ".StructName"},
+	{old: regexp.MustCompile(`\.PackageName\b`), new: ".SrcPackageName"},
+	{old: regexp.MustCompile(`\.PackagePath\b`), new: ".SrcPackagePath"},
+}
+
+// migrateTemplateVariables returns a copy of a v2 template string with the
+// renamed template variables replaced by their v3 names.
+func migrateTemplateVariables(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	migrated := *s
+	for _, v := range renamedTemplateVariables {
+		migrated = v.old.ReplaceAllLiteralString(migrated, v.new)
+	}
+	return &migrated
 }
 
 func migrateConfig(
@@ -317,10 +352,13 @@ func migrateConfig(
 		tbl.Append("deprecated-parameter", "`case` is no longer supported. Use `structname` to specify the name and exported-ness of the output mocks.")
 	}
 	v3.ConfigFile = v2Config.Config
-	if v2Config.Cpuprofile != nil {
-		tbl.Append("deprecated-parameter", "`cpuprofile` is not supported in v3, however we welcome PRs to implement the feature: https://github.com/vektra/mockery/issues/956")
+	v3.Cpuprofile = v2Config.Cpuprofile
+	if v2Config.Profile != nil && *v2Config.Profile != "" {
+		// `profile` was an alias of `cpuprofile` in v2 that took precedence
+		// over it.
+		v3.Cpuprofile = v2Config.Profile
 	}
-	v3.Dir = v2Config.Dir
+	v3.Dir = migrateTemplateVariables(v2Config.Dir)
 	if v2Config.DisableConfigSearch != nil {
 		tbl.Append("deprecated-parameter", "`disable-config-search` is permanently disabled in v3.")
 	}
@@ -364,14 +402,14 @@ func migrateConfig(
 		}
 		v3.TemplateData["mock-build-tags"] = *v2Config.MockBuildTags
 	}
-	v3.StructName = v2Config.MockName
+	v3.StructName = migrateTemplateVariables(v2Config.MockName)
 	if v2Config.Name != nil {
 		tbl.Append("deprecated-parameter", "`name` is no longer supported. Use `structname` instead.")
 	}
 	if v2Config.Note != nil {
 		tbl.Append("deprecated-parameter", "`note` is no longer supported.")
 	}
-	v3.PkgName = v2Config.Outpkg
+	v3.PkgName = migrateTemplateVariables(v2Config.Outpkg)
 	if v2Config.Output != nil {
 		tbl.Append("deprecated-parameter", "`output` was replaced by `dir` in v2. This value is ignored.")
 	}
@@ -380,9 +418,6 @@ func migrateConfig(
 	}
 	if v2Config.Print != nil && *v2Config.Print == true {
 		tbl.Append("deprecated-parameter", "`print` is not supported in v3.")
-	}
-	if v2Config.Profile != nil {
-		tbl.Append("deprecated-parameter", "`profile` is not supported in v3, but PRs are welcome to implement it: https://github.com/vektra/mockery/issues/955")
 	}
 	if v2Config.Quiet != nil && *v2Config.Quiet == true {
 		tbl.Append("deprecated-parameter", "`quiet` is not supported in v3. Use `log-level` instead.")
@@ -398,7 +433,7 @@ func migrateConfig(
 		tbl.Append("deprecated-parameter", "`srcpkg` is not supported in v3. Use the `packages` configuration instead.")
 	}
 	if v2Config.StructName != nil {
-		tbl.Append("deprecated-parameter", "`structname` was replaced by `structname` in v2. This value is ignored.")
+		tbl.Append("deprecated-parameter", "`structname` was replaced by `mockname` in v2. This value is ignored.")
 	}
 	if v2Config.TestOnly != nil {
 		tbl.Append("deprecated-parameter", "`testonly` was replaced by `filename` in v2. This value is ignored and not supported in v3.")
@@ -436,7 +471,7 @@ type V2Config struct {
 	BuildTags                   *string        `yaml:"tags"`             // DELETED: use mock-build-tags instead
 	Case                        *string        `yaml:"case"`             // DELETED: caseness is specified using template variables/functions in `structname`.
 	Config                      *string        `yaml:"config"`
-	Cpuprofile                  *string        `yaml:"cpuprofile"` // DELETED: not an option in v3
+	Cpuprofile                  *string        `yaml:"cpuprofile"`
 	Dir                         *string        `yaml:"dir"`
 	DisableConfigSearch         *bool          `yaml:"disable-config-search"` // DEPRECATED: permanently set to `false` in v3
 	DisableDeprecationWarnings  *bool          `yaml:"disable-deprecation-warnings"`
@@ -464,13 +499,13 @@ type V2Config struct {
 	Output                      *string        `yaml:"output"`        // DELETED: Use `packages` config
 	Packageprefix               *string        `yaml:"packageprefix"` // DEPRECATED: use `pkgname`
 	Print                       *bool          `yaml:"print"`         // DEPRECATED: printing mocks not an option
-	Profile                     *string        `yaml:"profile"`       // DELETED: not an option in v3
+	Profile                     *string        `yaml:"profile"`       // MOVED: moved to `cpuprofile`
 	Quiet                       *bool          `yaml:"quiet"`         // DEPRECATED: deleted in v3 in favor of log-level
 	Recursive                   *bool          `yaml:"recursive"`
 	ReplaceType                 []string       `yaml:"replace-type"`       // DEPRECATED: moved to new schema in v3
 	ResolveTypeAlias            *bool          `yaml:"resolve-type-alias"` // DEPRECATED: permanently set to false in v3
 	SrcPkg                      *string        `yaml:"srcpkg"`             // DELETED: Use `packages` config.
-	StructName                  *string        `yaml:"structname"`         // MOVED: moved to `structname` in v3
+	StructName                  *string        `yaml:"structname"`         // DEPRECATED: replaced by `mockname` in v2
 	TestOnly                    *bool          `yaml:"testonly"`           // DEPRECATED: use `filename` to generate `_test.go` suffix.
 	UnrollVariadic              *bool          `yaml:"unroll-variadic"`    // MOVED: moved to `template-data.unroll-variadic`
 	Version                     *bool          `yaml:"version"`

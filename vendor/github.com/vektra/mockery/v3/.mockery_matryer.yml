@@ -8,11 +8,46 @@ template-data:
   with-resets: True
   boilerplate-file: "./.boilerplate.txt"
 packages:
+  github.com/vektra/mockery/v3/internal/fixtures/embedded_types:
+    config:
+      dir: "{{.InterfaceDir}}/mocks"
+      pkgname: embeddedmocks
+    interfaces:
+      GreeterServer:
+        configs:
+          - template-data:
+              struct-preamble: |
+                embeddedtypes.UnimplementedGreeterServer
+                Metadata extras.Metadata
+                Label string `json:"{{label}}"`
+              add-import:
+                - name: embeddedtypes
+                  pkgPath: github.com/vektra/mockery/v3/internal/fixtures/embedded_types
+                - name: extras
+                  pkgPath: github.com/vektra/mockery/v3/internal/fixtures/embedded_types/metadata
+          - dir: "{{.InterfaceDir}}"
+            pkgname: embeddedtypes
+            structname: MoqGreeterServerLocal
+            template-data:
+              struct-preamble: UnimplementedGreeterServer
+      OtherServer:
+        config:
+          template-data:
+            struct-preamble: embeddedtypes.UnimplementedOtherServer
+            add-import:
+              - name: embeddedtypes
+                pkgPath: github.com/vektra/mockery/v3/internal/fixtures/embedded_types
+      Store:
+        config:
+          template-data:
+            struct-preamble: embeddedtypes.UnimplementedStore[T]
+            add-import:
+              - name: embeddedtypes
+                pkgPath: github.com/vektra/mockery/v3/internal/fixtures/embedded_types
   github.com/vektra/mockery/v3/internal/fixtures:
     config:
       all: false
       include-interface-regex: '.*'
-      exclude-interface-regex: 'RequesterGenerics'
     interfaces:
       Requester:
         configs:
@@ -39,3 +74,42 @@ packages:
       OutputDirWithSamePkgNameAsSrc:
         config:
           dir: "{{.InterfaceDir}}/output_dir"
+  github.com/vektra/mockery/v3/internal/fixtures/matryer_skip_ensure/ensure:
+    config:
+      all: false
+      dir: internal/fixtures/matryer_skip_ensure/mocks
+      pkgname: skipensuremocks
+    interfaces:
+      First:
+        config:
+          filename: mocks_matryer_interface_skip_test.go
+          structname: MoqFirstSkipEnsure
+          template-data:
+            skip-ensure: True
+      Typed:
+        config:
+          filename: mocks_matryer_method_import_test.go
+          template-data:
+            skip-ensure: True
+  github.com/vektra/mockery/v3/internal/fixtures/matryer_skip_ensure/skip:
+    config:
+      all: false
+      dir: internal/fixtures/matryer_skip_ensure/mocks
+      pkgname: skipensuremocks
+      template-data:
+        skip-ensure: True
+    interfaces:
+      First:
+        configs:
+          - filename: mocks_matryer_interface_ensure_test.go
+            structname: MoqFirstEnsure
+            template-data:
+              skip-ensure: False
+          - filename: mocks_matryer_mixed_test.go
+            structname: MoqFirstMixed
+            template-data:
+              skip-ensure: False
+      Second:
+        config:
+          filename: mocks_matryer_mixed_test.go
+          structname: MoqSecondMixed
